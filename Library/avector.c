@@ -36,12 +36,11 @@ init_avector(pavector v, uint dim)
 }
 
 pavector
-init_sub_avector(pavector v, pavector src,
-		 uint dim, uint off)
+init_sub_avector(pavector v, pavector src, uint dim, uint off)
 {
   assert(v != NULL);
   assert(src != NULL);
-  assert(off+dim <= src->dim);
+  assert(off + dim <= src->dim);
 
   v->v = src->v + off;
   v->dim = dim;
@@ -66,7 +65,7 @@ init_column_avector(pavector v, pamatrix src, uint col)
 
   lda = src->ld;
 
-  v->v = src->a + col*lda;
+  v->v = src->a + col * lda;
   v->dim = src->rows;
   v->owner = src;
 
@@ -99,7 +98,7 @@ init_pointer_avector(pavector v, pfield src, uint dim)
 void
 uninit_avector(pavector v)
 {
-  if(!v->owner)
+  if (!v->owner)
     freemem(v->v);
 
   assert(active_avector > 0);
@@ -113,7 +112,7 @@ uninit_avector(pavector v)
 pavector
 new_avector(uint dim)
 {
-  pavector v;
+  pavector  v;
 
   v = (pavector) allocmem(sizeof(avector));
 
@@ -123,10 +122,9 @@ new_avector(uint dim)
 }
 
 pavector
-new_sub_avector(pavector src,
-	       uint dim, uint off)
+new_sub_avector(pavector src, uint dim, uint off)
 {
-  pavector v;
+  pavector  v;
 
   v = (pavector) allocmem(sizeof(avector));
 
@@ -138,7 +136,7 @@ new_sub_avector(pavector src,
 pavector
 new_pointer_avector(pfield src, uint dim)
 {
-  pavector v;
+  pavector  v;
 
   v = (pavector) allocmem(sizeof(avector));
 
@@ -159,7 +157,7 @@ resize_avector(pavector v, uint dim)
 {
   assert(v->owner == NULL);
 
-  if(dim != v->dim) {
+  if (dim != v->dim) {
     freemem(v->v);
     v->v = allocfield(dim);
     v->dim = dim;
@@ -179,10 +177,10 @@ getactives_avector()
 size_t
 getsize_avector(pcavector v)
 {
-  size_t sz;
+  size_t    sz;
 
   sz = sizeof(avector);
-  if(v->owner == NULL)
+  if (v->owner == NULL)
     sz += (size_t) sizeof(field) * v->dim;
 
   return sz;
@@ -191,10 +189,10 @@ getsize_avector(pcavector v)
 size_t
 getsize_heap_avector(pcavector v)
 {
-  size_t sz;
+  size_t    sz;
 
   sz = 0;
-  if(v->owner == NULL)
+  if (v->owner == NULL)
     sz += (size_t) sizeof(field) * v->dim;
 
   return sz;
@@ -207,64 +205,64 @@ getsize_heap_avector(pcavector v)
 void
 clear_avector(pavector v)
 {
-  uint i;
+  uint      i;
 
-  for(i=0; i<v->dim; i++)
+  for (i = 0; i < v->dim; i++)
     v->v[i] = 0.0;
 }
 
 void
 fill_avector(pavector v, field x)
 {
-  uint i;
+  uint      i;
 
-  for(i=0; i<v->dim; i++)
+  for (i = 0; i < v->dim; i++)
     v->v[i] = x;
 }
 
 void
 random_avector(pavector v)
 {
-  uint i;
+  uint      i;
 
-  for(i=0; i<v->dim; i++)
+  for (i = 0; i < v->dim; i++)
     v->v[i] = 2.0 * rand() / RAND_MAX - 1.0;
 }
 
 void
 copy_avector(pcavector v, pavector w)
 {
-  uint i;
+  uint      i;
 
   assert(v->dim == w->dim);
 
-  for(i=0; i<v->dim; i++)
+  for (i = 0; i < v->dim; i++)
     w->v[i] = v->v[i];
 }
 
 void
 copy_sub_avector(pcavector v, pavector w)
 {
-  uint i, n;
+  uint      i, n;
 
   n = UINT_MIN(v->dim, w->dim);
 
-  for(i=0; i<n; i++)
+  for (i = 0; i < n; i++)
     w->v[i] = v->v[i];
 }
 
 void
 print_avector(pcavector v)
 {
-  uint dim = v->dim;
-  uint i;
+  uint      dim = v->dim;
+  uint      i;
 
   (void) printf("avector(%u)\n", dim);
-  if(dim == 0)
+  if (dim == 0)
     return;
 
   (void) printf("  (% .5e", v->v[0]);
-  for(i=1; i<dim; i++)
+  for (i = 1; i < dim; i++)
     (void) printf(" % .5e", v->v[i]);
   (void) printf(")\n");
 }
@@ -275,10 +273,14 @@ print_avector(pcavector v)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-dscal_(const unsigned *n,
-       const double *alpha,
-       double *x,
-       const int *incx);
+
+
+
+
+
+
+
+   dscal_(const unsigned *n, const double *alpha, double *x, const int *incx);
 void
 scale_avector(field alpha, pavector v)
 {
@@ -288,18 +290,16 @@ scale_avector(field alpha, pavector v)
 void
 scale_avector(field alpha, pavector v)
 {
-  uint i;
+  uint      i;
 
-  for(i=0; i<v->dim; i++)
+  for (i = 0; i < v->dim; i++)
     v->v[i] *= alpha;
 }
 #endif
 
 #ifdef USE_BLAS
 IMPORT_PREFIX double
-dnrm2_(const unsigned *n,
-       const double *x,
-       const int *incx);
+          dnrm2_(const unsigned *n, const double *x, const int *incx);
 
 real
 norm2_avector(pcavector v)
@@ -310,11 +310,11 @@ norm2_avector(pcavector v)
 real
 norm2_avector(pcavector v)
 {
-  real sum;
-  uint i;
+  real      sum;
+  uint      i;
 
   sum = 0.0;
-  for(i=0; i<v->dim; i++)
+  for (i = 0; i < v->dim; i++)
     sum += ABSSQR(v->v[i]);
 
   return REAL_SQRT(sum);
@@ -323,11 +323,18 @@ norm2_avector(pcavector v)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX double
+
+
+
+
+
+
+
+
+
+
 ddot_(const unsigned *n,
-      const double *x,
-      const int *incx,
-      const double *y,
-      const int *incy);
+      const double *x, const int *incx, const double *y, const int *incy);
 
 field
 dotprod_avector(pcavector x, pcavector y)
@@ -341,12 +348,12 @@ field
 dotprod_avector(pcavector x, pcavector y)
 {
   register field alpha;
-  uint i;
+  uint      i;
 
   assert(x->dim == y->dim);
 
   alpha = 0.0;
-  for(i=0; i<x->dim; i++)
+  for (i = 0; i < x->dim; i++)
     alpha += CONJ(x->v[i]) * y->v[i];
 
   return alpha;
@@ -355,12 +362,20 @@ dotprod_avector(pcavector x, pcavector y)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
+
+
+
+
+
+
+
+
+
+
 daxpy_(const unsigned *n,
        const double *alpha,
        const double *x,
-       const unsigned *incx,
-       double *y,
-       const unsigned *incy);
+       const unsigned *incx, double *y, const unsigned *incy);
 
 void
 add_avector(field alpha, pcavector x, pavector y)
@@ -373,9 +388,9 @@ add_avector(field alpha, pcavector x, pavector y)
 void
 add_avector(field alpha, pcavector x, pavector y)
 {
-  uint i;
+  uint      i;
 
-  for(i=0; i<x->dim; i++)
+  for (i = 0; i < x->dim; i++)
     y->v[i] += alpha * x->v[i];
 }
 #endif

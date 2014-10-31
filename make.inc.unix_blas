@@ -1,0 +1,9 @@
+# --- Linux, debugging with BLAS/LAPACK
+AR = ar
+ARFLAGS = cru
+RM = rm
+CC = gcc
+GCC = gcc
+CFLAGS = -Wall -g -DUSE_BLAS -DUSE_CAIRO -DUSE_FREEGLUT -DUSE_GTK3 -DUSE_ZLIB `pkg-config --cflags gtk+-3.0 cairo`
+LDFLAGS = -Wall -g
+LIBS = -llapack -lblas -lgfortran -lcairo -lglut -lGLU -lGL -lz -lm `pkg-config --libs gtk+-3.0 cairo`
