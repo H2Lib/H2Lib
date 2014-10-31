@@ -1,0 +1,9 @@
+# --- Linux, optimized with BLAS/LAPACK
+AR = ar
+ARFLAGS = cru
+RM = rm
+CC = gcc
+GCC = gcc
+CFLAGS = -Wall -O3  -march=native -funroll-loops -funswitch-loops `pkg-config --cflags cairo` -DUSE_BLAS -DUSE_CAIRO
+LDFLAGS = -Wall -O3 -march=native
+LIBS = -llapack -lblas -lgfortran -lm `pkg-config --libs cairo`

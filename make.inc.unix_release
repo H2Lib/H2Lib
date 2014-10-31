@@ -1,0 +1,9 @@
+# --- Linux, as many warnings as possible
+AR = ar
+ARFLAGS = cru
+RM = rm
+CC = gcc
+GCC = gcc
+CFLAGS = -Wall -Wextra -pedantic -ansi -O3  -march=native -funroll-loops -funswitch-loops -DUSE_CAIRO `pkg-config --cflags cairo`
+LDFLAGS = -Wall -O3 -march=native
+LIBS = -lm -lcairo `pkg-config --libs cairo`

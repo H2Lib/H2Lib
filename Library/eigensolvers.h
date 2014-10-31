@@ -1,19 +1,22 @@
-
 /* ------------------------------------------------------------
-   This is the file "eigensolvers.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ This is the file "eigensolvers.h" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2009
+ ------------------------------------------------------------ */
 
-/** @file eigensolvers.h
- *  @author Steffen B&ouml;rm */
+/**
+ * @file eigensolvers.h
+ * @author Steffen B&ouml;rm
+ */
 
 #ifndef EIGENSOLVERS_H
 #define EIGENSOLVERS_H
 
-/** @defgroup eigensolvers eigensolvers
+/**
+ *  @defgroup eigensolvers eigensolvers
  *  @brief Solve symmetric eigenproblems and compute singular value
  *     decompositions.
- *  @{ */
+ *  @{
+ */
 
 /** @brief Tridiagonal matrix. */
 typedef struct _tridiag tridiag;
@@ -27,37 +30,50 @@ typedef const tridiag *pctridiag;
 #include "amatrix.h"
 #include "settings.h"
 
-/** @brief Tridiagonal matrix @f$T@f$, represented by vectors containing
- *    the diagonal, sub- and superdiagonal. */
+/**
+ * @brief Tridiagonal matrix @f$T@f$, represented by vectors containing
+ *    the diagonal, sub- and superdiagonal.
+ */
 struct _tridiag {
-  /** @brief Diagonal represented by the vector
+  /**
+   * @brief Diagonal represented by the vector
    *    @f$(t_{11},t_{22},\ldots,t_{nn})@f$,
-   *    dimension <tt>dim</tt>. */
+   *    dimension <tt>dim</tt>.
+   */
   pfield d;
 
-  /** @brief Subdiagonal represented by the vector
+  /**
+   * @brief Subdiagonal represented by the vector
    *    @f$(t_{21},t_{32},\ldots,t_{n,n-1})@f$,
-   *    dimension <tt>dim-1</tt>. */
+   *    dimension <tt>dim-1</tt>.
+   */
   pfield l;
-  
-  /** @brief Superdiagonal represented by the vector
+
+  /**
+   * @brief Superdiagonal represented by the vector
    *    @f$(t_{12},t_{23},\ldots,t_{n-1,n})@f$,
-   *    dimension <tt>dim-1</tt>. */
+   *    dimension <tt>dim-1</tt>.
+   */
   pfield u;
 
-  /** @brief Matrix dimension. */
+  /**
+   * @brief Matrix dimension.
+   */
   uint dim;
 
-  /** @brief If this a submatrix, this points to the supermatrix it
-   *    was taken from. */
+  /**
+   * @brief If this a submatrix, this points to the supermatrix it
+   *    was taken from.
+   */
   ptridiag owner;
 };
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ Constructors and destructors
+ ------------------------------------------------------------ */
 
-/** @brief Initialize a @ref tridiag object.
+/**
+ * @brief Initialize a @ref tridiag object.
  *
  *  Sets up the components of the object and allocates storage for
  *  the coefficient vectors.
@@ -70,7 +86,8 @@ struct _tridiag {
 HEADER_PREFIX ptridiag
 init_tridiag(ptridiag T, uint dim);
 
-/** @brief Initialize a @ref tridiag object to represent a submatrix.
+/**
+ * @brief Initialize a @ref tridiag object to represent a submatrix.
  *
  *  Sets up the components of the object and uses part of the storage
  *  of another @ref amatrix for the coefficient vectors, leading to a
@@ -137,8 +154,8 @@ HEADER_PREFIX void
 del_tridiag(ptridiag T);
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ Simple utility functions
+ ------------------------------------------------------------ */
 
 /** @brief Copy a matrix into another matrix, @f$T_{\rm copy} \gets T@f$.
  *
@@ -167,9 +184,9 @@ HEADER_PREFIX real
 check_lower_tridiag(pctridiag T, pcamatrix Ts);
 
 /* ------------------------------------------------------------
-   Compute eigenvalues and eigenvectors,
-   only for self-adjoint tridiagonal matrices
-   ------------------------------------------------------------ */
+ Compute eigenvalues and eigenvectors,
+ only for self-adjoint tridiagonal matrices
+ ------------------------------------------------------------ */
 
 /** @brief Perform one implicit QR step on a self-adjoint tridiagonal
  *  matrix.
@@ -247,8 +264,7 @@ eig_tridiag(ptridiag T, pamatrix Q);
  *  @param Q If <tt>Q!=0</tt>, this matrix will be filled with the
  *    unitary transformation @f$Q@f$. */
 HEADER_PREFIX void
-sb_tridiagonalize_amatrix(pamatrix A,
-			  ptridiag T, pamatrix Q);
+sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q);
 
 /** @brief Solve a self-adjoint eigenproblem.
  *
@@ -295,8 +311,8 @@ HEADER_PREFIX uint
 geig_amatrix(pamatrix A, pamatrix M, pavector lambda, pamatrix Q);
 
 /* ------------------------------------------------------------
-   Singular value decomposition of a sub-bidiagonal matrix
-   ------------------------------------------------------------ */
+ Singular value decomposition of a sub-bidiagonal matrix
+ ------------------------------------------------------------ */
 
 /** @brief Perform one step of the Golub-Kahan iteration on a lower
  *  bidiagonal matrix.
@@ -389,8 +405,7 @@ svd_tridiag(ptridiag T, pamatrix U, pamatrix Vt);
  *  @param Vt If <tt>Vt!=0</tt>, this matrix will be filled with the
  *    adjoint unitary transformation @f$V^*@f$. */
 HEADER_PREFIX void
-sb_bidiagonalize_amatrix(pamatrix A,
-			 ptridiag T, pamatrix U, pamatrix Vt);
+sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt);
 
 /** @brief Compute the SVD of a matrix.
  *
@@ -398,14 +413,16 @@ sb_bidiagonalize_amatrix(pamatrix A,
  *  matrix @f$T@f$ such that @f$A = U T V^*@f$.
  *
  *  @param A Matrix @f$A@f$, will be overwritten by the function.
- *  @param T Bidiagonal matrix @f$@f$.
+ *  @param work Auxiliary storage, dimension at least as large as
+ *    the maximum of the number of rows and of columns.
+ *  @param T Bidiagonal matrix @f$T@f$.
  *  @param U If <tt>U!=0</tt>, this matrix will be filled with the
  *    unitary transformation @f$U@f$.
  *  @param Vt If <tt>Vt!=0</tt>, this matrix will be filled with the
  *    adjoint unitary transformation @f$V^*@f$. */
 HEADER_PREFIX void
-bidiagonalize_amatrix(pamatrix A, pavector work,
-		      ptridiag T, pamatrix U, pamatrix Vt);
+bidiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix U,
+    pamatrix Vt);
 
 /** @brief Compute the SVD of a matrix.
  *
@@ -426,8 +443,8 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
  *  @param maxiter Upper bound for the number of Golub-Kahan steps.
  *  @returns Number of Golub-Kahan steps. */
 HEADER_PREFIX uint
-sb_svd_amatrix(pamatrix A,
-	       pavector sigma, pamatrix U, pamatrix Vt, uint maxiter);
+sb_svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt,
+    uint maxiter);
 
 /** @brief Compute the SVD of a matrix.
  *
@@ -446,6 +463,24 @@ sb_svd_amatrix(pamatrix A,
  *    iteration did not converge. */
 HEADER_PREFIX uint
 svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt);
+
+/** @brief Compute the SVD of a matrix and explicitly check the result.
+ *
+ *  Compute the factorization @f$A = U \Sigma V^*@f$ with a real diagonal
+ *  matrix @f$\Sigma=\mathop{\operatorname{diag}}(\sigma_1,\ldots,\sigma_k)@f$,
+ *  @f$\sigma_1\geq\sigma_2\geq\ldots@f$ and unitary matrices @f$U@f$ and
+ *  @f$V@f$.
+ *
+ *  @param A Matrix @f$A@f$, will be overwritten by the function.
+ *  @param sigma Singular values @f$\sigma_1,\sigma_2,\ldots@f$.
+ *  @param U If <tt>U!=0</tt>, this matrix will be filled with the
+ *    unitary transformation @f$U@f$.
+ *  @param Vt If <tt>Vt!=0</tt>, this matrix will be filled with the
+ *    adjoint unitary transformation @f$V^*@f$.
+ *  @returns Zero on successful completion, non-zero if the Golub-Kahan
+ *    iteration did not converge. */
+HEADER_PREFIX uint
+svd_verified_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt);
 
 /** @} */
 

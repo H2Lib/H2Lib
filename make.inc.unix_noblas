@@ -1,0 +1,9 @@
+# --- Unix, optimized, no BLAS/LAPACK
+AR = ar
+ARFLAGS = cru
+RM = rm
+CC = gcc
+GCC = gcc
+CFLAGS = -Wall -O3 -funroll-loops -funswitch-loops
+LDFLAGS =
+LIBS = -lm
