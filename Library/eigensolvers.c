@@ -15,15 +15,13 @@
 #include "factorizations.h"
 
 /** @brief "Machine accuracy" for QR eigenvalue iteration */
-#define H2_QR_EPS 1e-15
+#define H2_QR_EPS 1e-13
 
 /** @brief "Machine accuracy" for SVD iteration */
-#define H2_SVD_EPS 1e-16
+#define H2_SVD_EPS 1e-13
 
 /** @brief Tolerance for SVD verification */
 #define H2_SVD_TOL 3e-10
-
-#undef USE_BLAS
 
 /* ------------------------------------------------------------
  Constructors and destructors
