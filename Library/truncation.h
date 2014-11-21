@@ -96,6 +96,10 @@ new_relfrob_truncmode();
  * @brief Create a new @ref truncmode object with block relative euclidean
  * error norm.
  *
+ * @attention This function is intended for use with @ref h2matrix objects
+ * only. @ref hmatrix objects handle truncation differently and always use
+ * block-relative truncation.
+ *
  * @return A new @ref truncmode object is returned using block relative
  * euclidean error norm.
  */
@@ -105,6 +109,10 @@ new_blockreleucl_truncmode();
 /**
  * @brief Create a new @ref truncmode object with block relative frobenius
  * error norm.
+ *
+ * @attention This function is intended for use with @ref h2matrix objects
+ * only. @ref hmatrix objects handle truncation differently and always use
+ * block-relative truncation.
  *
  * @return A new @ref truncmode object is returned using block relative
  * frobenius error norm.
