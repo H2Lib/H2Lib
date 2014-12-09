@@ -146,6 +146,8 @@ build_regular_cluster(pclustergeometry cf, uint size, uint * idx,
     size0 = 0;
     size1 = 0;
 
+    update_point_bbox_clustergeometry(cf, size, idx);
+
     if (direction < cf->dim - 1) {
       newd = direction + 1;
     }
