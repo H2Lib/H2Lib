@@ -437,32 +437,12 @@ sb_muleig_tridiag(ptridiag T, pamatrix Q, uint maxiter)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dsteqr_(const char *compz,
 	const unsigned *n,
 	double *d,
 	double *e, double *z, const unsigned *ldz, double *work, int *info);
 
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dstev_(const char *jobz,
        const unsigned *n,
        double *d,
@@ -633,16 +613,6 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dlarf_(const char *side,
        const unsigned *m,
        const unsigned *n,
@@ -799,18 +769,12 @@ sb_eig_amatrix(pamatrix A, pavector lambda, pamatrix Q, uint maxiter)
 }
 
 #ifdef USE_BLAS
+/* Remark: if compiled the wrong way, DORMQR, and by extension DORMBR
+ * and DGESVD, are currently not thread-safe.
+ * gfortran does the right thing if called with "-frecursive", but this
+ * appears not to be the standard in, e.g., OpenSUSE Linux. */
 #if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dsyev_(const char *jobz,
        const char *uplo,
        const unsigned *n,
@@ -1279,16 +1243,6 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dbdsqr_(const char *uplo,
 	const unsigned *n,
 	const unsigned *ncvt,
@@ -1648,16 +1602,6 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dlarf_(const char *side,
        const unsigned *m,
        const unsigned *n,
@@ -2038,16 +1982,6 @@ sb_svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt,
 #ifdef USE_BLAS
 #if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dgesvd_(const char *jobu,
 	const char *jobvt,
 	const unsigned *m,

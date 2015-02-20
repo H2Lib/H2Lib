@@ -36,16 +36,6 @@ diagsolve_amatrix_avector(bool atrans, pcamatrix a, pavector x)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dscal_(const unsigned *n,
        const double *alpha, double *x, const unsigned *incx);
 
@@ -104,16 +94,6 @@ diagsolve_amatrix(bool atrans, pcamatrix a, bool xtrans, pamatrix x)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dscal_(const unsigned *n,
        const double *alpha, double *x, const unsigned *incx);
 
@@ -176,16 +156,6 @@ diageval_amatrix(bool atrans, pcamatrix a, bool xtrans, pamatrix x)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dtrtrs_(const char *uplo,
 	const char *trans,
 	const char *diag,
@@ -311,16 +281,6 @@ triangularsolve_amatrix_avector(bool alower, bool aunit, bool atrans,
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dtrsm_(const char *side,
        const char *uplo,
        const char *transa,
@@ -579,16 +539,6 @@ triangularsolve_amatrix(bool alower, bool aunit, bool atrans, pcamatrix a,
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dtrmv_(const char *uplo,
        const char *trans,
        const char *diag,
@@ -596,16 +546,6 @@ dtrmv_(const char *uplo,
        const double *a, const unsigned *lda, double *x, const unsigned *incx);
 
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dgemv_(const char *trans,
        const unsigned *m,
        const unsigned *n,
@@ -843,16 +783,6 @@ triangulareval_amatrix_avector(bool alower, bool aunit, bool atrans,
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dtrmm_(const char *side,
        const char *uplo,
        const char *trans,
@@ -863,16 +793,6 @@ dtrmm_(const char *side,
        const double *a, const unsigned *lda, double *b, const unsigned *ldb);
 
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dgemm_(const char *transa,
        const char *transb,
        const unsigned *m,
@@ -1334,16 +1254,6 @@ triangulareval_amatrix(bool alower, bool aunit, bool atrans, pcamatrix a,
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dger_(const unsigned *m,
       const unsigned *n,
       const double *alpha,
@@ -1619,30 +1529,10 @@ copy_upper_amatrix(pcamatrix a, bool aunit, pamatrix b)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dscal_(const unsigned *n,
        const double *alpha, double *x, const unsigned *incx);
 
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dger_(const unsigned *m,
       const unsigned *n,
       const double *alpha,
@@ -1725,16 +1615,6 @@ lrsolve_amatrix_avector(pcamatrix a, pavector x)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dpotrf_(const char *uplo,
 	const unsigned *n, double *a, const unsigned *lda, int *info);
 
@@ -1804,30 +1684,10 @@ cholsolve_amatrix_avector(pcamatrix a, pavector x)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dscal_(const unsigned *n,
        const double *alpha, double *x, const unsigned *incx);
 
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dsyr_(const char *uplo,
       const unsigned *n,
       const double *alpha,
@@ -1915,16 +1775,6 @@ ldltsolve_amatrix_avector(pcamatrix a, pavector x)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dgeqrf_(const unsigned *m,
 	const unsigned *n,
 	double *a,
@@ -2019,18 +1869,12 @@ qrdecomp_amatrix(pamatrix a, pavector tau)
 }
 #endif
 
-#ifdef USE_BLAS
+/* Remark: if compiled the wrong way, DORMQR is currently not
+ * thread-safe.
+ * gfortran does the right thing if called with "-frecursive", but this
+ * appears not to be the standard in, e.g., OpenSUSE Linux. */
+#if defined(USE_BLAS) && (defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP))
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dormqr_(const char *side,
 	const char *trans,
 	const unsigned *m,
@@ -2263,16 +2107,6 @@ qrinvert_amatrix(pamatrix a)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dorgqr_(const unsigned *m,
 	const unsigned *n,
 	const unsigned *k,
