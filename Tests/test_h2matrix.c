@@ -97,8 +97,8 @@ main()
   add_avector(-1.0, x, b);
   error = norm2_avector(b) / norm2_avector(x);
   (void) printf("  Accuracy %g, %sokay\n", error,
-		IS_IN_RANGE(2.0e-13, error, 2.0e-12) ? "" : "    NOT ");
-  if (!IS_IN_RANGE(2.0e-13, error, 2.0e-12))
+		IS_IN_RANGE(2.0e-13, error, 3.0e-12) ? "" : "    NOT ");
+  if (!IS_IN_RANGE(2.0e-13, error, 3.0e-12))
     problems++;
 
   rwfh2 = prepare_row_clusteroperator(h2copy->rb, h2copy->cb, tm);
@@ -196,8 +196,8 @@ main()
   addmul_h2matrix(-1.0, L, false, R, h2copy, rwfh2, cwfh2, tm, tol);
   error = norm2_h2matrix(h2copy) / error;
   (void) printf("  Accuracy %g, %sokay\n", error,
-		IS_IN_RANGE(4.0e-15, error, 4.0e-14) ? "" : "    NOT ");
-  if (!IS_IN_RANGE(4.0e-15, error, 4.0e-14))
+		IS_IN_RANGE(4.0e-15, error, 5.0e-14) ? "" : "    NOT ");
+  if (!IS_IN_RANGE(4.0e-15, error, 5.0e-14))
     problems++;
 
 
