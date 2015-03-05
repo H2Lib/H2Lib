@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 2.6.0)
+project(H2Lib)
+
+option(USE_BLAS "Whether to use BLAS and LAPACK" ON)
+option(BUILD_TESTS "Whether to build the test suite" ON)
+option(BUILD_DOCS "Whether to build the documentation" ON)
+
+if(USE_BLAS)
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+  add_definitions(-DUSE_BLAS)
+endif()
+
+add_subdirectory(Library)
+if(BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(Tests)
+endif()
+if(BUILD_DOCS)
+  add_subdirectory(Doc)
+endif()
