@@ -13,7 +13,7 @@ include_directories(${PROJECT_SOURCE_DIR}/Library)
 foreach(t ${TESTS})
   set(test_executable test_${t})
   add_executable(${test_executable} ${test_executable}.c)
-  target_link_libraries(${test_executable} H2LIB)
+  target_link_libraries(${test_executable} H2LIB ${gcov})
   add_test(${t} ${test_executable})
 endforeach()
 

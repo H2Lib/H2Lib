@@ -9,6 +9,9 @@ can find the corresponding e-mail address in the file "AUTHORS".
 
 Enjoy.
 
+[![Build Status](https://travis-ci.org/d-meiser/H2Lib.png?branch=master)](https://travis-ci.org/d-meiser/H2Lib)
+[![Coverage Status](https://coveralls.io/repos/d-meiser/H2Lib/badge.svg?branch=master)](https://coveralls.io/r/d-meiser/H2Lib?branch=master)
+
 
 ## Obtaining the public version of H2Lib
 
