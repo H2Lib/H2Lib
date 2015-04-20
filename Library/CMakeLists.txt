@@ -1,0 +1,83 @@
+set(H2LIB_SRCS
+   aca.c
+   amatrix.c
+   avector.c
+   basic.c
+   bem2d.c
+   bem3d.c
+   block.c
+   clusterbasis.c
+   cluster.c
+   clustergeometry.c
+   clusteroperator.c
+   curve2d.c
+   eigensolvers.c
+   factorizations.c
+   gaussquad.c
+   h2arith.c
+   h2compression.c
+   h2matrix.c
+   h2update.c
+   harith.c
+   hcoarsen.c
+   hmatrix.c
+   krylov.c
+   laplacebem2d.c
+   laplacebem3d.c
+   macrosurface3d.c
+   parameters.c
+   rkmatrix.c
+   settings.c
+   singquad1d.c
+   singquad2d.c
+   sparsematrix.c
+   sparsepattern.c
+   surface3d.c
+   truncation.c
+   uniform.c
+   )
+set(H2LIB_HDRS
+   aca.h
+   amatrix.h
+   avector.h
+   basic.h
+   bem2d.h
+   bem3d.h
+   block.h
+   clusterbasis.h
+   clustergeometry.h
+   cluster.h
+   clusteroperator.h
+   curve2d.h
+   eigensolvers.h
+   factorizations.h
+   gaussquad.h
+   h2arith.h
+   h2compression.h
+   h2matrix.h
+   h2update.h
+   harith.h
+   hcoarsen.h
+   hmatrix.h
+   krylov.h
+   laplacebem2d.h
+   laplacebem3d.h
+   macrosurface3d.h
+   parameters.h
+   rkmatrix.h
+   settings.h
+   singquad1d.h
+   singquad2d.h
+   sparsematrix.h
+   sparsepattern.h
+   surface3d.h
+   truncation.h
+   uniform.h
+   )
+
+add_library(H2LIB ${H2LIB_SRCS} ${H2LIB_HDRS})
+if(USE_BLAS)
+  target_link_libraries(H2LIB ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+endif()
+install(TARGETS H2LIB DESTINATION lib)
+install(FILES ${H2LIB_HDRS} DESTINATION include)
