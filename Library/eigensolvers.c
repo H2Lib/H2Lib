@@ -597,13 +597,13 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
 	for (j = 0; j < n; j++) {
 	  gamma = qa[j + (k + 1) * ldq];
 	  for (i = k + 2; i < n; i++)
-	    gamma += aa[i + k * ldq] * qa[j + i * ldq];
+	    gamma += aa[i + k * lda] * qa[j + i * ldq];
 
 	  gamma *= beta;
 
 	  qa[j + (k + 1) * ldq] -= gamma;
 	  for (i = k + 2; i < n; i++)
-	    qa[j + i * ldq] -= gamma * CONJ(aa[i + k * ldq]);
+	    qa[j + i * ldq] -= gamma * CONJ(aa[i + k * lda]);
 	}
       }
     }
