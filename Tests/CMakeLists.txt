@@ -1,5 +1,5 @@
 ##############################################################
-###    Include Directories                                 ###
+###    Include Directories and External Libraries          ###
 ##############################################################
 include_directories( ${PROJECT_SOURCE_DIR}/Library )
 
@@ -7,7 +7,7 @@ find_library(M_LIB m)
 
 
 ##############################################################
-###    Executables                                         ###
+###    Build Executables                                   ###
 ##############################################################
 set(SRC
   test_amatrix.c test_eigen.c test_h2compression.c 

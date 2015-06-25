@@ -2,7 +2,7 @@
 ###    General                                             ###
 ##############################################################
 # general settings
-cmake_minimum_required (VERSION 2.8.11)
+cmake_minimum_required (VERSION 2.8.11) # ???
 project (H2Lib)
 
 # The version number.
@@ -21,10 +21,12 @@ add_subdirectory (Tests)
 ###    Set Compiler Flags                                  ###
 ##############################################################
 # Compiler definitions
-add_definitions("-O3 -Wall")
+#add_definitions("-O3 -Wall")
 
 # Compiler flags
-#set(CMAKE_C_FLAGS "-O3 -Wall ${DOLFIN_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
+set(CMAKE_C_FLAGS "-O3 -Wall -march=native -funroll-loops -funswitch-loops ${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS_DEBUG "-g -Wall ${CMAKE_C_FLAGS_DEBUG}")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -Wall ${CMAKE_C_FLAGS_RELEASE}")
 
 
 ##############################################################
