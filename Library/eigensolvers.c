@@ -14,10 +14,12 @@
 #include "basic.h"
 #include "factorizations.h"
 
-/** @brief "Machine accuracy" for QR eigenvalue iteration */
+/** @brief Error tolerance for QR eigenvalue iteration */
 #define H2_QR_EPS 1e-14
-/** @brief "Machine accuracy" for SVD iteration */
+/** @brief Error tolerance for SVD iteration */
 #define H2_SVD_EPS 1e-14
+/** @brief Bound for a number that is essentially zero */
+#define H2_ALMOST_ZERO 1e-300
 
 /** @brief Tolerance for SVD verification */
 #define H2_SVD_TOL 3e-10
@@ -545,7 +547,7 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
       norm2 += ABSSQR(aa[i + k * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 == 0.0) {
+    if (norm2 <= H2_ALMOST_ZERO) {
       d[k] = aa[k + k * lda];
       l[k] = 0.0;
       u[k] = 0.0;
@@ -559,61 +561,54 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
       /* Compute 2 / |v|^2 */
       beta = 1.0 / (norm2 + ABS(first) * norm);
 
-      if (isinf(beta)) {
-	d[k] = aa[k + k * lda];
-	l[k] = 0.0;
-	u[k] = 0.0;
-      }
-      else {
-	/* Normalize reflection vector */
+      /* Normalize reflection vector */
+      for (i = k + 2; i < n; i++)
+	aa[i + k * lda] /= gamma;
+      beta *= ABSSQR(gamma);
+      
+      /* Compute k-th column */
+      d[k] = aa[k + k * lda];
+      l[k] = alpha;
+      u[k] = CONJ(alpha);
+      
+      /* Update remaining columns */
+      for (j = k + 1; j < n; j++) {
+	gamma = aa[(k + 1) + j * lda];
 	for (i = k + 2; i < n; i++)
-	  aa[i + k * lda] /= gamma;
-	beta *= ABSSQR(gamma);
+	  gamma += CONJ(aa[i + k * lda]) * aa[i + j * lda];
 	
-	/* Compute k-th column */
-	d[k] = aa[k + k * lda];
-	l[k] = alpha;
-	u[k] = CONJ(alpha);
+	gamma *= beta;
 	
-	/* Update remaining columns */
-	for (j = k + 1; j < n; j++) {
-	  gamma = aa[(k + 1) + j * lda];
+	aa[(k + 1) + j * lda] -= gamma;
+	for (i = k + 2; i < n; i++)
+	  aa[i + j * lda] -= gamma * aa[i + k * lda];
+      }
+      
+      /* Update remaining rows */
+      for (j = k + 1; j < n; j++) {
+	gamma = aa[j + (k + 1) * lda];
+	for (i = k + 2; i < n; i++)
+	  gamma += aa[i + k * lda] * aa[j + i * lda];
+	
+	gamma *= beta;
+	
+	aa[j + (k + 1) * lda] -= gamma;
+	for (i = k + 2; i < n; i++)
+	  aa[j + i * lda] -= gamma * CONJ(aa[i + k * lda]);
+      }
+      
+      if (Q) {
+	/* Update Q */
+	for (j = 0; j < n; j++) {
+	  gamma = qa[j + (k + 1) * ldq];
 	  for (i = k + 2; i < n; i++)
-	    gamma += CONJ(aa[i + k * lda]) * aa[i + j * lda];
+	    gamma += aa[i + k * lda] * qa[j + i * ldq];
 	  
 	  gamma *= beta;
 	  
-	  aa[(k + 1) + j * lda] -= gamma;
+	  qa[j + (k + 1) * ldq] -= gamma;
 	  for (i = k + 2; i < n; i++)
-	    aa[i + j * lda] -= gamma * aa[i + k * lda];
-	}
-
-	/* Update remaining rows */
-	for (j = k + 1; j < n; j++) {
-	  gamma = aa[j + (k + 1) * lda];
-	  for (i = k + 2; i < n; i++)
-	    gamma += aa[i + k * lda] * aa[j + i * lda];
-	  
-	  gamma *= beta;
-	  
-	  aa[j + (k + 1) * lda] -= gamma;
-	  for (i = k + 2; i < n; i++)
-	    aa[j + i * lda] -= gamma * CONJ(aa[i + k * lda]);
-	}
-
-	if (Q) {
-	  /* Update Q */
-	  for (j = 0; j < n; j++) {
-	    gamma = qa[j + (k + 1) * ldq];
-	    for (i = k + 2; i < n; i++)
-	      gamma += aa[i + k * lda] * qa[j + i * ldq];
-	    
-	    gamma *= beta;
-	    
-	    qa[j + (k + 1) * ldq] -= gamma;
-	    for (i = k + 2; i < n; i++)
-	      qa[j + i * ldq] -= gamma * CONJ(aa[i + k * lda]);
-	  }
+	    qa[j + i * ldq] -= gamma * CONJ(aa[i + k * lda]);
 	}
       }
     }
@@ -678,7 +673,7 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
       norm2 += ABSSQR(aa[i + k * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 == 0.0) {
+    if (norm2 <= H2_ALMOST_ZERO) {
       d[k] = aa[k + k * lda];
       l[k] = 0.0;
       u[k] = 0.0;
@@ -692,46 +687,39 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
       /* Compute 2 / |v|^2 */
       beta = 1.0 / (norm2 + ABS(first) * norm);
 
-      if (isinf(beta)) {
-	d[k] = aa[k + k * lda];
-	l[k] = 0.0;
-	u[k] = 0.0;
-      }
-      else {
-	/* Normalize reflection vector */
-	for (i = k + 2; i < n; i++)
-	  aa[i + k * lda] /= gamma;
-	beta *= ABSSQR(gamma);
-	
-	/* Compute k-th column */
-	d[k] = aa[k + k * lda];
-	l[k] = alpha;
-	u[k] = CONJ(alpha);
-	
-	/* Update remaining columns */
-	first = aa[(k + 1) + k * lda];
-	aa[(k + 1) + k * lda] = 1.0;
-	n1 = n - k - 1;
-	dlarf_("Left",
-	       &n1, &n1,
-	       aa + (k + 1) + k * lda, &u_one,
-	       &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
-	
-	/* Update remaining rows */
+      /* Normalize reflection vector */
+      for (i = k + 2; i < n; i++)
+	aa[i + k * lda] /= gamma;
+      beta *= ABSSQR(gamma);
+      
+      /* Compute k-th column */
+      d[k] = aa[k + k * lda];
+      l[k] = alpha;
+      u[k] = CONJ(alpha);
+      
+      /* Update remaining columns */
+      first = aa[(k + 1) + k * lda];
+      aa[(k + 1) + k * lda] = 1.0;
+      n1 = n - k - 1;
+      dlarf_("Left",
+	     &n1, &n1,
+	     aa + (k + 1) + k * lda, &u_one,
+	     &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
+      
+      /* Update remaining rows */
+      dlarf_("Right",
+	     &n1, &n1,
+	     aa + (k + 1) + k * lda, &u_one,
+	     &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
+      
+      if (Q) {
+	/* Update Q */
 	dlarf_("Right",
-	       &n1, &n1,
+	       &n, &n1,
 	       aa + (k + 1) + k * lda, &u_one,
-	       &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
-	
-	if (Q) {
-	  /* Update Q */
-	  dlarf_("Right",
-		 &n, &n1,
-		 aa + (k + 1) + k * lda, &u_one,
-		 &beta, qa + (k + 1) * ldq, &ldq, work->v);
-	}
-	aa[(k + 1) + k * lda] = first;
+	       &beta, qa + (k + 1) * ldq, &ldq, work->v);
       }
+      aa[(k + 1) + k * lda] = first;
     }
   }
   T->d[k] = aa[k + k * lda];
@@ -1376,7 +1364,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 == 0.0)
+      if (norm2 <= H2_ALMOST_ZERO)
 	tau[k] = 0.0;
       else {
 	/* Determine Householder reflection vector v */
@@ -1387,29 +1375,25 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	/* Compute norm of v */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-	if (isinf(beta))
-	  tau[k] = 0.0;
-	else {
-	  /* Normalize reflection vector */
+	/* Normalize reflection vector */
+	for (i = k + 1; i < rows; i++)
+	  a[i + k * lda] /= gamma;
+	beta *= ABSSQR(gamma);
+	tau[k] = beta;
+	
+	a[k + k * lda] = alpha;
+	
+	/* Update columns k+1,...,cols */
+	for (j = k + 1; j < cols; j++) {
+	  gamma = a[k + j * lda];
 	  for (i = k + 1; i < rows; i++)
-	    a[i + k * lda] /= gamma;
-	  beta *= ABSSQR(gamma);
-	  tau[k] = beta;
-
-	  a[k + k * lda] = alpha;
+	    gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
 	  
-	  /* Update columns k+1,...,cols */
-	  for (j = k + 1; j < cols; j++) {
-	    gamma = a[k + j * lda];
-	    for (i = k + 1; i < rows; i++)
-	      gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
-	    
-	    gamma *= beta;
-	    
-	    a[k + j * lda] -= gamma;
-	    for (i = k + 1; i < rows; i++)
-	      a[i + j * lda] -= gamma * a[i + k * lda];
-	  }
+	  gamma *= beta;
+	  
+	  a[k + j * lda] -= gamma;
+	  for (i = k + 1; i < rows; i++)
+	    a[i + j * lda] -= gamma * a[i + k * lda];
 	}
       }
     }
@@ -1448,7 +1432,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[k + i * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 == 0.0)
+      if (norm2 <= H2_ALMOST_ZERO)
 	tau[k] = 0.0;
       else {
 	/* Determine Householder reflection vector v */
@@ -1459,29 +1443,25 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	/* Compute norm of v */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-	if (isinf(beta))
-	  tau[k] = 0.0;
-	else {
-	  /* Normalize reflection vector */
+	/* Normalize reflection vector */
+	for (i = k + 1; i < cols; i++)
+	  a[k + i * lda] /= gamma;
+	beta *= ABSSQR(gamma);
+	tau[k] = beta;
+	
+	a[k + k * lda] = alpha;
+	
+	/* Update rows k+1,...,rows */
+	for (j = k + 1; j < rows; j++) {
+	  gamma = a[j + k * lda];
 	  for (i = k + 1; i < cols; i++)
-	    a[k + i * lda] /= gamma;
-	  beta *= ABSSQR(gamma);
-	  tau[k] = beta;
-
-	  a[k + k * lda] = alpha;
-
-	  /* Update rows k+1,...,rows */
-	  for (j = k + 1; j < rows; j++) {
-	    gamma = a[j + k * lda];
-	    for (i = k + 1; i < cols; i++)
-	      gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
-	    
-	    gamma *= beta;
-	    
-	    a[j + k * lda] -= gamma;
-	    for (i = k + 1; i < cols; i++)
-	      a[j + i * lda] -= gamma * a[k + i * lda];
-	  }
+	    gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
+	  
+	  gamma *= beta;
+	  
+	  a[j + k * lda] -= gamma;
+	  for (i = k + 1; i < cols; i++)
+	    a[j + i * lda] -= gamma * a[k + i * lda];
 	}
       }
     }
@@ -1525,7 +1505,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       norm2 += ABSSQR(a[k + i * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 == 0.0)
+    if (norm2 <= H2_ALMOST_ZERO)
       d[k] = 0.0;
     else {
       /* Determine Householder reflection vector v */
@@ -1536,45 +1516,41 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       /* Compute 2 / |v|^2 */
       beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-      if (isinf(beta))
-	d[k] = 0.0;
-      else {
-	/* Normalize reflection vector */
+      /* Normalize reflection vector */
+      for (i = k + 1; i < cols; i++)
+	a[k + i * lda] /= gamma;
+      beta *= ABSSQR(gamma);
+      
+      d[k] = alpha;
+      
+      /* Update rows k+1,...,rows */
+      for (j = k + 1; j < rows; j++) {
+	gamma = a[j + k * lda];
 	for (i = k + 1; i < cols; i++)
-	  a[k + i * lda] /= gamma;
-	beta *= ABSSQR(gamma);
-
-	d[k] = alpha;
-
-	/* Update rows k+1,...,rows */
-	for (j = k + 1; j < rows; j++) {
-	  gamma = a[j + k * lda];
+	  gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
+	
+	gamma *= beta;
+	
+	a[j + k * lda] -= gamma;
+	for (i = k + 1; i < cols; i++)
+	  a[j + i * lda] -= gamma * a[k + i * lda];
+      }
+      
+      /* Update columns of Vt */
+      if (Vt)
+	for (j = 0; j < Vt->cols; j++) {
+	  gamma = va[k + j * ldv];
 	  for (i = k + 1; i < cols; i++)
-	    gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
+	    gamma += a[k + i * lda] * va[i + j * ldv];
 	  
 	  gamma *= beta;
 	  
-	  a[j + k * lda] -= gamma;
+	  va[k + j * ldv] -= gamma;
 	  for (i = k + 1; i < cols; i++)
-	    a[j + i * lda] -= gamma * a[k + i * lda];
+	    va[i + j * ldv] -= gamma * CONJ(a[k + i * lda]);
 	}
-	
-	/* Update columns of Vt */
-	if (Vt)
-	  for (j = 0; j < Vt->cols; j++) {
-	    gamma = va[k + j * ldv];
-	    for (i = k + 1; i < cols; i++)
-	      gamma += a[k + i * lda] * va[i + j * ldv];
-	    
-	    gamma *= beta;
-	    
-	    va[k + j * ldv] -= gamma;
-	    for (i = k + 1; i < cols; i++)
-	      va[i + j * ldv] -= gamma * CONJ(a[k + i * lda]);
-	  }
-      }
     }
-
+  
     /* Eliminate (k+2,k) to (rows,k) by row reflections */
     if (k + 1 < rows) {
       norm2 = ABSSQR(a[(k + 1) + k * lda]);
@@ -1582,7 +1558,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 == 0.0)
+      if (norm2 <= H2_ALMOST_ZERO)
 	l[k] = 0.0;
       else {
 	/* Determine Householder reflection vector v */
@@ -1593,43 +1569,39 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	/* Compute 2 / |v|^2 */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-	if (isinf(beta))
-	  l[k] = 0.0;
-	else {
-	  /* Normalize reflection vector */
+	/* Normalize reflection vector */
+	for (i = k + 2; i < rows; i++)
+	  a[i + k * lda] /= gamma;
+	beta *= ABSSQR(gamma);
+	
+	l[k] = alpha;
+	
+	/* Update columns k+1,...,cols */
+	for (j = k + 1; j < cols; j++) {
+	  gamma = a[(k + 1) + j * lda];
 	  for (i = k + 2; i < rows; i++)
-	    a[i + k * lda] /= gamma;
-	  beta *= ABSSQR(gamma);
-
-	  l[k] = alpha;
-
-	  /* Update columns k+1,...,cols */
-	  for (j = k + 1; j < cols; j++) {
-	    gamma = a[(k + 1) + j * lda];
+	    gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
+	  
+	  gamma *= beta;
+	  
+	  a[(k + 1) + j * lda] -= gamma;
+	  for (i = k + 2; i < rows; i++)
+	    a[i + j * lda] -= gamma * a[i + k * lda];
+	}
+	
+	/* Update rows of U */
+	if (U)
+	  for (j = 0; j < U->rows; j++) {
+	    gamma = ua[j + (k + 1) * ldu];
 	    for (i = k + 2; i < rows; i++)
-	      gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
+	      gamma += a[i + k * lda] * ua[j + i * ldu];
 	    
 	    gamma *= beta;
 	    
-	    a[(k + 1) + j * lda] -= gamma;
+	    ua[j + (k + 1) * ldu] -= gamma;
 	    for (i = k + 2; i < rows; i++)
-	      a[i + j * lda] -= gamma * a[i + k * lda];
+	      ua[j + i * ldu] -= gamma * CONJ(a[i + k * lda]);
 	  }
-	  
-	  /* Update rows of U */
-	  if (U)
-	    for (j = 0; j < U->rows; j++) {
-	      gamma = ua[j + (k + 1) * ldu];
-	      for (i = k + 2; i < rows; i++)
-		gamma += a[i + k * lda] * ua[j + i * ldu];
-	      
-	      gamma *= beta;
-	      
-	      ua[j + (k + 1) * ldu] -= gamma;
-	      for (i = k + 2; i < rows; i++)
-		ua[j + i * ldu] -= gamma * CONJ(a[i + k * lda]);
-	    }
-	}
       }
     }
   }
@@ -1694,7 +1666,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 == 0.0)
+      if (norm2 <= H2_ALMOST_ZERO)
 	tau[k] = 0.0;
       else {
 	/* Determine Householder reflection vector v */
@@ -1705,28 +1677,24 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	/* Compute norm of v */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-	if (isinf(beta))
-	  tau[k] = 0.0;
-	else {
-	  /* Normalize reflection vector */
-	  for (i = k + 1; i < rows; i++)
-	    a[i + k * lda] /= gamma;
-	  beta *= ABSSQR(gamma);
-	  a[k + k * lda] = 1.0;
-
-	  tau[k] = beta;
-
-	  /* Update columns k+1,...,cols */
-	  rows1 = rows - k;
-	  cols1 = cols - k - 1;
-	  dlarf_("Left",
-		 &rows1, &cols1,
-		 a + k + k * lda, &u_one,
-		 &beta, a + k + (k + 1) * lda, &lda, work->v);
-	  
-	  /* Set new diagonal entry */
-	  a[k + k * lda] = alpha;
-	}
+	/* Normalize reflection vector */
+	for (i = k + 1; i < rows; i++)
+	  a[i + k * lda] /= gamma;
+	beta *= ABSSQR(gamma);
+	a[k + k * lda] = 1.0;
+	
+	tau[k] = beta;
+	
+	/* Update columns k+1,...,cols */
+	rows1 = rows - k;
+	cols1 = cols - k - 1;
+	dlarf_("Left",
+	       &rows1, &cols1,
+	       a + k + k * lda, &u_one,
+	       &beta, a + k + (k + 1) * lda, &lda, work->v);
+	
+	/* Set new diagonal entry */
+	a[k + k * lda] = alpha;
       }
     }
 
@@ -1765,7 +1733,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	norm2 += ABSSQR(a[k + i * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 == 0.0)
+      if (norm2 <= H2_ALMOST_ZERO)
 	tau[k] = 0.0;
       else {
 	/* Determine Householder reflection vector v */
@@ -1776,28 +1744,24 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	/* Compute norm of v */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-	if (isinf(beta))
-	  tau[k] = 0.0;
-	else {
-	  /* Normalize reflection vector */
-	  for (i = k + 1; i < cols; i++)
-	    a[k + i * lda] /= gamma;
-	  beta *= ABSSQR(gamma);
-	  a[k + k * lda] = 1.0;
-
-	  tau[k] = beta;
-
-	  /* Update rows k+1,...,rows */
-	  rows1 = rows - k - 1;
-	  cols1 = cols - k;
-	  dlarf_("Right",
-		 &rows1, &cols1,
-		 a + k + k * lda, &lda,
-		 &beta, a + (k + 1) + k * lda, &lda, work->v);
-	  
-	  /* Set new diagonal entry */
-	  a[k + k * lda] = alpha;
-	}
+	/* Normalize reflection vector */
+	for (i = k + 1; i < cols; i++)
+	  a[k + i * lda] /= gamma;
+	beta *= ABSSQR(gamma);
+	a[k + k * lda] = 1.0;
+	
+	tau[k] = beta;
+	
+	/* Update rows k+1,...,rows */
+	rows1 = rows - k - 1;
+	cols1 = cols - k;
+	dlarf_("Right",
+	       &rows1, &cols1,
+	       a + k + k * lda, &lda,
+	       &beta, a + (k + 1) + k * lda, &lda, work->v);
+	
+	/* Set new diagonal entry */
+	a[k + k * lda] = alpha;
       }
     }
 
@@ -1839,7 +1803,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
       norm2 += ABSSQR(a[k + i * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 == 0.0)
+    if (norm2 <= H2_ALMOST_ZERO)
       d[k] = 0.0;
     else {
       diag = a[k + k * lda];
@@ -1849,33 +1813,29 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
       /* Compute 2 / |v|^2 */
       beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-      if (isinf(beta))
-	d[k] = 0.0;
-      else {
-	/* Normalize reflection vector */
-	for (i = k + 1; i < cols; i++)
-	  a[k + i * lda] /= gamma;
-	beta *= ABSSQR(gamma);
-	a[k + k * lda] = 1.0;
-
-	d[k] = alpha;
-
-	/* Update rows k+1,...,rows */
-	rows1 = rows - k - 1;
-	cols1 = cols - k;
-	dlarf_("Right",
+      /* Normalize reflection vector */
+      for (i = k + 1; i < cols; i++)
+	a[k + i * lda] /= gamma;
+      beta *= ABSSQR(gamma);
+      a[k + k * lda] = 1.0;
+      
+      d[k] = alpha;
+      
+      /* Update rows k+1,...,rows */
+      rows1 = rows - k - 1;
+      cols1 = cols - k;
+      dlarf_("Right",
+	     &rows1, &cols1,
+	     a + k + k * lda, &lda,
+	     &beta, a + (k + 1) + k * lda, &lda, work->v);
+      
+      /* Update columns of Vt */
+      if (Vt) {
+	rows1 = cols - k;
+	cols1 = Vt->cols;
+	dlarf_("Left",
 	       &rows1, &cols1,
-	       a + k + k * lda, &lda,
-	       &beta, a + (k + 1) + k * lda, &lda, work->v);
-	
-	/* Update columns of Vt */
-	if (Vt) {
-	  rows1 = cols - k;
-	  cols1 = Vt->cols;
-	  dlarf_("Left",
-		 &rows1, &cols1,
-		 a + k + k * lda, &lda, &beta, va + k, &ldv, work->v);
-	}
+	       a + k + k * lda, &lda, &beta, va + k, &ldv, work->v);
       }
     }
 
@@ -1886,7 +1846,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 == 0.0)
+      if (norm2 <= H2_ALMOST_ZERO)
 	l[k] = 0.0;
       else {
 	/* Determine Householder reflection vector v */
@@ -1897,34 +1857,30 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	/* Compute 2 / |v|^2 */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
-	if (isinf(beta))
-	  l[k] = 0.0;
-	else {
-	  /* Normalize reflection vector */
-	  for (i = k + 2; i < rows; i++)
-	    a[i + k * lda] /= gamma;
-	  beta *= ABSSQR(gamma);
-	  a[(k + 1) + k * lda] = 1.0;
-
-	  l[k] = alpha;
-
-	  /* Update columns k+1,...,cols */
-	  rows1 = rows - k - 1;
-	  cols1 = cols - k - 1;
-	  dlarf_("Left",
+	/* Normalize reflection vector */
+	for (i = k + 2; i < rows; i++)
+	  a[i + k * lda] /= gamma;
+	beta *= ABSSQR(gamma);
+	a[(k + 1) + k * lda] = 1.0;
+	
+	l[k] = alpha;
+	
+	/* Update columns k+1,...,cols */
+	rows1 = rows - k - 1;
+	cols1 = cols - k - 1;
+	dlarf_("Left",
+	       &rows1, &cols1,
+	       a + (k + 1) + k * lda, &u_one,
+	       &beta, a + (k + 1) + (k + 1) * lda, &lda, work->v);
+	
+	/* Update rows of U */
+	if (U) {
+	  rows1 = U->rows;
+	  cols1 = rows - k - 1;
+	  dlarf_("Right",
 		 &rows1, &cols1,
 		 a + (k + 1) + k * lda, &u_one,
-		 &beta, a + (k + 1) + (k + 1) * lda, &lda, work->v);
-	  
-	  /* Update rows of U */
-	  if (U) {
-	    rows1 = U->rows;
-	    cols1 = rows - k - 1;
-	    dlarf_("Right",
-		   &rows1, &cols1,
-		   a + (k + 1) + k * lda, &u_one,
-		   &beta, ua + (k + 1) * ldu, &ldu, work->v);
-	  }
+		 &beta, ua + (k + 1) * ldu, &ldu, work->v);
 	}
       }
     }
