@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "h2compression.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2011
-   ------------------------------------------------------------ */
+ * This is the file "h2compression.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2011
+ * ------------------------------------------------------------ */
 
 #include "h2compression.h"
 
@@ -12,8 +12,8 @@
 #include "basic.h"
 
 /* ------------------------------------------------------------
-   High-level compression functions
-   ------------------------------------------------------------ */
+ * High-level compression functions
+ * ------------------------------------------------------------ */
 
 ph2matrix
 compress_amatrix_h2matrix(pcamatrix G, pcblock b, pctruncmode tm, real eps)
@@ -93,8 +93,8 @@ compress_h2matrix_h2matrix(pch2matrix G,
 }
 
 /* ------------------------------------------------------------
-   Compute local and total weights for H^2-matrices
-   ------------------------------------------------------------ */
+ * Compute local and total weights for H^2-matrices
+ * ------------------------------------------------------------ */
 
 typedef struct _weightsdata weightsdata;
 typedef weightsdata *pweightsdata;
@@ -616,8 +616,8 @@ totalweights_h2matrix(pch2matrix G,
 }
 
 /* ------------------------------------------------------------
-   Compute truncated cluster basis
-   ------------------------------------------------------------ */
+ * Compute truncated cluster basis
+ * ------------------------------------------------------------ */
 
 struct _truncate_data {
   pclusteroperator *cw;		/* Total cluster weights */
@@ -1721,7 +1721,7 @@ project_parallel_inplace_h2matrix(ph2matrix G, uint pardepth,
   pd.ron = enumerate_clusteroperator(G->rb->t, (pclusteroperator) ro);
   pd.con = enumerate_clusteroperator(G->cb->t, (pclusteroperator) co);
 
-  iterate_byrow_h2matrix(G, 0, 0, 0, pardepth, 0, project_inplace, &pd);
+  iterate_h2matrix(G, 0, 0, 0, pardepth, 0, project_inplace, &pd);
 
   freemem(pd.con);
   freemem(pd.ron);
@@ -1738,8 +1738,8 @@ project_inplace_h2matrix(ph2matrix G,
 }
 
 /* ------------------------------------------------------------
-   Specialized recompression routines for H^2-matrix arithmetic algorithms
-   ------------------------------------------------------------ */
+ * Specialized recompression routines for H^2-matrix arithmetic algorithms
+ * ------------------------------------------------------------ */
 
 /* compute the R of QR decomposition of the clusterbasis */
 void
@@ -2151,8 +2151,8 @@ recompress_inplace_h2matrix(ph2matrix G, pctruncmode tm, real eps)
 }
 
 /* ------------------------------------------------------------
-   Unify multiple cluster bases
-   ------------------------------------------------------------ */
+ * Unify multiple cluster bases
+ * ------------------------------------------------------------ */
 
 ptruncblock
 new_truncblock(pcclusterbasis cb, pcclusteroperator cw, ptruncblock next)
@@ -2576,8 +2576,8 @@ unify_clusterbasis(pccluster t, ptruncblock tb,
 }
 
 /* ------------------------------------------------------------
-   Combine H^2-submatrices
-   ------------------------------------------------------------ */
+ * Combine H^2-submatrices
+ * ------------------------------------------------------------ */
 
 void
 unify_parallel_h2matrix(ph2matrix G, uint pardepth,
@@ -2880,8 +2880,8 @@ unify_h2matrix(ph2matrix G,
 }
 
 /* ------------------------------------------------------------
-   Lossless conversion of an rkmatrix into a uniform matrix
-   ------------------------------------------------------------ */
+ * Lossless conversion of an rkmatrix into a uniform matrix
+ * ------------------------------------------------------------ */
 
 void
 convert_rkmatrix_uniform(pcrkmatrix r, puniform u, pctruncmode tm,
@@ -3032,8 +3032,8 @@ convert_rkmatrix_uniform(pcrkmatrix r, puniform u, pctruncmode tm,
 }
 
 /* ------------------------------------------------------------
-   H-matrix blocks
-   ------------------------------------------------------------ */
+ * H-matrix blocks
+ * ------------------------------------------------------------ */
 
 typedef struct _hcompactive hcompactive;
 typedef hcompactive *phcompactive;
@@ -3472,8 +3472,8 @@ buildcolbasis_hmatrix(pchmatrix G, pctruncmode tm, real eps)
 }
 
 /* ------------------------------------------------------------
-   Approximate H-matrix in new cluster bases
-   ------------------------------------------------------------ */
+ * Approximate H-matrix in new cluster bases
+ * ------------------------------------------------------------ */
 
 ph2matrix
 build_projected_hmatrix_h2matrix(pchmatrix G,
@@ -3533,8 +3533,8 @@ build_projected_hmatrix_h2matrix(pchmatrix G,
 }
 
 /* ------------------------------------------------------------
-   Dense matrix blocks
-   ------------------------------------------------------------ */
+ * Dense matrix blocks
+ * ------------------------------------------------------------ */
 
 typedef struct _compactive compactive;
 typedef compactive *pcompactive;
@@ -3950,8 +3950,8 @@ buildcolbasis_amatrix(pcamatrix G, pcblock b, pctruncmode tm, real eps)
 }
 
 /* ------------------------------------------------------------
-   Orthogonal projection
-   ------------------------------------------------------------ */
+ * Orthogonal projection
+ * ------------------------------------------------------------ */
 
 ph2matrix
 build_projected_amatrix_h2matrix(pcamatrix G, pcblock b,
