@@ -1398,21 +1398,25 @@ assemble_bem2d_greenhybrid_row_rkmatrix(pccluster rc, uint rname,
   uint      cols = cc->size;
 
   pamatrix  V;
-  pgreencluster2d grc;
+  pgreencluster2d grc, grc0;
   uint     *xihat;
   uint      rank;
 
   (void) cname;
 
-  grc = par->grcn[rname];
-
 #ifdef USE_OPENMP
 #pragma omp critical
 #endif
-  if (grc == NULL) {
-    grc = par->grcn[rname] = new_greencluster2d(rc);
-    assemble_row_greencluster2d(bem, grc);
+  {
+    grc = par->grcn[rname];
+    grc0 = grc;
+
+    if (grc0 == NULL)
+      grc = par->grcn[rname] = new_greencluster2d(rc);
   }
+
+  if(grc0 == NULL)
+    assemble_row_greencluster2d(bem, grc);
 
   V = grc->V;
   rank = V->cols;
@@ -1503,21 +1507,25 @@ assemble_bem2d_greenhybrid_col_rkmatrix(pccluster rc, uint rname,
   uint      cols = cc->size;
 
   pamatrix  V;
-  pgreencluster2d gcc;
+  pgreencluster2d gcc, gcc0;
   uint     *xihat;
   uint      rank;
 
   (void) rname;
 
-  gcc = par->gccn[cname];
-
 #ifdef USE_OPENMP
 #pragma omp critical
 #endif
-  if (gcc == NULL) {
-    gcc = par->gccn[cname] = new_greencluster2d(cc);
-    assemble_col_greencluster2d(bem, gcc);
+  {
+    gcc = par->gccn[cname];
+    gcc0 = gcc;
+
+    if (gcc0 == NULL)
+      gcc = par->gccn[cname] = new_greencluster2d(cc);
   }
+
+  if(gcc0 == NULL)
+    assemble_col_greencluster2d(bem, gcc);
 
   V = gcc->V;
   rank = V->cols;
