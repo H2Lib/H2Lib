@@ -215,11 +215,11 @@ addevaltrans_rkmatrix_avector(field alpha, pcrkmatrix r, pcavector x,
 }
 
 void
-mvm_rkmatrix_avector(field alpha, bool rtrans, pcamatrix r,
+mvm_rkmatrix_avector(field alpha, bool rtrans, pcrkmatrix r,
 		     pcavector x, pavector y)
 {
   if (rtrans)
-    addevaltrans_amatrix_avector(alpha, r, x, y);
+    addevaltrans_rkmatrix_avector(alpha, r, x, y);
   else
-    addeval_amatrix_avector(alpha, r, x, y);
+    addeval_rkmatrix_avector(alpha, r, x, y);
 }

@@ -298,7 +298,7 @@ addevaltrans_rkmatrix_avector(field alpha, pcrkmatrix r,
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-mvm_rkmatrix_avector(field alpha, bool rtrans, pcamatrix r,
+mvm_rkmatrix_avector(field alpha, bool rtrans, pcrkmatrix r,
 		     pcavector x, pavector y);
 
 /** @} */
