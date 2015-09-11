@@ -1721,7 +1721,7 @@ project_parallel_inplace_h2matrix(ph2matrix G, uint pardepth,
   pd.ron = enumerate_clusteroperator(G->rb->t, (pclusteroperator) ro);
   pd.con = enumerate_clusteroperator(G->cb->t, (pclusteroperator) co);
 
-  iterate_byrow_h2matrix(G, 0, 0, 0, pardepth, 0, project_inplace, &pd);
+  iterate_h2matrix(G, 0, 0, 0, pardepth, 0, project_inplace, &pd);
 
   freemem(pd.con);
   freemem(pd.ron);

@@ -14,11 +14,12 @@
 #include "basic.h"
 #include "factorizations.h"
 
-/** @brief "Machine accuracy" for QR eigenvalue iteration */
-#define H2_QR_EPS 1e-13
-
-/** @brief "Machine accuracy" for SVD iteration */
-#define H2_SVD_EPS 1e-13
+/** @brief Error tolerance for QR eigenvalue iteration */
+#define H2_QR_EPS 1e-14
+/** @brief Error tolerance for SVD iteration */
+#define H2_SVD_EPS 1e-14
+/** @brief Bound for a number that is essentially zero */
+#define H2_ALMOST_ZERO 1e-300
 
 /** @brief Tolerance for SVD verification */
 #define H2_SVD_TOL 3e-10
@@ -193,17 +194,21 @@ check_lower_tridiag(pctridiag T, pcamatrix Ts)
 static void
 givens(field a, field b, pfield c, pfield s)
 {
-  real      norm, norm2;
+  field     t;
 
-  norm2 = ABSSQR(a) + ABSSQR(b);
-  if (norm2 > 0.0) {
-    norm = REAL_SQRT(norm2);
-    *c = CONJ(a) / norm;
-    *s = CONJ(b) / norm;
-  }
-  else {
+  if(b == 0.0) {
     *c = 1.0;
     *s = 0.0;
+  }
+  else if(ABS(a) > ABS(b)) {
+    t = b / a;
+    *c = 1.0 / REAL_SQRT(1.0 + ABSSQR(t));
+    *s = t * (*c);
+  }
+  else {
+    t = a / b;
+    *s = 1.0 / REAL_SQRT(1.0 + ABSSQR(t));
+    *c = t * (*s);
   }
 }
 
@@ -437,32 +442,12 @@ sb_muleig_tridiag(ptridiag T, pamatrix Q, uint maxiter)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dsteqr_(const char *compz,
 	const unsigned *n,
 	double *d,
 	double *e, double *z, const unsigned *ldz, double *work, int *info);
 
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dstev_(const char *jobz,
        const unsigned *n,
        double *d,
@@ -524,8 +509,8 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
   pfield    d, l, u;
   uint      n;
   uint      i, j, k;
-  real      norm2, norm;
-  field     first, alpha, beta, gamma;
+  real      norm2, norm, beta;
+  field     first, alpha, gamma;
 
   n = A->rows;
 
@@ -562,7 +547,7 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
       norm2 += ABSSQR(aa[i + k * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 == 0.0) {
+    if (norm2 <= H2_ALMOST_ZERO) {
       d[k] = aa[k + k * lda];
       l[k] = 0.0;
       u[k] = 0.0;
@@ -574,56 +559,56 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
       gamma = first - alpha;
 
       /* Compute 2 / |v|^2 */
-      beta = 1.0 / (norm2 - REAL(CONJ(alpha) * first));
+      beta = 1.0 / (norm2 + ABS(first) * norm);
 
       /* Normalize reflection vector */
       for (i = k + 2; i < n; i++)
 	aa[i + k * lda] /= gamma;
       beta *= ABSSQR(gamma);
-
+      
       /* Compute k-th column */
       d[k] = aa[k + k * lda];
       l[k] = alpha;
       u[k] = CONJ(alpha);
-
+      
       /* Update remaining columns */
       for (j = k + 1; j < n; j++) {
 	gamma = aa[(k + 1) + j * lda];
 	for (i = k + 2; i < n; i++)
 	  gamma += CONJ(aa[i + k * lda]) * aa[i + j * lda];
-
+	
 	gamma *= beta;
-
+	
 	aa[(k + 1) + j * lda] -= gamma;
 	for (i = k + 2; i < n; i++)
 	  aa[i + j * lda] -= gamma * aa[i + k * lda];
       }
-
+      
       /* Update remaining rows */
       for (j = k + 1; j < n; j++) {
 	gamma = aa[j + (k + 1) * lda];
 	for (i = k + 2; i < n; i++)
 	  gamma += aa[i + k * lda] * aa[j + i * lda];
-
+	
 	gamma *= beta;
-
+	
 	aa[j + (k + 1) * lda] -= gamma;
 	for (i = k + 2; i < n; i++)
 	  aa[j + i * lda] -= gamma * CONJ(aa[i + k * lda]);
       }
-
+      
       if (Q) {
 	/* Update Q */
 	for (j = 0; j < n; j++) {
 	  gamma = qa[j + (k + 1) * ldq];
 	  for (i = k + 2; i < n; i++)
-	    gamma += aa[i + k * ldq] * qa[j + i * ldq];
-
+	    gamma += aa[i + k * lda] * qa[j + i * ldq];
+	  
 	  gamma *= beta;
-
+	  
 	  qa[j + (k + 1) * ldq] -= gamma;
 	  for (i = k + 2; i < n; i++)
-	    qa[j + i * ldq] -= gamma * CONJ(aa[i + k * ldq]);
+	    qa[j + i * ldq] -= gamma * CONJ(aa[i + k * lda]);
 	}
       }
     }
@@ -633,16 +618,6 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dlarf_(const char *side,
        const unsigned *m,
        const unsigned *n,
@@ -660,8 +635,8 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
   pfield    d, l, u;
   uint      n, n1;
   uint      i, k;
-  real      norm2, norm;
-  field     first, alpha, beta, gamma;
+  real      norm2, norm, beta;
+  field     first, alpha, gamma;
 
   n = A->rows;
 
@@ -698,7 +673,7 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
       norm2 += ABSSQR(aa[i + k * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 == 0.0) {
+    if (norm2 <= H2_ALMOST_ZERO) {
       d[k] = aa[k + k * lda];
       l[k] = 0.0;
       u[k] = 0.0;
@@ -710,18 +685,18 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
       gamma = first - alpha;
 
       /* Compute 2 / |v|^2 */
-      beta = 1.0 / (norm2 - REAL(CONJ(alpha) * first));
+      beta = 1.0 / (norm2 + ABS(first) * norm);
 
       /* Normalize reflection vector */
       for (i = k + 2; i < n; i++)
 	aa[i + k * lda] /= gamma;
       beta *= ABSSQR(gamma);
-
+      
       /* Compute k-th column */
       d[k] = aa[k + k * lda];
       l[k] = alpha;
       u[k] = CONJ(alpha);
-
+      
       /* Update remaining columns */
       first = aa[(k + 1) + k * lda];
       aa[(k + 1) + k * lda] = 1.0;
@@ -730,13 +705,13 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
 	     &n1, &n1,
 	     aa + (k + 1) + k * lda, &u_one,
 	     &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
-
+      
       /* Update remaining rows */
       dlarf_("Right",
 	     &n1, &n1,
 	     aa + (k + 1) + k * lda, &u_one,
 	     &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
-
+      
       if (Q) {
 	/* Update Q */
 	dlarf_("Right",
@@ -799,18 +774,12 @@ sb_eig_amatrix(pamatrix A, pavector lambda, pamatrix Q, uint maxiter)
 }
 
 #ifdef USE_BLAS
+/* Remark: if compiled the wrong way, DORMQR, and by extension DORMBR
+ * and DGESVD, are currently not thread-safe.
+ * gfortran does the right thing if called with "-frecursive", but this
+ * appears not to be the standard in, e.g., OpenSUSE Linux. */
 #if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dsyev_(const char *jobz,
        const char *uplo,
        const unsigned *n,
@@ -1279,16 +1248,6 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dbdsqr_(const char *uplo,
 	const unsigned *n,
 	const unsigned *ncvt,
@@ -1364,8 +1323,8 @@ void
 sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 {
   pfield    a, ua, va, d, l, tau;
-  field     alpha, beta, gamma, diag;
-  real      norm, norm2;
+  field     alpha, gamma, diag;
+  real      norm, norm2, beta;
   uint      rows, cols, lda, ldu, ldv;
   uint      dim;
   uint      i, j, k;
@@ -1405,36 +1364,38 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      beta = 0.0;
-      if (norm2 > 0.0) {
+      if (norm2 <= H2_ALMOST_ZERO)
+	tau[k] = 0.0;
+      else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
 	alpha = -SIGN(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute norm of v */
-	beta = 1.0 / (norm2 - CONJ(alpha) * diag);
+	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
 	/* Normalize reflection vector */
 	for (i = k + 1; i < rows; i++)
 	  a[i + k * lda] /= gamma;
 	beta *= ABSSQR(gamma);
+	tau[k] = beta;
+	
 	a[k + k * lda] = alpha;
-
+	
 	/* Update columns k+1,...,cols */
 	for (j = k + 1; j < cols; j++) {
 	  gamma = a[k + j * lda];
 	  for (i = k + 1; i < rows; i++)
 	    gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
-
+	  
 	  gamma *= beta;
-
+	  
 	  a[k + j * lda] -= gamma;
 	  for (i = k + 1; i < rows; i++)
 	    a[i + j * lda] -= gamma * a[i + k * lda];
 	}
       }
-      tau[k] = beta;
     }
 
     /* Apply reflections in reversed order to U */
@@ -1471,36 +1432,38 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[k + i * lda]);
       norm = REAL_SQRT(norm2);
 
-      beta = 0.0;
-      if (norm2 > 0.0) {
+      if (norm2 <= H2_ALMOST_ZERO)
+	tau[k] = 0.0;
+      else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
 	alpha = -SIGN(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute norm of v */
-	beta = 1.0 / (norm2 - CONJ(alpha) * diag);
+	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
 	/* Normalize reflection vector */
 	for (i = k + 1; i < cols; i++)
 	  a[k + i * lda] /= gamma;
 	beta *= ABSSQR(gamma);
+	tau[k] = beta;
+	
 	a[k + k * lda] = alpha;
-
+	
 	/* Update rows k+1,...,rows */
 	for (j = k + 1; j < rows; j++) {
 	  gamma = a[j + k * lda];
 	  for (i = k + 1; i < cols; i++)
 	    gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
-
+	  
 	  gamma *= beta;
-
+	  
 	  a[j + k * lda] -= gamma;
 	  for (i = k + 1; i < cols; i++)
 	    a[j + i * lda] -= gamma * a[k + i * lda];
 	}
       }
-      tau[k] = beta;
     }
 
     /* Apply reflections in reversed order to Vt */
@@ -1542,53 +1505,52 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       norm2 += ABSSQR(a[k + i * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 > 0.0) {
+    if (norm2 <= H2_ALMOST_ZERO)
+      d[k] = 0.0;
+    else {
       /* Determine Householder reflection vector v */
       diag = a[k + k * lda];
       alpha = -SIGN(diag) * norm;
       gamma = diag - alpha;
 
       /* Compute 2 / |v|^2 */
-      beta = 1.0 / (norm2 - REAL(CONJ(alpha) * diag));
+      beta = 1.0 / (norm2 + ABS(diag) * norm);
 
       /* Normalize reflection vector */
       for (i = k + 1; i < cols; i++)
 	a[k + i * lda] /= gamma;
       beta *= ABSSQR(gamma);
-
+      
+      d[k] = alpha;
+      
       /* Update rows k+1,...,rows */
       for (j = k + 1; j < rows; j++) {
 	gamma = a[j + k * lda];
 	for (i = k + 1; i < cols; i++)
 	  gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
-
+	
 	gamma *= beta;
-
+	
 	a[j + k * lda] -= gamma;
 	for (i = k + 1; i < cols; i++)
 	  a[j + i * lda] -= gamma * a[k + i * lda];
       }
-
+      
       /* Update columns of Vt */
       if (Vt)
 	for (j = 0; j < Vt->cols; j++) {
 	  gamma = va[k + j * ldv];
 	  for (i = k + 1; i < cols; i++)
 	    gamma += a[k + i * lda] * va[i + j * ldv];
-
+	  
 	  gamma *= beta;
-
+	  
 	  va[k + j * ldv] -= gamma;
 	  for (i = k + 1; i < cols; i++)
 	    va[i + j * ldv] -= gamma * CONJ(a[k + i * lda]);
 	}
-
-      /* Store diagonal element */
-      d[k] = alpha;
     }
-    else
-      d[k] = 0.0;
-
+  
     /* Eliminate (k+2,k) to (rows,k) by row reflections */
     if (k + 1 < rows) {
       norm2 = ABSSQR(a[(k + 1) + k * lda]);
@@ -1596,68 +1558,57 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 > 0.0) {
+      if (norm2 <= H2_ALMOST_ZERO)
+	l[k] = 0.0;
+      else {
 	/* Determine Householder reflection vector v */
 	diag = a[(k + 1) + k * lda];
 	alpha = -SIGN(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute 2 / |v|^2 */
-	beta = 1.0 / (norm2 - REAL(CONJ(alpha) * diag));
+	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
 	/* Normalize reflection vector */
 	for (i = k + 2; i < rows; i++)
 	  a[i + k * lda] /= gamma;
 	beta *= ABSSQR(gamma);
-
+	
+	l[k] = alpha;
+	
 	/* Update columns k+1,...,cols */
 	for (j = k + 1; j < cols; j++) {
 	  gamma = a[(k + 1) + j * lda];
 	  for (i = k + 2; i < rows; i++)
 	    gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
-
+	  
 	  gamma *= beta;
-
+	  
 	  a[(k + 1) + j * lda] -= gamma;
 	  for (i = k + 2; i < rows; i++)
 	    a[i + j * lda] -= gamma * a[i + k * lda];
 	}
-
+	
 	/* Update rows of U */
 	if (U)
 	  for (j = 0; j < U->rows; j++) {
 	    gamma = ua[j + (k + 1) * ldu];
 	    for (i = k + 2; i < rows; i++)
 	      gamma += a[i + k * lda] * ua[j + i * ldu];
-
+	    
 	    gamma *= beta;
-
+	    
 	    ua[j + (k + 1) * ldu] -= gamma;
 	    for (i = k + 2; i < rows; i++)
 	      ua[j + i * ldu] -= gamma * CONJ(a[i + k * lda]);
 	  }
-
-	/* Store subdiagonal element */
-	l[k] = alpha;
       }
-      else
-	l[k] = 0.0;
     }
   }
 }
 
 #ifdef USE_BLAS
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dlarf_(const char *side,
        const unsigned *m,
        const unsigned *n,
@@ -1670,8 +1621,8 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 		      ptridiag T, pamatrix U, pamatrix Vt)
 {
   pfield    a, ua, va, d, l, tau;
-  field     alpha, beta, gamma, diag;
-  real      norm, norm2;
+  field     alpha, gamma, diag;
+  real      norm, norm2, beta;
   uint      rows, cols, lda, ldu, ldv;
   uint      rows1, cols1;
   uint      dim;
@@ -1715,22 +1666,25 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      beta = 0.0;
-      if (norm2 > 0.0) {
+      if (norm2 <= H2_ALMOST_ZERO)
+	tau[k] = 0.0;
+      else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
 	alpha = -SIGN(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute norm of v */
-	beta = 1.0 / (norm2 - CONJ(alpha) * diag);
+	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
 	/* Normalize reflection vector */
 	for (i = k + 1; i < rows; i++)
 	  a[i + k * lda] /= gamma;
 	beta *= ABSSQR(gamma);
 	a[k + k * lda] = 1.0;
-
+	
+	tau[k] = beta;
+	
 	/* Update columns k+1,...,cols */
 	rows1 = rows - k;
 	cols1 = cols - k - 1;
@@ -1738,11 +1692,10 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	       &rows1, &cols1,
 	       a + k + k * lda, &u_one,
 	       &beta, a + k + (k + 1) * lda, &lda, work->v);
-
+	
 	/* Set new diagonal entry */
 	a[k + k * lda] = alpha;
       }
-      tau[k] = beta;
     }
 
     /* Apply reflections in reversed order to U */
@@ -1780,22 +1733,25 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	norm2 += ABSSQR(a[k + i * lda]);
       norm = REAL_SQRT(norm2);
 
-      beta = 0.0;
-      if (norm2 > 0.0) {
+      if (norm2 <= H2_ALMOST_ZERO)
+	tau[k] = 0.0;
+      else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
 	alpha = -SIGN(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute norm of v */
-	beta = 1.0 / (norm2 - CONJ(alpha) * diag);
+	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
 	/* Normalize reflection vector */
 	for (i = k + 1; i < cols; i++)
 	  a[k + i * lda] /= gamma;
 	beta *= ABSSQR(gamma);
 	a[k + k * lda] = 1.0;
-
+	
+	tau[k] = beta;
+	
 	/* Update rows k+1,...,rows */
 	rows1 = rows - k - 1;
 	cols1 = cols - k;
@@ -1803,11 +1759,10 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	       &rows1, &cols1,
 	       a + k + k * lda, &lda,
 	       &beta, a + (k + 1) + k * lda, &lda, work->v);
-
+	
 	/* Set new diagonal entry */
 	a[k + k * lda] = alpha;
       }
-      tau[k] = beta;
     }
 
     /* Apply reflections in reversed order to Vt */
@@ -1848,21 +1803,24 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
       norm2 += ABSSQR(a[k + i * lda]);
     norm = REAL_SQRT(norm2);
 
-    if (norm2 > 0.0) {
-      /* Determine Householder reflection vector v */
+    if (norm2 <= H2_ALMOST_ZERO)
+      d[k] = 0.0;
+    else {
       diag = a[k + k * lda];
       alpha = -SIGN(diag) * norm;
       gamma = diag - alpha;
 
       /* Compute 2 / |v|^2 */
-      beta = 1.0 / (norm2 - REAL(CONJ(alpha) * diag));
+      beta = 1.0 / (norm2 + ABS(diag) * norm);
 
       /* Normalize reflection vector */
       for (i = k + 1; i < cols; i++)
 	a[k + i * lda] /= gamma;
       beta *= ABSSQR(gamma);
       a[k + k * lda] = 1.0;
-
+      
+      d[k] = alpha;
+      
       /* Update rows k+1,...,rows */
       rows1 = rows - k - 1;
       cols1 = cols - k;
@@ -1870,7 +1828,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	     &rows1, &cols1,
 	     a + k + k * lda, &lda,
 	     &beta, a + (k + 1) + k * lda, &lda, work->v);
-
+      
       /* Update columns of Vt */
       if (Vt) {
 	rows1 = cols - k;
@@ -1879,12 +1837,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	       &rows1, &cols1,
 	       a + k + k * lda, &lda, &beta, va + k, &ldv, work->v);
       }
-
-      /* Store diagonal element */
-      d[k] = alpha;
     }
-    else
-      d[k] = 0.0;
 
     /* Eliminate (k+2,k) to (rows,k) by row reflections */
     if (k + 1 < rows) {
@@ -1893,21 +1846,25 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 > 0.0) {
+      if (norm2 <= H2_ALMOST_ZERO)
+	l[k] = 0.0;
+      else {
 	/* Determine Householder reflection vector v */
 	diag = a[(k + 1) + k * lda];
 	alpha = -SIGN(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute 2 / |v|^2 */
-	beta = 1.0 / (norm2 - REAL(CONJ(alpha) * diag));
+	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
 	/* Normalize reflection vector */
 	for (i = k + 2; i < rows; i++)
 	  a[i + k * lda] /= gamma;
 	beta *= ABSSQR(gamma);
 	a[(k + 1) + k * lda] = 1.0;
-
+	
+	l[k] = alpha;
+	
 	/* Update columns k+1,...,cols */
 	rows1 = rows - k - 1;
 	cols1 = cols - k - 1;
@@ -1915,7 +1872,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 	       &rows1, &cols1,
 	       a + (k + 1) + k * lda, &u_one,
 	       &beta, a + (k + 1) + (k + 1) * lda, &lda, work->v);
-
+	
 	/* Update rows of U */
 	if (U) {
 	  rows1 = U->rows;
@@ -1925,12 +1882,7 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
 		 a + (k + 1) + k * lda, &u_one,
 		 &beta, ua + (k + 1) * ldu, &ldu, work->v);
 	}
-
-	/* Store subdiagonal element */
-	l[k] = alpha;
       }
-      else
-	l[k] = 0.0;
     }
   }
 }
@@ -2038,16 +1990,6 @@ sb_svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt,
 #ifdef USE_BLAS
 #if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
 IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
 dgesvd_(const char *jobu,
 	const char *jobvt,
 	const unsigned *m,

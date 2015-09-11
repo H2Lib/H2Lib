@@ -501,13 +501,13 @@ compute_boundingbox_curve2d(pccurve2d gr, real * bmin, real * bmax)
 void
 draw_curve2d(pccurve2d gr, cairo_t * cr, real scale)
 {
-  uint      i, edges;
-  real     *p, bmin[2], bmax[2];
-  real      s, tx, ty, tol;
+  uint i, edges;
+  real *p, bmin[2], bmax[2];
+  real s, tx, ty, tol;
 
   edges = gr->edges;
 
-  tol = 0.4;
+  tol = 0.05;
 
   compute_boundingbox_curve2d(gr, bmin, bmax);
 
@@ -518,24 +518,21 @@ draw_curve2d(pccurve2d gr, cairo_t * cr, real scale)
     s = (1.0 - tol) / (bmax[1] - bmin[1]);
   }
 
-  tx = -0.5 * (bmax[0] + bmin[0]);
-  ty = bmin[1] - 0.5 * (bmax[1] + bmin[1]);
+  tx = -1.5*bmin[0] + 0.5 * (bmax[0] + bmin[0]);
+  ty = -1.5*bmin[1] + 0.5 * (bmax[1] + bmin[1]);
 
   cairo_scale(cr, s, s);
-  cairo_translate(cr, tx, ty);
-  /*
-     cairo_set_line_width(cr, 1.0 / (s * scale));
-   */
+  cairo_translate(cr, tx/s, ty/s);
+
   cairo_set_line_width(cr, cairo_get_line_width(cr) / scale);
 
   for (i = 0; i < edges; ++i) {
     p = gr->x[gr->e[i][0]];
-    cairo_move_to(cr, p[0], bmax[1] - p[1]);
+    cairo_move_to(cr, p[0], p[1]);
     p = gr->x[gr->e[i][1]];
-    cairo_line_to(cr, p[0], bmax[1] - p[1]);
+    cairo_line_to(cr, p[0], p[1]);
   }
 
   cairo_stroke(cr);
-
 }
 #endif

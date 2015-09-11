@@ -112,7 +112,7 @@ findrank_truncmode(pctruncmode tm, real eps, pcavector sigma)
     if (tm->absolute) {
       sum = 0.0;
       k = sigma->dim;
-      while (k > 0 && (sum += ABSSQR(sigma->v[k - 1])) < eps * eps)
+      while (k > 0 && (sum += ABSSQR(sigma->v[k - 1])) <= eps * eps)
 	k--;
     }
     else {
@@ -122,19 +122,19 @@ findrank_truncmode(pctruncmode tm, real eps, pcavector sigma)
 
       sum = 0.0;
       k = sigma->dim;
-      while (k > 0 && (sum += ABSSQR(sigma->v[k - 1])) < eps * eps * norm)
+      while (k > 0 && (sum += ABSSQR(sigma->v[k - 1])) <= eps * eps * norm)
 	k--;
     }
   }
   else {
     if (tm && tm->absolute) {
       k = 0;
-      while (k < sigma->dim && sigma->v[k] >= eps)
+      while (k < sigma->dim && sigma->v[k] > eps)
 	k++;
     }
     else {
       k = 0;
-      while (k < sigma->dim && sigma->v[k] >= eps * sigma->v[0])
+      while (k < sigma->dim && sigma->v[k] > eps * sigma->v[0])
 	k++;
     }
   }
