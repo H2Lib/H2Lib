@@ -3708,7 +3708,7 @@ addcol_comp(pccluster cc, pcamatrix G, pcblock b, pctruncmode tm,
     cidx = b->cc->idx;
     for (j = 0; j < rsize; j++)
       for (i = 0; i < csize; i++)
-	Bhat->a[i + j * Bhat->ld] = G->a[ridx[j] + cidx[i] * G->ld];
+	Bhat->a[i + j * Bhat->ld] = CONJ(G->a[ridx[j] + cidx[i] * G->ld]);
 
     /* Compute weight factor if necessary */
     weight = 1.0;
