@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "h2arith.c" of the H2Lib package.
- All rights reserved, Knut Reimer 2012
- ------------------------------------------------------------ */
+ * This is the file "h2arith.c" of the H2Lib package.
+ * All rights reserved, Knut Reimer 2012
+ * ------------------------------------------------------------ */
 
 #include <stdio.h>
 
@@ -1874,8 +1875,7 @@ uppersolve_amatrix_1_h2matrix(bool unit, pcamatrix a, ph2matrix x,
     rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
     del_rkmatrix(r);
   }
-  else {
-    assert(x->f != 0);
+  else if (x->f != 0) {
     triangularsolve_amatrix(false, unit, false, a, false, x->f);
   }
 }
@@ -1966,8 +1966,7 @@ uppersolve_amatrix_4_h2matrix(bool unit, pcamatrix a, ph2matrix x,
     rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
     del_rkmatrix(r);
   }
-  else {
-    assert(x->f != 0);
+  else if(x->f != 0) {
     triangularsolve_amatrix(true, unit, true, a, true, x->f);
   }
 }
@@ -2327,8 +2326,7 @@ uppersolve_h2matrix_1_h2matrix(bool unit, pch2matrix a, ph2matrix x,
       rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
       del_rkmatrix(r);
     }
-    else {
-      assert(x->f != 0);
+    else if (x->f != 0) {
       lowersolve_h2matrix_amatrix(unit, false, a, false, x->f);
     }
   }
@@ -2445,8 +2443,7 @@ uppersolve_h2matrix_4_h2matrix(bool unit, pch2matrix a, ph2matrix x,
       rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
       del_rkmatrix(r);
     }
-    else {
-      assert(x->f != 0);
+    else if (x->f != 0) {
       lowersolve_h2matrix_amatrix(unit, true, a, false, x->f);
     }
   }
