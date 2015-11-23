@@ -1,10 +1,14 @@
-
 /* ------------------------------------------------------------
- This is the file "hmatrix.c" of the H2Lib package.
- All rights reserved, Steffen Boerm 2010
- ------------------------------------------------------------ */
+ * This is the file "hmatrix.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2010
+ * ------------------------------------------------------------ */
 
 #include <stdio.h>
+
+#ifdef USE_NETCDF
+#include <string.h>
+#include <netcdf.h>
+#endif
 
 #include "hmatrix.h"
 #include "basic.h"
@@ -321,17 +325,47 @@ clear_hmatrix(phmatrix hm)
     rsons = hm->rsons;
     csons = hm->csons;
 
-    for (j = 0; j < csons; j++)
-      for (i = 0; i < rsons; i++)
+    for (j = 0; j < csons; j++) {
+      for (i = 0; i < rsons; i++) {
 	clear_hmatrix(hm->son[i + j * rsons]);
+      }
+    }
   }
   else if (hm->r) {
-    clear_amatrix(&hm->r->A);
-    clear_amatrix(&hm->r->B);
+    setrank_rkmatrix(hm->r, 0);
   }
   else {
     assert(hm->f);
     clear_amatrix(hm->f);
+  }
+}
+
+void
+clear_upper_hmatrix(phmatrix hm, bool strict)
+{
+  uint      rsons, csons;
+  uint      i, j;
+
+  if (hm->son) {
+    rsons = hm->rsons;
+    csons = hm->csons;
+
+    for (j = 0; j < csons; j++) {
+      for (i = 0; i < UINT_MIN(j, rsons); i++) {
+	clear_hmatrix(hm->son[i + j * rsons]);
+      }
+      if (j < rsons) {
+	clear_upper_hmatrix(hm->son[j + j * rsons], strict);
+      }
+    }
+  }
+  else if (hm->r) {
+    setrank_rkmatrix(hm->r, 0);
+  }
+  else {
+    assert(hm->f);
+    assert(hm->rc == hm->cc);
+    clear_upper_amatrix(hm->f, strict);
   }
 }
 
@@ -354,25 +388,75 @@ copy_hmatrix(pchmatrix src, phmatrix trg)
 	copy_hmatrix(src->son[i + j * rsons], trg->son[i + j * rsons]);
       }
     }
-
   }
   else if (src->r != NULL) {
-    if (src->r->k != trg->r->k) {
-      resize_amatrix(&trg->r->A, src->rc->size, src->r->k);
-      resize_amatrix(&trg->r->B, src->cc->size, src->r->k);
-      trg->r->k = src->r->k;
-    }
+    resize_rkmatrix(trg->r, src->rc->size, src->cc->size, src->r->k);
     copy_amatrix(false, &src->r->A, &trg->r->A);
     copy_amatrix(false, &src->r->B, &trg->r->B);
   }
-  else {
-    assert(src->f != NULL);
+  else if (src->f != NULL) {
     copy_amatrix(false, src->f, trg->f);
   }
 }
 
+void
+identity_hmatrix(phmatrix hm)
+{
+  uint      rsons, csons;
+  uint      i, j;
+
+  if (hm->son) {
+    rsons = hm->rsons;
+    csons = hm->csons;
+
+    for (j = 0; j < csons; j++) {
+      for (i = 0; i < rsons; i++) {
+	identity_hmatrix(hm->son[i + j * rsons]);
+      }
+    }
+  }
+  else if (hm->r) {
+    setrank_rkmatrix(hm->r, 0);
+  }
+  else {
+    assert(hm->f);
+    if (hm->rc == hm->cc) {
+      identity_amatrix(hm->f);
+    }
+    else {
+      clear_amatrix(hm->f);
+    }
+  }
+}
+
+void
+random_hmatrix(phmatrix hm, uint kmax)
+{
+  uint      rsons = hm->rsons;
+  uint      csons = hm->csons;
+
+  uint      i, j;
+
+  if (hm->son != NULL) {
+    for (j = 0; j < csons; ++j) {
+      for (i = 0; i < rsons; ++i) {
+	random_hmatrix(hm->son[i + j * rsons], kmax);
+      }
+    }
+  }
+  else if (hm->r != NULL) {
+    resize_rkmatrix(hm->r, hm->rc->size, hm->cc->size, kmax);
+    random_amatrix(&hm->r->A);
+    random_amatrix(&hm->r->B);
+  }
+  else {
+    assert(hm->f != NULL);
+    random_amatrix(hm->f);
+  }
+}
+
 /* ------------------------------------------------------------
- Build H^2-matrix based on block tree
+ Build H-matrix based on block tree
  ------------------------------------------------------------ */
 
 phmatrix
@@ -409,6 +493,43 @@ build_from_block_hmatrix(pcblock b, uint k)
   update_hmatrix(h);
 
   return h;
+}
+
+/* ------------------------------------------------------------
+ * Build block tree from H-matrix
+ * ------------------------------------------------------------ */
+
+pblock
+build_from_hmatrix_block(pchmatrix G)
+{
+  uint      i, j, rsons, csons;
+  pblock    b;
+
+  b = 0;
+  if (G->son) {
+    rsons = G->rsons;
+    csons = G->csons;
+
+    b = new_block((pcluster) G->rc, (pcluster) G->cc, false, rsons, csons);
+
+    for (j = 0; j < csons; j++) {
+      for (i = 0; i < rsons; i++) {
+	b->son[i + j * rsons] =
+	  build_from_hmatrix_block(G->son[i + j * rsons]);
+      }
+    }
+  }
+  else if (G->r) {
+    b = new_block((pcluster) G->rc, (pcluster) G->cc, true, 0, 0);
+  }
+  else {
+    assert(G->f);
+    b = new_block((pcluster) G->rc, (pcluster) G->cc, false, 0, 0);
+  }
+
+  update_block(b);
+
+  return b;
 }
 
 /* ------------------------------------------------------------
@@ -656,8 +777,8 @@ addevalsymm_offdiag(field alpha, pchmatrix hm, uint roff, uint coff,
       roff1 = roff;
 
       for (i = 0; i < rsons; i++) {
-	addevalsymm_offdiag(alpha, hm->son[i + j * rsons], roff1, coff1,
-			    xp, yp);
+	addevalsymm_offdiag(alpha, hm->son[i + j * rsons], roff1, coff1, xp,
+			    yp);
 
 	roff1 += hm->son[i]->rc->size;
       }
@@ -670,8 +791,8 @@ addevalsymm_offdiag(field alpha, pchmatrix hm, uint roff, uint coff,
 }
 
 static void
-addevalsymm_diag(field alpha, pchmatrix hm, uint off,
-		 pcavector xp, pavector yp)
+addevalsymm_diag(field alpha, pchmatrix hm, uint off, pcavector xp,
+		 pavector yp)
 {
   avector   tmp1, tmp2;
   pavector  xp1, yp1;
@@ -732,8 +853,8 @@ addevalsymm_diag(field alpha, pchmatrix hm, uint off,
 }
 
 void
-fastaddevalsymm_hmatrix_avector(field alpha, pchmatrix hm,
-				pcavector xp, pavector yp)
+fastaddevalsymm_hmatrix_avector(field alpha, pchmatrix hm, pcavector xp,
+				pavector yp)
 {
   assert(hm->rc == hm->cc);
 
@@ -741,8 +862,8 @@ fastaddevalsymm_hmatrix_avector(field alpha, pchmatrix hm,
 }
 
 void
-addevalsymm_hmatrix_avector(field alpha, pchmatrix hm,
-			    pcavector x, pavector y)
+addevalsymm_hmatrix_avector(field alpha, pchmatrix hm, pcavector x,
+			    pavector y)
 {
   pavector  xp, yp;
   avector   xtmp, ytmp;
@@ -915,6 +1036,45 @@ norm2diff_amatrix_hmatrix(pchmatrix a, pcamatrix b)
 }
 
 real
+norm2diff_sparsematrix_hmatrix(pcsparsematrix G2, pchmatrix G1)
+{
+  avector   tmp1, tmp2;
+  uint      rows = G1->rc->size;
+  uint      cols = G1->cc->size;
+
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  assert(G2->rows == rows);
+  assert(G2->cols == cols);
+
+  x = init_avector(&tmp1, cols);
+  y = init_avector(&tmp2, rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
+    scale_avector(1.0 / norm, x);
+
+    clear_avector(y);
+    addeval_hmatrix_avector(1.0, G1, x, y);
+    addeval_sparsematrix_avector(-1.0, G2, x, y);
+
+    clear_avector(x);
+    addevaltrans_hmatrix_avector(1.0, G1, y, x);
+    addevaltrans_sparsematrix_avector(-1.0, G2, y, x);
+
+    norm = norm2_avector(x);
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
+}
+
+real
 norm2diff_hmatrix(pchmatrix a, pchmatrix b)
 {
   avector   tmp1, tmp2;
@@ -956,6 +1116,779 @@ norm2diff_hmatrix(pchmatrix a, pchmatrix b)
  File I/O
  ------------------------------------------------------------ */
 
+#ifdef USE_NETCDF
+static void
+write_count(pchmatrix G, size_t * blocks, size_t * coeffs)
+{
+  uint      rsons, csons;
+  uint      i, j;
+
+  /* Increase submatrix counter */
+  (*blocks)++;
+
+  if (G->f) {
+    /* If it's an amatrix: add number of coefficients to coeffs */
+    (*coeffs) += G->f->rows * G->f->cols;
+  }
+  else if (G->r) {
+    /* If it's an rkmatrix: also add number of coefficients to coeffs */
+    (*coeffs) +=
+      (getrows_rkmatrix(G->r) +
+       getcols_rkmatrix(G->r)) * getrank_rkmatrix(G->r);
+  }
+  else if (G->son) {
+    rsons = G->rsons;
+    csons = G->csons;
+
+    /* If it's subdivided: check sons */
+    for (j = 0; j < csons; j++)
+      for (i = 0; i < rsons; i++)
+	write_count(G->son[i + j * rsons], blocks, coeffs);
+  }
+}
+
+static void
+write_cdf(pchmatrix G, size_t blocks, size_t coeffs,
+	  size_t * blockidx, size_t * coeffidx,
+	  int nc_file,
+	  int nc_type, int nc_rows, int nc_cols, int nc_rank,
+	  int nc_rsons, int nc_csons, int nc_coeff)
+{
+  size_t    start, count;
+  ptrdiff_t stride;
+  pamatrix  f;
+  prkmatrix r;
+  uint      rsons, csons;
+  uint      rows, cols, k;
+  uint      lda, ldb, ldf;
+  int       val;
+  uint      i, j;
+
+  assert(*blockidx <= blocks);
+
+  rows = getrows_hmatrix(G);
+  cols = getcols_hmatrix(G);
+
+  /* Write number of rows to nc_rows[*blockidx] */
+  start = *blockidx;
+  count = 1;
+  stride = 1;
+  val = rows;
+  nc_put_vars(nc_file, nc_rows, &start, &count, &stride, &val);
+
+  /* Write number of columns to nc_cols[*blockidx] */
+  val = cols;
+  nc_put_vars(nc_file, nc_cols, &start, &count, &stride, &val);
+
+  if (G->f) {
+    f = G->f;
+    ldf = f->ld;
+    assert(f->rows == rows);
+    assert(f->cols == cols);
+
+    /* Write type 1 to nc_type[*blockidx] */
+    val = 1;
+    nc_put_vars(nc_file, nc_type, &start, &count, &stride, &val);
+
+    /* An amatrix has no rank, rsons, or csons */
+    val = 0;
+    nc_put_vars(nc_file, nc_rank, &start, &count, &stride, &val);
+    nc_put_vars(nc_file, nc_rsons, &start, &count, &stride, &val);
+    nc_put_vars(nc_file, nc_csons, &start, &count, &stride, &val);
+
+    /* Write coefficients */
+    start = *coeffidx;
+    count = rows;
+    assert(start + rows * cols <= coeffs);
+    for (j = 0; j < cols; j++) {
+      nc_put_vars(nc_file, nc_coeff, &start, &count, &stride, f->a + j * ldf);
+      start += rows;
+    }
+    *coeffidx = start;
+
+    /* Increase blocks counter */
+    (*blockidx)++;
+  }
+  else if (G->r) {
+    r = G->r;
+    lda = r->A.ld;
+    ldb = r->B.ld;
+    k = r->A.cols;
+    assert(r->B.cols == k);
+    assert(r->A.rows == rows);
+    assert(r->B.rows == cols);
+
+    /* Write type 2 to nc_type[*blockidx] */
+    val = 2;
+    nc_put_vars(nc_file, nc_type, &start, &count, &stride, &val);
+
+    /* Write rank to nc_rank[*blockidx] */
+    val = k;
+    nc_put_vars(nc_file, nc_rank, &start, &count, &stride, &val);
+
+    /* An rkmatrix has no rsons, or csons */
+    val = 0;
+    nc_put_vars(nc_file, nc_rsons, &start, &count, &stride, &val);
+    nc_put_vars(nc_file, nc_csons, &start, &count, &stride, &val);
+
+    /* Write coefficients of A */
+    start = *coeffidx;
+    count = rows;
+    assert(start + rows * k <= coeffs);
+    for (j = 0; j < k; j++) {
+      nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
+		  r->A.a + j * lda);
+      start += rows;
+    }
+
+    /* Write coefficients of B */
+    count = cols;
+    assert(start + cols * k <= coeffs);
+    for (j = 0; j < k; j++) {
+      nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
+		  r->B.a + j * ldb);
+      start += cols;
+    }
+    *coeffidx = start;
+
+    /* Increase submatrix counter */
+    (*blockidx)++;
+  }
+  else if (G->son) {
+    rsons = G->rsons;
+    csons = G->csons;
+
+    /* Write type 3 to nc_type */
+    val = 3;
+    nc_put_vars(nc_file, nc_type, &start, &count, &stride, &val);
+
+    /* Subdivided matrices have no rank */
+    val = 0;
+    nc_put_vars(nc_file, nc_rank, &start, &count, &stride, &val);
+
+    /* Write rsons and csons.
+     * rsons == 0 means that the sons use the same row cluster
+     * as the father. The same convention is used for csons. */
+    val = (G->rc == G->son[0]->rc ? 0 : rsons);
+    nc_put_vars(nc_file, nc_rsons, &start, &count, &stride, &val);
+    val = (G->cc == G->son[0]->cc ? 0 : csons);
+    nc_put_vars(nc_file, nc_csons, &start, &count, &stride, &val);
+
+    /* Increase submatrix counter */
+    (*blockidx)++;
+
+    /* Take care of sons */
+    for (j = 0; j < csons; j++)
+      for (i = 0; i < rsons; i++)
+	write_cdf(G->son[i + j * rsons], blocks, coeffs,
+		  blockidx, coeffidx,
+		  nc_file,
+		  nc_type, nc_rows, nc_cols, nc_rank,
+		  nc_rsons, nc_csons, nc_coeff);
+  }
+}
+
+void
+write_cdf_hmatrix(pchmatrix G, const char *name)
+{
+  size_t    blocks, blockidx;
+  size_t    coeffs, coeffidx;
+  int       nc_file, nc_type, nc_rows, nc_cols, nc_rank;
+  int       nc_rsons, nc_csons, nc_coeff, nc_blocks, nc_coeffs;
+  int       result;
+
+  /* Count number of blocks and coefficients */
+  blocks = 0;
+  coeffs = 0;
+  write_count(G, &blocks, &coeffs);
+
+  /* Create NetCDF file */
+  result = nc_create(name, NC_64BIT_OFFSET, &nc_file);
+  assert(result == NC_NOERR);
+
+  /* Define "blocks" dimension */
+  result = nc_def_dim(nc_file, "blocks", blocks, &nc_blocks);
+  assert(result == NC_NOERR);
+
+  /* Define "coeffs" dimension */
+  result = nc_def_dim(nc_file, "coeffs", coeffs, &nc_coeffs);
+  assert(result == NC_NOERR);
+
+  /* Define "type" variable */
+  result = nc_def_var(nc_file, "type", NC_INT, 1, &nc_blocks, &nc_type);
+  assert(result == NC_NOERR);
+
+  /* Define "rows" variable */
+  result = nc_def_var(nc_file, "rows", NC_INT, 1, &nc_blocks, &nc_rows);
+  assert(result == NC_NOERR);
+
+  /* Define "cols" variable */
+  result = nc_def_var(nc_file, "cols", NC_INT, 1, &nc_blocks, &nc_cols);
+  assert(result == NC_NOERR);
+
+  /* Define "rank" variable */
+  result = nc_def_var(nc_file, "rank", NC_INT, 1, &nc_blocks, &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Define "rsons" variable */
+  result = nc_def_var(nc_file, "rsons", NC_INT, 1, &nc_blocks, &nc_rsons);
+  assert(result == NC_NOERR);
+
+  /* Define "csons" variable */
+  result = nc_def_var(nc_file, "csons", NC_INT, 1, &nc_blocks, &nc_csons);
+  assert(result == NC_NOERR);
+
+  /* Define "coeff" variable */
+  result = nc_def_var(nc_file, "coeff", NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Finish NetCDF define mode */
+  result = nc_enddef(nc_file);
+  assert(result == NC_NOERR);
+
+  /* Write matrices to NetCDF variables */
+  blockidx = 0;
+  coeffidx = 0;
+  write_cdf(G, blocks, coeffs, &blockidx, &coeffidx,
+	    nc_file, nc_type, nc_rows, nc_cols, nc_rank,
+	    nc_rsons, nc_csons, nc_coeff);
+  assert(blockidx == blocks);
+  assert(coeffidx == coeffs);
+
+  /* Close file */
+  result = nc_close(nc_file);
+  assert(result == NC_NOERR);
+}
+
+static void
+prefix_name(char *buf, int bufsize, const char *prefix, const char *name)
+{
+  if (prefix)
+    snprintf(buf, bufsize, "%s_%s", prefix, name);
+  else
+    strncpy(buf, name, bufsize);
+}
+
+void
+write_cdfpart_hmatrix(pchmatrix G, int nc_file, const char *prefix)
+{
+  size_t    blocks, blockidx;
+  size_t    coeffs, coeffidx;
+  char     *buf;
+  int       bufsize;
+  int       nc_type, nc_rows, nc_cols, nc_rank;
+  int       nc_rsons, nc_csons, nc_coeff, nc_blocks, nc_coeffs;
+  int       result;
+
+  /* Prepare buffer for prefixed names */
+  bufsize = strlen(prefix) + 16;
+  buf = (char *) allocmem(sizeof(char) * bufsize);
+
+  /* Count number of blocks and coefficients */
+  blocks = 0;
+  coeffs = 0;
+  write_count(G, &blocks, &coeffs);
+
+  /* Switch NetCDF file to define mode */
+  result = nc_redef(nc_file);
+  assert(result == NC_NOERR || result == NC_EINDEFINE);
+
+  /* Define "blocks" dimension */
+  prefix_name(buf, bufsize, prefix, "blocks");
+  result = nc_def_dim(nc_file, buf, blocks, &nc_blocks);
+  assert(result == NC_NOERR);
+
+  /* Define "coeffs" dimension */
+  prefix_name(buf, bufsize, prefix, "coeffs");
+  result = nc_def_dim(nc_file, buf, coeffs, &nc_coeffs);
+  assert(result == NC_NOERR);
+
+  /* Define "type" variable */
+  prefix_name(buf, bufsize, prefix, "type");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_blocks, &nc_type);
+  assert(result == NC_NOERR);
+
+  /* Define "rows" variable */
+  prefix_name(buf, bufsize, prefix, "rows");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_blocks, &nc_rows);
+  assert(result == NC_NOERR);
+
+  /* Define "cols" variable */
+  prefix_name(buf, bufsize, prefix, "cols");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_blocks, &nc_cols);
+  assert(result == NC_NOERR);
+
+  /* Define "rank" variable */
+  prefix_name(buf, bufsize, prefix, "rank");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_blocks, &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Define "rsons" variable */
+  prefix_name(buf, bufsize, prefix, "rsons");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_blocks, &nc_rsons);
+  assert(result == NC_NOERR);
+
+  /* Define "csons" variable */
+  prefix_name(buf, bufsize, prefix, "csons");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_blocks, &nc_csons);
+  assert(result == NC_NOERR);
+
+  /* Define "coeff" variable */
+  prefix_name(buf, bufsize, prefix, "coeff");
+  result = nc_def_var(nc_file, buf, NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Finish NetCDF define mode */
+  result = nc_enddef(nc_file);
+  assert(result == NC_NOERR);
+
+  /* Write matrices to NetCDF variables */
+  blockidx = 0;
+  coeffidx = 0;
+  write_cdf(G, blocks, coeffs, &blockidx, &coeffidx,
+	    nc_file, nc_type, nc_rows, nc_cols, nc_rank,
+	    nc_rsons, nc_csons, nc_coeff);
+  assert(blockidx == blocks);
+  assert(coeffidx == coeffs);
+
+  /* Clean up */
+  nc_sync(nc_file);
+  freemem(buf);
+}
+
+static phmatrix
+read_cdf_part(int nc_file,
+	      int nc_type, int nc_rows, int nc_cols, int nc_rank,
+	      int nc_rsons, int nc_csons, int nc_coeffs,
+	      pcluster *rc, pcluster *cc,
+	      uint * ridx, uint * cidx, size_t * blockidx, size_t * coeffidx)
+{
+  phmatrix  G, G1;
+  prkmatrix r;
+  pamatrix  f;
+  pcluster *rc1, *cc1;
+  uint     *ridx1, *cidx1;
+  uint      rows, cols;
+  uint      rsons, csons;
+  uint      lda, ldb, ldf;
+  uint      k;
+  uint      i, j;
+  size_t    start, count;
+  ptrdiff_t stride;
+  int       val, result;
+
+  /* Get number of rows */
+  start = *blockidx;
+  count = 1;
+  stride = 1;
+  result = nc_get_vars(nc_file, nc_rows, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+  rows = val;
+
+  /* Get number of columns */
+  result = nc_get_vars(nc_file, nc_cols, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+  cols = val;
+
+  /* If we have not inherited a row cluster, create one */
+  if (*rc == 0) {
+    /* If we have not inherited a row index, create one */
+    if (ridx == 0) {
+      ridx = (uint *) allocmem(sizeof(uint) * rows);
+      for (i = 0; i < rows; i++)
+	ridx[i] = i;
+    }
+
+    *rc = new_cluster(rows, ridx, 0, 1);
+  }
+  else {
+    assert((*rc)->size == rows);
+
+    ridx = (*rc)->idx;
+  }
+
+  /* If we have not inherited a column cluster, create one */
+  if (*cc == 0) {
+    /* If we have not inherited a column index, create one */
+    if (cidx == 0) {
+      cidx = (uint *) allocmem(sizeof(uint) * cols);
+      for (j = 0; j < cols; j++)
+	cidx[j] = j;
+    }
+
+    *cc = new_cluster(cols, cidx, 0, 1);
+  }
+  else {
+    assert((*cc)->size == cols);
+
+    cidx = (*cc)->idx;
+  }
+
+  /* Get matrix type */
+  result = nc_get_vars(nc_file, nc_type, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+
+  G = 0;
+  switch (val) {
+  case 1:
+    /* Create amatrix */
+    G = new_full_hmatrix(*rc, *cc);
+    f = G->f;
+    ldf = f->ld;
+
+    /* Get coefficients */
+    start = *coeffidx;
+    count = rows;
+    for (j = 0; j < cols; j++) {
+      nc_get_vars(nc_file, nc_coeffs, &start, &count, &stride,
+		  f->a + j * ldf);
+      start += rows;
+    }
+    *coeffidx = start;
+
+    /* Switch to next submatrix */
+    (*blockidx)++;
+
+    break;
+
+  case 2:
+    /* Get rank */
+    result = nc_get_vars(nc_file, nc_rank, &start, &count, &stride, &val);
+    assert(result == NC_NOERR);
+    k = val;
+
+    /* Create matrix */
+    G = new_rk_hmatrix(*rc, *cc, k);
+    r = G->r;
+    lda = r->A.ld;
+    ldb = r->B.ld;
+
+    /* Get matrix A */
+    start = *coeffidx;
+    count = rows;
+    for (j = 0; j < k; j++) {
+      nc_get_vars(nc_file, nc_coeffs, &start, &count, &stride,
+		  r->A.a + j * lda);
+      start += rows;
+    }
+
+    /* Get matrix B */
+    count = cols;
+    for (j = 0; j < k; j++) {
+      nc_get_vars(nc_file, nc_coeffs, &start, &count, &stride,
+		  r->B.a + j * ldb);
+      start += cols;
+    }
+    *coeffidx = start;
+
+    /* Switch to next submatrix */
+    (*blockidx)++;
+
+    break;
+
+  case 3:
+    /* Get number of row sons */
+    result = nc_get_vars(nc_file, nc_rsons, &start, &count, &stride, &val);
+    assert(result == NC_NOERR);
+    rsons = val;
+
+    /* Get number of column sons */
+    result = nc_get_vars(nc_file, nc_csons, &start, &count, &stride, &val);
+    assert(result == NC_NOERR);
+    csons = val;
+
+    /* If we need the row sons, ensure that we have them */
+    if (rsons > 0) {
+      /* Update row cluster if it didn't have sons before */
+      if ((*rc)->sons == 0)
+	setsons_cluster(*rc, rsons);
+      else
+	assert((*rc)->sons == rsons);
+
+      rc1 = (*rc)->son;
+    }
+    else {
+      rsons = 1;
+      rc1 = rc;
+    }
+
+    /* If we need the column sons, ensure that we have them */
+    if (csons > 0) {
+      /* Update column cluster if it didn't have sons before */
+      if ((*cc)->sons == 0)
+	setsons_cluster(*cc, csons);
+      else
+	assert((*cc)->sons == csons);
+
+      cc1 = (*cc)->son;
+    }
+    else {
+      csons = 1;
+      cc1 = cc;
+    }
+
+    /* Create H-matrix */
+    G = new_super_hmatrix(*rc, *cc, rsons, csons);
+
+    /* Switch to next submatrix */
+    (*blockidx)++;
+
+    cidx1 = cidx;
+    for (j = 0; j < csons; j++) {
+      ridx1 = ridx;
+
+      for (i = 0; i < rsons; i++) {
+	G1 = read_cdf_part(nc_file,
+			   nc_type, nc_rows, nc_cols, nc_rank,
+			   nc_rsons, nc_csons, nc_coeffs,
+			   rc1 + i, cc1 + j, ridx1, cidx1,
+			   blockidx, coeffidx);
+	ref_hmatrix(G->son + i + j * rsons, G1);
+
+	ridx1 += G1->rc->size;
+      }
+      assert(ridx1 == ridx + rows);
+
+      cidx1 += G->son[j * rsons]->cc->size;
+    }
+    assert(cidx1 == cidx + cols);
+
+    break;
+
+  default:
+    (void) fprintf(stderr, "Unexpected matrix type %d\n", val);
+    abort();
+  }
+
+  update_hmatrix(G);
+
+  return G;
+}
+
+phmatrix
+read_cdf_hmatrix(const char *name, pccluster rc, pccluster cc)
+{
+  phmatrix  G;
+  pcluster  rc0, cc0;
+  size_t    blocks, blockidx;
+  size_t    coeffs, coeffidx;
+  char      dimname[NC_MAX_NAME + 1];
+  int       nc_file, nc_type, nc_rows, nc_cols, nc_rank;
+  int       nc_rsons, nc_csons, nc_coeff, nc_blocks, nc_coeffs;
+  int       result;
+
+  /* Open NetCDF file */
+  result = nc_open(name, NC_NOWRITE, &nc_file);
+  assert(result == NC_NOERR);
+
+  /* Get "blocks" dimension */
+  result = nc_inq_dimid(nc_file, "blocks", &nc_blocks);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_blocks, dimname, &blocks);
+  assert(result == NC_NOERR);
+
+  /* Get "coeffs" dimension */
+  result = nc_inq_dimid(nc_file, "coeffs", &nc_coeffs);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
+  assert(result == NC_NOERR);
+
+  /* Get "type" variable */
+  result = nc_inq_varid(nc_file, "type", &nc_type);
+  assert(result == NC_NOERR);
+
+  /* Get "rows" variable */
+  result = nc_inq_varid(nc_file, "rows", &nc_rows);
+  assert(result == NC_NOERR);
+
+  /* Get "cols" variable */
+  result = nc_inq_varid(nc_file, "cols", &nc_cols);
+  assert(result == NC_NOERR);
+
+  /* Get "rank" variable */
+  result = nc_inq_varid(nc_file, "rank", &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Get "rsons" variable */
+  result = nc_inq_varid(nc_file, "rsons", &nc_rsons);
+  assert(result == NC_NOERR);
+
+  /* Get "csons" variable */
+  result = nc_inq_varid(nc_file, "csons", &nc_csons);
+  assert(result == NC_NOERR);
+
+  /* Get "coeff" variable */
+  result = nc_inq_varid(nc_file, "coeff", &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Read matrices from NetCDF variables */
+  rc0 = (pcluster) rc;
+  cc0 = (pcluster) cc;
+  blockidx = 0;
+  coeffidx = 0;
+
+  G = read_cdf_part(nc_file,
+		    nc_type, nc_rows, nc_cols, nc_rank,
+		    nc_rsons, nc_csons, nc_coeff,
+		    &rc0, &cc0, 0, 0, &blockidx, &coeffidx);
+  assert(rc0 == rc);
+  assert(cc0 == cc);
+  assert(blockidx == blocks);
+  assert(coeffidx == coeffs);
+
+  return G;
+}
+
+phmatrix
+read_cdfpart_hmatrix(int nc_file, const char *prefix,
+		     pccluster rc, pccluster cc)
+{
+  phmatrix  G;
+  pcluster  rc0, cc0;
+  size_t    blocks, blockidx;
+  size_t    coeffs, coeffidx;
+  char      dimname[NC_MAX_NAME + 1];
+  char     *buf;
+  int       bufsize;
+  int       nc_type, nc_rows, nc_cols, nc_rank;
+  int       nc_rsons, nc_csons, nc_coeff, nc_blocks, nc_coeffs;
+  int       result;
+
+  /* Prepare buffer for prefixed names */
+  bufsize = strlen(prefix) + 16;
+  buf = (char *) allocmem(sizeof(char) * bufsize);
+
+  /* Get "blocks" dimension */
+  prefix_name(buf, bufsize, prefix, "blocks");
+  result = nc_inq_dimid(nc_file, buf, &nc_blocks);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_blocks, dimname, &blocks);
+  assert(result == NC_NOERR);
+
+  /* Get "coeffs" dimension */
+  prefix_name(buf, bufsize, prefix, "coeffs");
+  result = nc_inq_dimid(nc_file, buf, &nc_coeffs);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
+  assert(result == NC_NOERR);
+
+  /* Get "type" variable */
+  prefix_name(buf, bufsize, prefix, "type");
+  result = nc_inq_varid(nc_file, buf, &nc_type);
+  assert(result == NC_NOERR);
+
+  /* Get "rows" variable */
+  prefix_name(buf, bufsize, prefix, "rows");
+  result = nc_inq_varid(nc_file, buf, &nc_rows);
+  assert(result == NC_NOERR);
+
+  /* Get "cols" variable */
+  prefix_name(buf, bufsize, prefix, "cols");
+  result = nc_inq_varid(nc_file, buf, &nc_cols);
+  assert(result == NC_NOERR);
+
+  /* Get "rank" variable */
+  prefix_name(buf, bufsize, prefix, "rank");
+  result = nc_inq_varid(nc_file, buf, &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Get "rsons" variable */
+  prefix_name(buf, bufsize, prefix, "rsons");
+  result = nc_inq_varid(nc_file, buf, &nc_rsons);
+  assert(result == NC_NOERR);
+
+  /* Get "csons" variable */
+  prefix_name(buf, bufsize, prefix, "csons");
+  result = nc_inq_varid(nc_file, buf, &nc_csons);
+  assert(result == NC_NOERR);
+
+  /* Get "coeff" variable */
+  prefix_name(buf, bufsize, prefix, "coeff");
+  result = nc_inq_varid(nc_file, buf, &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Read matrices from NetCDF variables */
+  rc0 = (pcluster) rc;
+  cc0 = (pcluster) cc;
+  blockidx = 0;
+  coeffidx = 0;
+
+  G = read_cdf_part(nc_file,
+		    nc_type, nc_rows, nc_cols, nc_rank,
+		    nc_rsons, nc_csons, nc_coeff,
+		    &rc0, &cc0, 0, 0, &blockidx, &coeffidx);
+  assert(rc == 0 || rc0 == rc);
+  assert(cc == 0 || cc0 == cc);
+  assert(blockidx == blocks);
+  assert(coeffidx == coeffs);
+
+  /* Clean up */
+  freemem(buf);
+
+  return G;
+}
+
+void
+write_cdfcomplete_hmatrix(pchmatrix G, const char *name)
+{
+  int       nc_file;
+  int       result;
+
+  /* Create NetCDF file */
+  result = nc_create(name, NC_64BIT_OFFSET, &nc_file);
+  assert(result == NC_NOERR);
+
+  /* Write row cluster tree */
+  write_cdfpart_cluster(G->rc, nc_file, "rc");
+
+  if (G->cc != G->rc) {
+    /* Write column cluster tree */
+    write_cdfpart_cluster(G->cc, nc_file, "cc");
+  }
+
+  /* Write hmatrix */
+  write_cdfpart_hmatrix(G, nc_file, "ma");
+
+  /* Close NetCDF file */
+  nc_close(nc_file);
+}
+
+phmatrix
+read_cdfcomplete_hmatrix(const char *name)
+{
+  pcluster  rc, cc;
+  phmatrix  G;
+  int       nc_file, nc_sons;
+  int       result;
+
+  /* Open NetCDF file */
+  result = nc_open(name, NC_NOWRITE, &nc_file);
+  assert(result == NC_NOERR);
+
+  /* Read row cluster tree */
+  rc = read_cdfpart_cluster(nc_file, "rc");
+
+  /* Check whether there is a separate column cluster tree */
+  result = nc_inq_varid(nc_file, "cc_sons", &nc_sons);
+  if (result == NC_NOERR) {
+    /* If there is, read it */
+    cc = read_cdfpart_cluster(nc_file, "cc");
+  }
+  else {
+    /* Otherwise assume it's the row cluster tree */
+    cc = rc;
+  }
+
+  /* Read hmatrix */
+  G = read_cdfpart_hmatrix(nc_file, "ma", rc, cc);
+
+  /* Close NetCDF file */
+  nc_close(nc_file);
+
+  return G;
+}
+#endif
+
 static void
 write_hlib_part(pchmatrix G, uint roff, uint coff, FILE * out)
 {
@@ -991,11 +1924,11 @@ write_hlib_part(pchmatrix G, uint roff, uint coff, FILE * out)
 
     for (l = 0; l < k; l++)
       for (i = 0; i < rows; i++)
-	fprintf(out, "%.16e\n", r->A.a[i + lda * l]);
+	fprintf(out, FIELD_CS(.16, e) "\n", FIELD_ARG(r->A.a[i + lda * l]));
 
     for (l = 0; l < k; l++)
       for (j = 0; j < cols; j++)
-	fprintf(out, "%.16e\n", r->B.a[j + ldb * l]);
+	fprintf(out, FIELD_CS(.16, e) "\n", FIELD_ARG(r->B.a[j + ldb * l]));
   }
   else if (G->f) {
     f = G->f;
@@ -1012,7 +1945,7 @@ write_hlib_part(pchmatrix G, uint roff, uint coff, FILE * out)
 
     for (j = 0; j < cols; j++)
       for (i = 0; i < rows; i++)
-	fprintf(out, "%.16e\n", f->a[i + ldf * j]);
+	fprintf(out, FIELD_CS(.16, e) "\n", FIELD_ARG(f->a[i + ldf * j]));
   }
   else {
     assert(G->son != 0);
@@ -1174,7 +2107,8 @@ read_hlib_part(FILE * in, uint roff, uint coff, pcluster *rc,
       for (i = 0; i < rows; i++) {
 	line = fgets(buf, 80, in);
 	(*lineno)++;
-	fields = sscanf(line, "%le", r->A.a + i + l * lda);
+	fields = sscanf(line, FIELD_SCANF_CS(, e),
+			FIELD_ADDR(r->A.a + i + l * lda));
 	assert(fields == 1);
       }
 
@@ -1183,7 +2117,8 @@ read_hlib_part(FILE * in, uint roff, uint coff, pcluster *rc,
       for (j = 0; j < cols; j++) {
 	line = fgets(buf, 80, in);
 	(*lineno)++;
-	fields = sscanf(line, "%le", r->B.a + j + l * ldb);
+	fields = sscanf(line, FIELD_SCANF_CS(, e),
+			FIELD_ADDR(r->B.a + j + l * ldb));
 	assert(fields == 1);
       }
     break;
@@ -1199,7 +2134,8 @@ read_hlib_part(FILE * in, uint roff, uint coff, pcluster *rc,
       for (i = 0; i < rows; i++) {
 	line = fgets(buf, 80, in);
 	(*lineno)++;
-	fields = sscanf(line, "%le", f->a + i + j * ldf);
+	fields = sscanf(line, FIELD_SCANF_CS(, e),
+			FIELD_ADDR(f->a + i + j * ldf));
 	assert(fields == 1);
       }
     break;
@@ -1291,6 +2227,224 @@ read_hlib_hmatrix(const char *filename)
   return G;
 }
 
+static phmatrix
+read_hlibsymm_part(FILE * in, uint roff, pcluster *rc,
+		   uint * ridx, uint * lineno)
+{
+  char      buf[80];
+  char     *line, *c;
+  uint      fields;
+  phmatrix  G, G1;
+  prkmatrix r;
+  pamatrix  f;
+  pcluster *rc1;
+  uint     *ridx1, *cidx1;
+  uint      rows, cols;
+  uint      rsons, csons;
+  uint      roff1, coff1;
+  uint      lda, ldb, ldf;
+  uint      mtype;
+  uint      i, j, k, l;
+
+  line = fgets(buf, 80, in);
+  (*lineno)++;
+
+  if (line == 0) {
+    fprintf(stderr, "Unexpected end of file\n");
+
+    return 0;
+  }
+
+  /* Determine matrix type */
+  fields = sscanf(line, "Type %u", &mtype);
+  if (fields != 1) {
+    for (c = line; *c != '\0' && *c != '\n'; c++);
+    if (*c == '\n')
+      *c = '\0';
+
+    fprintf(stderr, "Expected \"Type ...\", got \"%s\"\n", line);
+
+    return 0;
+  }
+
+  /* Read offsets and compare to what we expect */
+  line = fgets(buf, 80, in);
+  (*lineno)++;
+  fields = sscanf(line, "row_offset = %u", &roff1);
+  assert(fields == 1);
+
+  line = fgets(buf, 80, in);
+  (*lineno)++;
+  fields = sscanf(line, "col_offset = %u", &coff1);
+  assert(fields == 1);
+
+  assert(roff == roff1);
+  assert(roff == coff1);
+
+  /* Read number of rows and columns */
+  line = fgets(buf, 80, in);
+  (*lineno)++;
+  fields = sscanf(line, "rows = %u", &rows);
+  assert(fields == 1);
+
+  line = fgets(buf, 80, in);
+  (*lineno)++;
+  fields = sscanf(line, "cols = %u", &cols);
+  assert(fields == 1);
+
+  assert(rows == cols);
+
+  /* If we have not inherited a row index, create one */
+  if (ridx == 0) {
+    ridx = (uint *) allocmem(sizeof(uint) * rows);
+    for (i = 0; i < rows; i++)
+      ridx[i] = i;
+  }
+
+  /* If we have not inherited a row cluster, create one */
+  if (*rc == 0)
+    *rc = new_cluster(rows, ridx, 0, 1);
+
+  G = 0;
+  switch (mtype) {
+  case 1:			/* rkmatrix */
+    /* Read rank */
+    line = fgets(buf, 80, in);
+    (*lineno)++;
+    fields = sscanf(line, "k = %u", &k);
+    assert(fields == 1);
+
+    line = fgets(buf, 80, in);
+    (*lineno)++;
+    fields = sscanf(line, "kt = %u", &k);
+    assert(fields == 1);
+
+    /* Create matrix */
+    G = new_rk_hmatrix(*rc, *rc, k);
+    r = G->r;
+    lda = r->A.ld;
+    ldb = r->B.ld;
+
+    /* Read A */
+    for (l = 0; l < k; l++)
+      for (i = 0; i < rows; i++) {
+	line = fgets(buf, 80, in);
+	(*lineno)++;
+	fields = sscanf(line, FIELD_SCANF_CS(, e),
+			FIELD_ADDR(r->A.a + i + l * lda));
+	assert(fields == 1);
+      }
+
+    /* Read B */
+    for (l = 0; l < k; l++)
+      for (j = 0; j < cols; j++) {
+	line = fgets(buf, 80, in);
+	(*lineno)++;
+	fields = sscanf(line, FIELD_SCANF_CS(, e),
+			FIELD_ADDR(r->B.a + j + l * ldb));
+	assert(fields == 1);
+      }
+    break;
+
+  case 2:			/* amatrix */
+    /* Create matrix */
+    G = new_full_hmatrix(*rc, *rc);
+    f = G->f;
+    ldf = f->ld;
+
+    /* Read coefficients */
+    for (j = 0; j < cols; j++)
+      for (i = 0; i < rows; i++) {
+	line = fgets(buf, 80, in);
+	(*lineno)++;
+	fields = sscanf(line, FIELD_SCANF_CS(, e),
+			FIELD_ADDR(f->a + i + j * ldf));
+	assert(fields == 1);
+      }
+    break;
+
+  case 3:			/* subdivided matrix */
+    /* Read number of block rows and columns */
+    line = fgets(buf, 80, in);
+    (*lineno)++;
+    fields = sscanf(line, "block_rows = %u", &rsons);
+    assert(fields == 1);
+
+    line = fgets(buf, 80, in);
+    (*lineno)++;
+    fields = sscanf(line, "block_cols = %u", &csons);
+    assert(fields == 1);
+    assert(rsons == csons);
+
+    /* Update row cluster if it didn't have sons before */
+    if ((*rc)->sons == 0)
+      setsons_cluster(*rc, rsons);
+    else
+      assert((*rc)->sons == rsons);
+
+    G = new_super_hmatrix(*rc, *rc, rsons, csons);
+
+    rc1 = (*rc)->son;
+
+    coff1 = roff;
+    cidx1 = ridx;
+    for (j = 0; j < csons; j++) {
+      roff1 = roff;
+      ridx1 = ridx;
+
+      for (i = 0; i < rsons; i++) {
+	G1 = (i == j ?
+	      read_hlibsymm_part(in, roff1, rc1 + i, ridx1, lineno) :
+	      read_hlib_part(in, roff1, coff1, rc1 + i, rc1 + j, ridx1, ridx1,
+			     lineno));
+	ref_hmatrix(G->son + i + j * rsons, G1);
+
+	roff1 += G1->rc->size;
+	ridx1 += G1->rc->size;
+      }
+      assert(roff1 == roff + rows);
+
+      coff1 += G->son[j * rsons]->cc->size;
+      cidx1 += G->son[j * rsons]->cc->size;
+    }
+    assert(coff1 == roff + cols);
+    break;
+
+  default:
+    ;
+  }
+
+  return G;
+}
+
+phmatrix
+read_hlibsymm_hmatrix(const char *filename)
+{
+  phmatrix  G;
+  FILE     *in;
+  char      buf[80], *line;
+  pcluster  rc;
+  uint      lineno;
+
+  in = fopen(filename, "r");
+  assert(in != 0);
+
+  line = fgets(buf, 80, in);
+  assert(line != 0);
+  lineno = 1;
+
+  rc = 0;
+  G = read_hlibsymm_part(in, 0, &rc, 0, &lineno);
+
+  line = fgets(buf, 80, in);
+  assert(line != 0);
+  lineno++;
+
+  fclose(in);
+
+  return G;
+}
+
 /* ------------------------------------------------------------
  Drawing
  ------------------------------------------------------------ */
@@ -1299,6 +2453,8 @@ read_hlib_hmatrix(const char *filename)
 static void
 cairodraw(cairo_t * cr, pchmatrix hm, bool storage, uint levels)
 {
+  cairo_text_extents_t extents;
+  char      buf[5];
   uint      rsons, csons;
   uint      rsize, csize;
   uint      roff, coff;
@@ -1348,6 +2504,19 @@ cairodraw(cairo_t * cr, pchmatrix hm, bool storage, uint levels)
 
 	cairo_rectangle(cr, 0.0, 0.0, csize, rsize);
 	cairo_stroke(cr);
+
+	if (hm->r->k > 0) {
+	  sprintf(buf, "%d", hm->r->k);
+	  cairo_set_font_size(cr, UINT_MIN(rsize, csize) / 2.5);
+	  cairo_text_extents(cr, buf, &extents);
+
+	  cairo_save(cr);
+	  cairo_translate(cr, (csize - extents.width) / 2.0,
+			  (rsize + extents.height) / 2.0);
+	  cairo_show_text(cr, buf);
+	  cairo_restore(cr);
+	}
+
       }
       else {
 	cairo_rectangle(cr, 0.0, 0.0, csize, rsize);
@@ -1357,7 +2526,26 @@ cairodraw(cairo_t * cr, pchmatrix hm, bool storage, uint levels)
 	  cairo_fill_preserve(cr);
 	  cairo_restore(cr);
 	}
+	if (hm->r->k == 0) {
+	  cairo_save(cr);
+	  cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+	  cairo_fill_preserve(cr);
+	  cairo_restore(cr);
+	}
+
 	cairo_stroke(cr);
+
+	if (hm->r->k > 0) {
+	  sprintf(buf, "%d", hm->r->k);
+	  cairo_set_font_size(cr, UINT_MIN(rsize, csize) / 2.5);
+	  cairo_text_extents(cr, buf, &extents);
+
+	  cairo_save(cr);
+	  cairo_translate(cr, (csize - extents.width) / 2.0,
+			  (rsize + extents.height) / 2.0);
+	  cairo_show_text(cr, buf);
+	  cairo_restore(cr);
+	}
       }
     }
     else if (hm->f) {
@@ -1398,8 +2586,7 @@ draw_cairo_hmatrix(cairo_t * cr, pchmatrix hm, bool storage, uint levels)
   scale = (scalex < scaley ? scalex : scaley);
 
   /* Center block in bounding box */
-  cairo_translate(cr,
-		  0.5 * (ex - sx - scale * rsize),
+  cairo_translate(cr, 0.5 * (ex - sx - scale * rsize),
 		  0.5 * (ey - sy - scale * csize));
 
   /* Scale coordinates */
@@ -1413,3 +2600,52 @@ draw_cairo_hmatrix(cairo_t * cr, pchmatrix hm, bool storage, uint levels)
   cairo_restore(cr);
 }
 #endif
+
+void
+copy_sparsematrix_hmatrix(psparsematrix sp, phmatrix hm)
+{
+
+  uint      i, j, k, l, m, rsize, csize;
+  uint     *ridx, *cidx, *row, *col;
+  pfield    coeff;
+  pamatrix  f;
+
+  if (hm->son) {
+    for (j = 0; j < hm->csons; j++) {
+      for (i = 0; i < hm->rsons; i++) {
+	copy_sparsematrix_hmatrix(sp, hm->son[i + j * (hm->rsons)]);
+      }
+    }
+  }
+  else if (hm->r) {		/*hm->r is defined, but hm->r->A = hm->r->B = NulL => all entries are 0 */
+
+  }
+  else if (hm->f) {
+    rsize = hm->rc->size;
+    csize = hm->cc->size;
+    ridx = hm->rc->idx;
+    cidx = hm->cc->idx;
+    row = sp->row;
+    col = sp->col;
+    coeff = sp->coeff;
+    f = hm->f;
+
+    for (j = 0; j < f->cols; j++)
+      for (i = 0; i < f->rows; i++)
+	f->a[i + j * f->rows] = 0.0;
+
+    for (k = 0; k < rsize; k++) {
+      i = ridx[k];
+      for (m = row[i]; m < row[i + 1]; m++) {
+	for (l = 0; l < csize; l++) {
+
+	  if (col[m] == cidx[l]) {
+
+	    setentry_amatrix(hm->f, k, l, coeff[m]);
+	  }
+	}
+      }
+    }
+
+  }
+}

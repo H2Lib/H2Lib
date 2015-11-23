@@ -131,6 +131,25 @@ admissible_max_cluster(pcluster rc, pcluster cc, void* data);
 HEADER_PREFIX bool
 admissible_sphere_cluster(pcluster rc, pcluster cc, void* data);
 
+/** @brief Check the euclidian minimum admissibility condition.
+ * 
+ * Checks the euclidianminimum admissibility of two @ref cluster trees 
+ * @f$ s @f$ and @f$ t @f$.
+ * The block @f$ (s,t) @f$ is admissible, if
+ * @f$ \min {\text{diam}_2 (B_s)  \text{diam}_2 (B_s)} \leq \eta 
+ * \text{dist}_2 (B_s, B_t) @f$. 
+ * @f$ B_s @f$ and @f$ B_t @f$ are the bounding boxes for @f$ s @f$ and 
+ * @f$ t @f$, @f$ \text{diam}_2 @f$ is the euclidian diameter, 
+ * @f$ \text{dist}_2 @f$ the euclidian distance.
+ * 
+ * @param rc Row cluster @f$t@f$.
+ * @param cc Col cluster @f$s@f$.
+ * @param data Has to be a pointer to real eta.
+ * @return TRUE, if the block @f$ (t,s) @f$ is admissible, otherwise FALSE.
+ */
+HEADER_PREFIX bool
+admissible_2_min_cluster(pcluster rc, pcluster cc, void* data);
+
 /* ------------------------------------------------------------
  Constructors and destructors
  ------------------------------------------------------------ */
@@ -211,6 +230,22 @@ build_nonstrict_block(pcluster rc, pcluster cc, void *data, admissible admis);
 HEADER_PREFIX pblock
 build_strict_block(pcluster rc, pcluster cc, void *data, admissible admis);
 
+/** @brief Build a strict lower triangular @ref block cluster tree.
+ *
+ * Builds a strict lower triangular block cluster tree from the row
+ * @ref cluster tree @f$ rc @f$ and the column @ref cluster tree @f$ cc @f$.
+ * A block cluster tree is called  strict, if all leaves @f$ (t,s) @f$ are
+ * admissible or @f$ t @f$ and @f$ s @f$ are leave cluster.
+ *
+ * @param rc Row cluster.
+ * @param cc Col Cluster.
+ * @param data Necessary data for the admissibility condition.
+ * @param admis Admissibility condition.
+ * @returns Returns a strict lower triangular block cluster tree.
+ */
+HEADER_PREFIX pblock
+build_strict_lower_block(pcluster rc, pcluster cc, void *data, admissible admis);
+
 /* ------------------------------------------------------------
  Drawing block cluster trees
  ------------------------------------------------------------ */
@@ -219,6 +254,14 @@ build_strict_block(pcluster rc, pcluster cc, void *data, admissible admis);
  * 
  */
 #ifdef USE_CAIRO
+/**
+ * @brief Draw a block tree to a cairo surface.
+ *
+ * @param cr Cairo surface to be drawn to.
+ * @param b The block tree that has to be drawn.
+ * @param levels Number of levels of the block tree, that should be drawn.
+ *   If @p levels == 0 holds, all levels will be drawn.
+ */
 HEADER_PREFIX void
 draw_cairo_block(cairo_t *cr, pcblock b, int levels);
 #endif
@@ -227,6 +270,11 @@ draw_cairo_block(cairo_t *cr, pcblock b, int levels);
  Interactive visualization
  ------------------------------------------------------------ */
 
+/**
+ * @brief Visualize a block tree in OpenGL.
+ *
+ * @param b The block tree that has to be drawn.
+ */
 HEADER_PREFIX void
 view_block(pcblock b);
 
@@ -285,8 +333,8 @@ HEADER_PREFIX void
 iterate_block(pcblock b, uint bname, uint rname, uint cname,
     void (*pre)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
         void *data),
-        void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
-            void *data), void *data);
+    void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
+        void *data), void *data);
 
 /** @brief Iterate through all subblocks of a @ref block cluster tree, rowwise.
  * 
@@ -349,8 +397,8 @@ iterate_byrow_block(pcblock b, uint bname, uint rname, uint cname,
     uint pardepth,
     void (*pre)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
         void *data),
-        void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
-            void *data), void *data);
+    void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
+        void *data), void *data);
 
 /** @brief Iterate through all subblocks of a @ref block cluster tree.
  * 
@@ -374,8 +422,8 @@ iterate_bycol_block(pcblock b, uint bname, uint rname, uint cname,
     uint pardepth,
     void (*pre)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
         void *data),
-        void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
-            void *data), void *data);
+    void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
+        void *data), void *data);
 
 /* ------------------------------------------------------------
  Enumeration
@@ -420,6 +468,7 @@ enumerate_level_block(pblock t);
  * Compute the maximal depth of a block cluster tree.
  * 
  * @param b Block cluster object
+ * @return Returns the maximal depth of @p b.
  */
 HEADER_PREFIX uint
 getdepth_block(pcblock b);

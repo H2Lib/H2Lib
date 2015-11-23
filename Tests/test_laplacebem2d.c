@@ -7,7 +7,7 @@ static uint problems = 0;
 #define IS_IN_RANGE(a, b, c) (((a) <= (b)) && ((b) <= (c)))
 
 /* Compute the L_2-error for constant basis functions */
-static real
+static    real
 L2gamma_c_diff_norm2(pbem2d bem, pavector x, boundary_func2d rhs)
 {
   pccurve2d gr = bem->gr;
@@ -405,7 +405,7 @@ main(int argc, char **argv)
    * Test Interpolation
    */
 
-  m = 9;
+  m = 8;
 
   setup_h2matrix_aprx_inter_bem2d(bem_slp, Vrb, Vcb, block, m);
   setup_h2matrix_aprx_inter_bem2d(bem_dlp, KMrb, KMcb, block, m);
@@ -585,7 +585,7 @@ main(int argc, char **argv)
    * Test Interpolation
    */
 
-  m = 9;
+  m = 8;
 
   setup_h2matrix_aprx_inter_bem2d(bem_slp, Vrb, Vcb, block, m);
   setup_h2matrix_aprx_inter_bem2d(bem_dlp, KMrb, KMcb, block, m);

@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "harith.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2014
- ------------------------------------------------------------ */
+ * This is the file "harith.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2014
+ * ------------------------------------------------------------ */
 
 /** @file harith.h
  @author Steffen B&ouml;rm
@@ -31,8 +32,63 @@ HEADER_PREFIX void
 trunc_rkmatrix(pctruncmode tm, real eps, prkmatrix r);
 
 /* ------------------------------------------------------------
- * Truncated addition
+ * Matrix addition
  * ------------------------------------------------------------ */
+
+/** @brief Truncated addition of a matrix to a low-rank matrices
+ *  in @ref rkmatrix representation,
+ *  @f$B \gets \operatorname{trunc}(B+\alpha A,\epsilon)@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param a Matrix @f$A@f$.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy @f$\epsilon@f$.
+ *  @param b Target matrix @f$B@f$. */
+HEADER_PREFIX void
+add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a,
+		     pctruncmode tm, real eps, prkmatrix b);
+
+///* @brief Truncated addition of a full matrix to a low-rank matrix
+// *  in @ref rkmatrix representation,
+// *  @f$B \gets \operatorname{trunc}(B+\alpha A,\epsilon)@f$.
+// *
+// *  This version uses a rank-revealing QR factorization instead
+// *  of the standard singular value decomposition. This method
+// *  may lead to larger ranks, but may also be faster in some
+// *  applications.
+// *
+// *  @param alpha Scaling factor @f$\alpha@f$.
+// *  @param a Source matrix @f$A@f$.
+// *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+// *  @param tm Truncation mode.
+// *  @param eps Truncation accuracy @f$\epsilon@f$.
+// *  @param b Target matrix @f$B@f$. */
+//HEADER_PREFIX void
+//add2_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a,
+//		      pctruncmode tm, real eps, prkmatrix b);
+
+/** @brief Addition of a low-rank matrix to a matrix,
+ *  @f$B \gets B+\alpha A@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param a Matrix @f$A@f$.
+ *  @param b Target matrix @f$B@f$. */
+HEADER_PREFIX void
+add_rkmatrix_amatrix(field alpha, bool atrans, pcrkmatrix a, pamatrix b);
+
+/** @brief Addition of a hierarchical matrix to a matrix,
+ *  @f$B \gets B+\alpha A@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param a Matrix @f$A@f$.
+ *  @param b Target matrix @f$B@f$. */
+HEADER_PREFIX void
+add_hmatrix_amatrix(field alpha,
+		    bool atrans, pchmatrix a,
+		    pamatrix b);
 
 /** @brief Truncated addition of two low-rank matrices in @ref rkmatrix
  *  representation,
@@ -45,20 +101,81 @@ trunc_rkmatrix(pctruncmode tm, real eps, prkmatrix r);
  *  @param trg Target matrix @f$A@f$. */
 HEADER_PREFIX void
 add_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm, real eps,
-    prkmatrix trg);
+	     prkmatrix trg);
+
+///* @brief Truncated addition of two low-rank matrices in @ref rkmatrix
+// *  representation,
+// *  @f$B \gets \operatorname{trunc}(B+\alpha A,\epsilon)@f$.
+// *
+// *  This version uses a rank-revealing QR factorization instead
+// *  of the standard singular value decomposition. This method
+// *  may lead to larger ranks, but may also be faster in some
+// *  applications.
+// *
+// *  @param alpha Scaling factor @f$\alpha@f$.
+// *  @param a Source matrix @f$A@f$.
+// *  @param tm Truncation mode.
+// *  @param eps Truncation accuracy @f$\epsilon@f$.
+// *  @param b Target matrix @f$B@f$. */
+//HEADER_PREFIX void
+//add2_rkmatrix(field alpha, pcrkmatrix a,
+//	      pctruncmode tm, real eps, prkmatrix b);
+
+/** @brief Locally truncated addition of a matrix in @ref amatrix
+ *  representation to a hierarchical matrix in @ref hmatrix representation,
+ *  @f$B \gets \operatorname{blocktrunc}(B + \alpha A,\epsilon)@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param a Matrix @f$A@f$.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy @f$\epsilon@f$.
+ *  @param b Target @ref hmatrix @f$B@f$. */
+HEADER_PREFIX void
+add_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a,
+		    pctruncmode tm, real eps, phmatrix b);
+
+/** @brief Locally truncated addition of a matrix in @ref amatrix
+ *  representation to the lower triangular part of a hierarchical matrix
+ *  in @ref hmatrix representation,
+ *  @f$\operatorname{lower}(B) \gets \operatorname{blocktrunc}(\operatorname{lower}(B + \alpha A),\epsilon)@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param a Matrix @f$A@f$.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy @f$\epsilon@f$.
+ *  @param b Target @ref hmatrix @f$B@f$. */
+HEADER_PREFIX void
+add_lower_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a,
+			  pctruncmode tm, real eps, phmatrix b);
 
 /** @brief Locally truncated addition of a low-rank matrix in @ref rkmatrix
  *  representation to a hierarchical matrix in @ref hmatrix representation,
- *  @f$A \gets \operatorname{blocktrunc}(A + \alpha B,\epsilon)@f$.
+ *  @f$B \gets \operatorname{blocktrunc}(B + \alpha A,\epsilon)@f$.
  *
  *  @param alpha Scaling factor @f$\alpha@f$.
- *  @param r Low-rank matrix @f$B@f$.
+ *  @param a Low-rank matrix @f$A@f$.
  *  @param tm Truncation mode.
  *  @param eps Truncation accuracy @f$\epsilon@f$.
- *  @param a Target @ref hmatrix @f$A@f$. */
+ *  @param b Target @ref hmatrix @f$B@f$. */
 HEADER_PREFIX void
-add_rkmatrix_hmatrix(field alpha, pcrkmatrix r, pctruncmode tm, real eps,
-    phmatrix a);
+add_rkmatrix_hmatrix(field alpha, pcrkmatrix a, pctruncmode tm, real eps,
+    phmatrix b);
+
+/** @brief Locally truncated addition of a low-rank matrix in @ref rkmatrix
+ *  representation to the lower triangular part of a hierarchical matrix
+ *  in @ref hmatrix representation,
+ *  @f$\operatorname{lower}(B) \gets \operatorname{blocktrunc}(\operatorname{lower}(B + \alpha A),\epsilon)@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param a Low-rank matrix @f$A@f$.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy @f$\epsilon@f$.
+ *  @param b Target @ref hmatrix @f$B@f$. */
+HEADER_PREFIX void
+add_lower_rkmatrix_hmatrix(field alpha, pcrkmatrix a,
+			   pctruncmode tm, real eps, phmatrix b);
 
 /** @brief Locally truncated addition of a hierarchical matrix to
  *  a hierarchical matrix representation,
@@ -76,17 +193,92 @@ add_hmatrix(field alpha, pchmatrix a, pctruncmode tm, real eps, phmatrix b);
  * Splitting and merging H-matrices
  * ------------------------------------------------------------ */
 
-/** @brief Split a leaf @ref hmatrix into submatrices.
+///* @brief Split an @ref amatrix into submatrices.
+// *
+// *  @param f Original matrix.
+// *  @param rc Row cluster.
+// *  @param cc Column cluster.
+// *  @param rsplit Set to split in row direction.
+// *  @param csplit Set to split in column direction.
+// *  @param copy Set to copy values into new matrix, otherwise it
+// *     will be zero.
+// *  @returns Block matrix of depth one. */
+//HEADER_PREFIX phmatrix
+//split_amatrix(pcamatrix f, pccluster rc, pccluster cc,
+//	      bool rsplit, bool csplit, bool copy);
+
+/** @brief Split an @ref amatrix into submatrices referencing the
+ *  original matrix.
  *
- *  @param hm Leaf @ref hmatrix.
+ *  @param f Original matrix.
+ *  @param rc Row cluster.
+ *  @param cc Column cluster.
+ *  @param rsplit Set to split in row direction.
+ *  @param csplit Set to split in column direction.
+ *  @returns Block matrix of depth one. */
+HEADER_PREFIX phmatrix
+split_sub_amatrix(pcamatrix f, pccluster rc, pccluster cc,
+		  bool rsplit, bool csplit);
+
+/** @brief Split an @ref rkmatrix into submatrices.
+ *
+ *  @param r Original matrix.
+ *  @param rc Row cluster.
+ *  @param cc Column cluster.
  *  @param rsplit Set to split in row direction.
  *  @param csplit Set to split in column direction.
  *  @param copy Set to copy values into new matrix, otherwise it
  *     will be zero.
- *  @returns Block matrix of depth one or zero according to
- *     <tt>rsplit</tt> and <tt>csplit</tt>. */
+ *  @returns Block matrix of depth one. */
 HEADER_PREFIX phmatrix
-split_hmatrix(phmatrix hm, bool rsplit, bool csplit, bool copy);
+split_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc,
+	       bool rsplit, bool csplit, bool copy);
+
+/** @brief Split an @ref rkmatrix into submatrices referencing the
+ *  original matrix.
+ *
+ *  @attention Since the blocks of the result contain only references
+ *  to the original matrix, they cannot be resized, and changing
+ *  them changes the other submatrices in the same row and column.
+ *  It's probably best to treat the submatrices as constant.
+ *
+ *  @param r Original matrix.
+ *  @param rc Row cluster.
+ *  @param cc Column cluster.
+ *  @param rsplit Set to split in row direction.
+ *  @param csplit Set to split in column direction.
+ *  @returns Block matrix of depth one. */
+HEADER_PREFIX phmatrix
+split_sub_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc,
+		   bool rsplit, bool csplit);
+
+///* @brief Split a leaf @ref hmatrix into submatrices.
+// *
+// *  @param hm Leaf @ref hmatrix.
+// *  @param rsplit Set to split in row direction.
+// *  @param csplit Set to split in column direction.
+// *  @param copy Set to copy values into new matrix, otherwise it
+// *     will be zero.
+// *  @returns Block matrix of depth one or zero according to
+// *     <tt>rsplit</tt> and <tt>csplit</tt>. */
+//HEADER_PREFIX phmatrix
+//split_hmatrix(phmatrix hm, bool rsplit, bool csplit, bool copy);
+//
+///* @brief Split a leaf @ref hmatrix into submatrices referencing
+// *  the original matrix.
+// *
+// *  @attention Since the blocks of the result contain only references
+// *  to the original matrix, they cannot be resized, and changing
+// *  them changes the original matrix.
+// *
+// *  @param hm Leaf @ref hmatrix.
+// *  @param rsplit Set to split in row direction.
+// *  @param csplit Set to split in column direction.
+// *  @returns Block matrix of depth one or zero according to
+// *     <tt>rsplit</tt> and <tt>csplit</tt>. */
+//HEADER_PREFIX phmatrix
+//split_sub_hmatrix(phmatrix hm,
+//		  bool rsplit, bool csplit);
 
 /** @brief Block-merge two rk matrices into a new rk matrix,
  *  @f$A \gets \operatorname{trunc}\left(\begin{pmatrix} A & B \end{pmatrix},\epsilon\right)@f$ or
@@ -138,7 +330,7 @@ HEADER_PREFIX void
 addmul_rkmatrix_amatrix_amatrix(field alpha, bool atrans, pcrkmatrix a,
     bool btrans, pcamatrix b, bool ctrans, pamatrix c);
 
-/** @brief Multiply a matrix by an @ref hmatrix,
+/** @brief Multiply a matrix by a @ref hmatrix,
  *  @f$C \gets C + \alpha A B@f$.
  *
  *  @remark The matrices @f$C@f$ and @f$B@f$ are assumed to be
@@ -170,6 +362,23 @@ addmul_hmatrix_amatrix_amatrix(field alpha, bool atrans, pchmatrix a,
 HEADER_PREFIX void
 addmul_hmatrix(field alpha, bool xtrans, pchmatrix x, bool ytrans, pchmatrix y,
     pctruncmode tm, real eps, phmatrix z);
+
+/** @brief Multiply two H-matrices, computing only the lower triangular
+ *  part of the result,
+ *  @f$\operatorname{lower}(Z) \gets \operatorname{succtrunc}(\operatorname{lower}(Z + \alpha X Y),\epsilon)@f$.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param xtrans Set if @f$X^*@f$ is to be used instead of @f$X@f$.
+ *  @param x Hierarchical matrix @f$X@f$.
+ *  @param ytrans Set if @f$Y^*@f$ is to be used instead of @f$Y@f$.
+ *  @param y Hierarchical matrix @f$Y@f$.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy @f$\epsilon@f$.
+ *  @param z Target matrix @f$Z@f$. */
+HEADER_PREFIX void
+addmul_lower_hmatrix(field alpha,
+		     bool xtrans, pchmatrix x, bool ytrans, pchmatrix y,
+		     pctruncmode tm, real eps, phmatrix z);
 
 /* ------------------------------------------------------------
  * Matrix inversion

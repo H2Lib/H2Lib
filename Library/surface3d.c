@@ -95,9 +95,8 @@ prepare_surface3d(psurface3d gr)
     b *= b;
     c *= c;
 
-    height =
-      REAL_SQRT(2 * (a * b + b * c + a * c) -
-		(a * a + b * b + c * c)) / height;
+    height = REAL_SQRT(2 * (a * b + b * c + a * c) - (a * a + b * b + c * c))
+      / height;
 
     hmin = REAL_MIN(hmin, height);
     hmax = REAL_MAX(hmax, height);
@@ -426,7 +425,10 @@ read_surface3d(const char *filename)
   for (i = 0; i < vertices; i++) {
     line = readline(buf, 80, in, &ln);
 
-    if (line == 0 || sscanf(line, "%lf %lf %lf", x[i], x[i] + 1, x[i] + 2)
+    if (line == 0
+	|| sscanf(line,
+		  "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %" SCANF_PREFIX "f",
+		  x[i], x[i] + 1, x[i] + 2)
 	!= 3) {
       (void) fprintf(stderr,
 		     "Could not read vertex %u in line %u of file \"%s\"\n",
@@ -866,7 +868,9 @@ read_netgen_surface3d(const char *filename)
 	line = readline(buf, 255, in, &ln);
 	i = 0;
 	while (line != NULL && strcmp(line, "\n") != 0) {
-	  sscanf(line, "%lf %lf %lf", &x[i][0], &x[i][1], &x[i][2]);
+	  sscanf(line,
+		 "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %" SCANF_PREFIX "f",
+		 &x[i][0], &x[i][1], &x[i][2]);
 	  i++;
 	  line = readline(buf, 255, in, &ln);
 	}

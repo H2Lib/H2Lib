@@ -12,6 +12,12 @@ static uint problems = 0;
 
 #define IS_IN_RANGE(a, b, c) (((a) <= (b)) && ((b) <= (c)))
 
+#ifdef USE_FLOAT
+static real tolerance = 1.0e-6;
+#else
+static real tolerance = 5.0e-8;
+#endif
+
 int
 main(int argc, char **argv)
 {
@@ -59,12 +65,12 @@ main(int argc, char **argv)
 
   clf = 16;
   eta = 1.0;
-  m = 2;
+  m = 4;
   l = 1;
   delta = 1.0;
-  eps_aca = 1.0e-7;
+  eps_aca = tolerance * 0.1;
 
-  eps = 1.0e-6;
+  eps = tolerance;
 
   (void) printf("========================================\n"
 		"Creating curve2d circle\n");
@@ -147,16 +153,17 @@ main(int argc, char **argv)
     addeval_amatrix_avector(-1.0, G, x, y);
     error = norm2_avector(y);
     (void) printf("  Difference for constant vector: %.4g %s okay\n", error,
-		  IS_IN_RANGE(1.0e-13, error,
-			      3.0e-13) ? "       " : "   NOT ");
-    if (!IS_IN_RANGE(1.0e-13, error, 3.0e-13))
+		  IS_IN_RANGE(0.0, error,
+			      10.0 * tolerance) ? "       " : "   NOT ");
+    if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
       problems++;
 
     (void) printf("Rel. spectral error bound by power iteration\n");
     error = norm2diff_amatrix_h2matrix(G2, G) / normG;
     (void) printf("  %.4e                                %s okay\n", error,
-		  IS_IN_RANGE(6.0e-9, error, 6.0e-8) ? "       " : "   NOT ");
-    if (!IS_IN_RANGE(6.0e-9, error, 6.0e-8))
+		  IS_IN_RANGE(0.0, error,
+			      10.0 * tolerance) ? "       " : "   NOT ");
+    if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
       problems++;
 
     del_avector(y);
@@ -214,14 +221,16 @@ main(int argc, char **argv)
 
   error = compareweights_clusteroperator(rw, rw2);
   (void) printf("  Relative row weight error %.4e      %s okay\n", error,
-		IS_IN_RANGE(0.0, error, 1.0e-14) ? "       " : "   NOT ");
-  if (!IS_IN_RANGE(0.0, error, 1e-14))
+		IS_IN_RANGE(0.0, error,
+			    10.0 * tolerance) ? "       " : "   NOT ");
+  if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
     problems++;
 
   error = compareweights_clusteroperator(cw, cw2);
   (void) printf("  Relative column weight error %.4e   %s okay\n", error,
-		IS_IN_RANGE(0.0, error, 1.0e-14) ? "       " : "   NOT ");
-  if (!IS_IN_RANGE(0.0, error, 1e-14))
+		IS_IN_RANGE(0.0, error,
+			    10.0 * tolerance) ? "       " : "   NOT ");
+  if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
     problems++;
 
   del_clusteroperator(cw2);
@@ -288,8 +297,9 @@ main(int argc, char **argv)
   (void) printf("Rel. spectral error bound by power iteration\n");
   error = norm2diff_h2matrix(G2, G3) / normG;
   (void) printf("  %.4e                                %s okay\n", error,
-		IS_IN_RANGE(6.0e-9, error, 6.0e-8) ? "       " : "   NOT ");
-  if (!IS_IN_RANGE(6.0e-9, error, 6.0e-8))
+		IS_IN_RANGE(0.0, error,
+			    10.0 * tolerance) ? "       " : "   NOT ");
+  if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
     problems++;
 
   (void) printf("========================================\n"
@@ -298,6 +308,14 @@ main(int argc, char **argv)
   Gh = build_from_block_hmatrix(broot, m);
   sz = getsize_hmatrix(Gh);
   (void) printf("  %.2f KB (%.2f KB/DoF)\n", sz / 1024.0, sz / 1024.0 / n);
+
+  sz = getfarsize_hmatrix(Gh);
+  (void) printf("   far:  %.2f KB (%.2f KB/DoF)\n", sz / 1024.0,
+		sz / 1024.0 / n);
+
+  sz = getnearsize_hmatrix(Gh);
+  (void) printf("   near: %.2f KB (%.2f KB/DoF)\n", sz / 1024.0,
+		sz / 1024.0 / n);
 
   (void) printf("Filling H-matrix structure\n");
   setup_hmatrix_aprx_greenhybrid_row_bem2d(bem, root, root, broot, m, l,
@@ -349,8 +367,9 @@ main(int argc, char **argv)
   (void) printf("Rel. spectral error bound by power iteration\n");
   error = norm2diff_hmatrix_h2matrix(G4, Gh) / normG;
   (void) printf("  %.4e                                %s okay\n", error,
-		IS_IN_RANGE(6.0e-9, error, 6.0e-8) ? "       " : "   NOT ");
-  if (!IS_IN_RANGE(6.0e-9, error, 6.0e-8))
+		IS_IN_RANGE(0.0, error,
+			    10.0 * tolerance) ? "       " : "   NOT ");
+  if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
     problems++;
 
   (void) printf("========================================\n");
@@ -385,8 +404,9 @@ main(int argc, char **argv)
   (void) printf("Rel. spectral error bound by power iteration\n");
   error = norm2diff_hmatrix_h2matrix(G6, Gh) / normG;
   (void) printf("  %.4e                                %s okay\n", error,
-		IS_IN_RANGE(6.0e-9, error, 6.0e-8) ? "       " : "   NOT ");
-  if (!IS_IN_RANGE(6.0e-9, error, 6.0e-8))
+		IS_IN_RANGE(0.0, error,
+			    10.0 * tolerance) ? "       " : "   NOT ");
+  if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
     problems++;
 
   G5 = 0;
@@ -433,8 +453,9 @@ main(int argc, char **argv)
     (void) printf("Rel. spectral error bound by power iteration\n");
     error = norm2diff_amatrix_h2matrix(G5, G) / normG;
     (void) printf("  %.4e                                %s okay\n", error,
-		  IS_IN_RANGE(6.0e-9, error, 6.0e-8) ? "       " : "   NOT ");
-    if (!IS_IN_RANGE(6.0e-9, error, 6.0e-8))
+		  IS_IN_RANGE(0.0, error,
+			      10.0 * tolerance) ? "       " : "   NOT ");
+    if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
       problems++;
   }
 

@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "h2arith.c" of the H2Lib package.
- All rights reserved, Knut Reimer 2012
- ------------------------------------------------------------ */
+ * This is the file "h2arith.c" of the H2Lib package.
+ * All rights reserved, Knut Reimer 2012
+ * ------------------------------------------------------------ */
 
 #include <stdio.h>
 
@@ -237,8 +238,8 @@ tolower_h2matrix(ph2matrix A)
 }
 
 /* ------------------------------------------------------------
- Sum
- ------------------------------------------------------------ */
+ * Sum
+ * ------------------------------------------------------------ */
 
 void
 add_hmatrix_h2matrix(pchmatrix Gh, ph2matrix Gh2, pclusteroperator rwf,
@@ -269,16 +270,14 @@ add_hmatrix_h2matrix(pchmatrix Gh, ph2matrix Gh2, pclusteroperator rwf,
     assert(Gh2->f);
     add_amatrix(1.0, false, Gh->f, Gh2->f);
   }
-  /* in else if ändern */
-  else {
-    assert(Gh->r);
+  else if (Gh->r) {
     rkupdate_h2matrix(Gh->r, Gh2, rwf, cwf, tm, eps);
   }
 }
 
 /* ------------------------------------------------------------
- Convert functions
- ------------------------------------------------------------ */
+ * Convert functions
+ * ------------------------------------------------------------ */
 
 pamatrix
 convert_h2matrix_amatrix(bool h2trans, pch2matrix h2)
@@ -449,8 +448,8 @@ convert_h2matrix_hmatrix(pch2matrix h2)
 }
 
 /* ------------------------------------------------------------
- Multiplication
- ------------------------------------------------------------ */
+ * Multiplication
+ * ------------------------------------------------------------ */
 
 prkmatrix
 mul_h2matrix_1_rkmatrix(pch2matrix A, pch2matrix B, real tol)
@@ -501,7 +500,7 @@ mul_h2matrix_1_rkmatrix(pch2matrix A, pch2matrix B, real tol)
       addmul_h2matrix_amatrix_amatrix(1.0, true, B, true, A->f, &R->B);
     }
     else {
-      /*      R = (prkmatrix) allocmem(sizeof(rkmatrix));
+      /* R = (prkmatrix) allocmem(sizeof(rkmatrix));
          R->k = s; */
       R = new_rkmatrix(rows, cols, s);
       copy_amatrix(false, A->f, &R->A);
@@ -521,11 +520,11 @@ mul_h2matrix_1_rkmatrix(pch2matrix A, pch2matrix B, real tol)
       addmul_h2matrix_amatrix_amatrix(1.0, false, A, false, B->f, &R->A);
     }
     else {
-      /*R = (prkmatrix) allocmem(sizeof(rkmatrix));
+      /* R = (prkmatrix) allocmem(sizeof(rkmatrix));
          R->k = s; */
       R = new_rkmatrix(rows, cols, s);
       tmp = convert_h2matrix_amatrix(false, A);
-      /*R->A = *tmp; */
+      /* R->A = *tmp; */
       copy_amatrix(false, tmp, &R->A);
       del_amatrix(tmp);
 
@@ -1146,14 +1145,15 @@ invert_h2matrix(ph2matrix h2, pclusteroperator rwf, pclusteroperator cwf,
 }
 
 /* ------------------------------------------------------------
- Forward / backward substitution
- ------------------------------------------------------------ */
+ * Forward / backward substitution
+ * ------------------------------------------------------------ */
+
 /* ------------------------------------------------------------
- lower-/uppersolve_h2matrix_avector
- ------------------------------------------------------------ */
+ * lower-/uppersolve_h2matrix_avector
+ * ------------------------------------------------------------ */
 
 /* x = L^{-1}*x
- L is lower triangular part of a */
+ * L is lower triangular part of a */
 void
 lowersolve_h2matrix_1_avector(bool unit, pch2matrix a, pavector x)
 {
@@ -1207,7 +1207,7 @@ lowersolve_h2matrix_1_avector(bool unit, pch2matrix a, pavector x)
 }
 
 /* x = R^{-T}*x 
- R is upper triangular part of a */
+ * R is upper triangular part of a */
 static void
 lowersolve_h2matrix_2_avector(bool unit, pch2matrix a, pavector x)
 {
@@ -1261,8 +1261,8 @@ lowersolve_h2matrix_2_avector(bool unit, pch2matrix a, pavector x)
 }
 
 /* x = T^{-1}*x 
- T is lower triangular matrix
- lower triangular or transposed upper triangular part of a */
+ * T is lower triangular matrix
+ * lower triangular or transposed upper triangular part of a */
 void
 lowersolve_h2matrix_avector(bool unit, bool atrans, pch2matrix a, pavector x)
 {
@@ -1273,7 +1273,7 @@ lowersolve_h2matrix_avector(bool unit, bool atrans, pch2matrix a, pavector x)
 }
 
 /* x = R^{-1}*x 
- R is upper triangular part of a */
+ * R is upper triangular part of a */
 static void
 uppersolve_h2matrix_1_avector(bool unit, pch2matrix a, pavector x)
 {
@@ -1326,7 +1326,7 @@ uppersolve_h2matrix_1_avector(bool unit, pch2matrix a, pavector x)
 }
 
 /* x = L^{-T}*x 
- L is lower triangular part of a */
+ * L is lower triangular part of a */
 static void
 uppersolve_h2matrix_2_avector(bool unit, pch2matrix a, pavector x)
 {
@@ -1380,8 +1380,8 @@ uppersolve_h2matrix_2_avector(bool unit, pch2matrix a, pavector x)
 }
 
 /* x = T^{-1}*x 
- T is upper triangular matrix
- upper triangular or transposed lower triangular part of a */
+ * T is upper triangular matrix
+ * upper triangular or transposed lower triangular part of a */
 void
 uppersolve_h2matrix_avector(bool unit, bool atrans, pch2matrix a, pavector x)
 {
@@ -1392,11 +1392,11 @@ uppersolve_h2matrix_avector(bool unit, bool atrans, pch2matrix a, pavector x)
 }
 
 /* ------------------------------------------------------------
- lower-/uppersolve_h2matrix_amatrix
- ------------------------------------------------------------ */
+ * lower-/uppersolve_h2matrix_amatrix
+ * ------------------------------------------------------------ */
 
 /* X = T^{-1}*X 
- T is lower triangular part of A */
+ * T is lower triangular part of A */
 static void
 lowersolve_h2matrix_1_amatrix(bool unit, pch2matrix a, bool xtrans,
 			      pamatrix x)
@@ -1453,7 +1453,7 @@ lowersolve_h2matrix_1_amatrix(bool unit, pch2matrix a, bool xtrans,
 }
 
 /* X = T^{-T}*X
- T is upper triangular part of A */
+ * T is upper triangular part of A */
 static void
 lowersolve_h2matrix_2_amatrix(bool unit, pch2matrix a, bool xtrans,
 			      pamatrix x)
@@ -1519,7 +1519,7 @@ lowersolve_h2matrix_amatrix(bool unit, bool atrans, pch2matrix A,
 }
 
 /* X = T^{-1}*X 
- T is upper triangular part of A */
+ * T is upper triangular part of A */
 static void
 uppersolve_h2matrix_1_amatrix(bool unit, pch2matrix a, bool xtrans,
 			      pamatrix x)
@@ -1581,7 +1581,7 @@ uppersolve_h2matrix_1_amatrix(bool unit, pch2matrix a, bool xtrans,
 }
 
 /* X = T^{-T}*X
- T is upper triangular part of A */
+ * T is upper triangular part of A */
 static void
 uppersolve_h2matrix_2_amatrix(bool unit, pch2matrix a, bool xtrans,
 			      pamatrix x)
@@ -1652,11 +1652,11 @@ uppersolve_h2matrix_amatrix(bool unit, bool atrans, pch2matrix A,
 }
 
 /* ------------------------------------------------------------
- lower-/uppersolve_amatrix_h2matrix
- ------------------------------------------------------------ */
+ * lower-/uppersolve_amatrix_h2matrix
+ * ------------------------------------------------------------ */
 
 /* R = T^{-1}*X 
- T is lower triangular part of L */
+ * T is lower triangular part of L */
 static void
 lowersolve_amatrix_1_h2matrix(bool unit, pcamatrix L, pch2matrix X,
 			      ph2matrix R, pclusteroperator rwfup,
@@ -1699,7 +1699,7 @@ lowersolve_amatrix_1_h2matrix(bool unit, pcamatrix L, pch2matrix X,
 }
 
 /* R^T = T^{-1}*X^T 
- T is lower triangular part of L */
+ * T is lower triangular part of L */
 static void
 lowersolve_amatrix_2_h2matrix(bool unit, pcamatrix L, pch2matrix X,
 			      ph2matrix R, pclusteroperator rwfup,
@@ -1743,7 +1743,7 @@ lowersolve_amatrix_2_h2matrix(bool unit, pcamatrix L, pch2matrix X,
 }
 
 /* L = T^{-T}*X 
- T is upper triangular part of R */
+ * T is upper triangular part of R */
 static void
 lowersolve_amatrix_3_h2matrix(bool unit, pcamatrix L, pch2matrix X,
 			      ph2matrix R, pclusteroperator rwfup,
@@ -1758,12 +1758,13 @@ lowersolve_amatrix_3_h2matrix(bool unit, pcamatrix L, pch2matrix X,
   (void) tm;
   (void) tol;
 
-  printf
-    ("Die Funktion lowersolve_amatrix_h2matrix_3 muss noch implementiert werden!\n");
+  printf("The function lowersolve_amatrix_h2matrix_3 has not yet "
+	 "been implemented\n");
+  abort();
 }
 
 /* L^T = T^{-T}*X^T 
- T is upper triangular part of R */
+ * T is upper triangular part of R */
 static void
 lowersolve_amatrix_4_h2matrix(bool unit, pcamatrix R, pch2matrix X,
 			      ph2matrix L, pclusteroperator rwflow,
@@ -1827,7 +1828,7 @@ lowersolve_amatrix_h2matrix(bool unit, bool atrans, pcamatrix A,
 }
 
 /* R = T^{-1}*X 
- T is lower triangular part of L */
+ * T is lower triangular part of L */
 static void
 uppersolve_amatrix_1_h2matrix(bool unit, pcamatrix a, ph2matrix x,
 			      pclusteroperator rwf, pclusteroperator cwf,
@@ -1874,14 +1875,13 @@ uppersolve_amatrix_1_h2matrix(bool unit, pcamatrix a, ph2matrix x,
     rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
     del_rkmatrix(r);
   }
-  else {
-    assert(x->f != 0);
+  else if (x->f != 0) {
     triangularsolve_amatrix(false, unit, false, a, false, x->f);
   }
 }
 
 /* R^T = T^{-1}*X^T 
- T is upper triangular part of L */
+ * T is upper triangular part of L */
 static void
 uppersolve_amatrix_2_h2matrix(bool unit, pcamatrix L, ph2matrix R,
 			      pclusteroperator rwfup, pclusteroperator cwfup,
@@ -1895,12 +1895,13 @@ uppersolve_amatrix_2_h2matrix(bool unit, pcamatrix L, ph2matrix R,
   (void) tm;
   (void) tol;
 
-  printf
-    ("Die Funktion uppersolve_amatrix_h2matrix_2 muss noch implementiert werden!\n");
+  printf("The function uppersolve_amatrix_h2matrix_2 has not yet "
+	 "been implemented\n");
+  abort();
 }
 
 /* L = T^{-T}*X 
- T is lower triangular part of R */
+ * T is lower triangular part of R */
 static void
 uppersolve_amatrix_3_h2matrix(bool unit, pcamatrix L, ph2matrix R,
 			      pclusteroperator rwfup, pclusteroperator cwfup,
@@ -1914,12 +1915,13 @@ uppersolve_amatrix_3_h2matrix(bool unit, pcamatrix L, ph2matrix R,
   (void) tm;
   (void) tol;
 
-  printf
-    ("Die Funktion uppersolve_amatrix_h2matrix_3 muss noch implementiert werden!\n");
+  printf("The function uppersolve_amatrix_h2matrix_3 has not yet "
+	 "been implemented\n");
+  abort();
 }
 
 /* L^T = T^{-T}*X^T 
- T is lower triangular part of R */
+ * T is lower triangular part of R */
 static void
 uppersolve_amatrix_4_h2matrix(bool unit, pcamatrix a, ph2matrix x,
 			      pclusteroperator rwf, pclusteroperator cwf,
@@ -1966,8 +1968,7 @@ uppersolve_amatrix_4_h2matrix(bool unit, pcamatrix a, ph2matrix x,
     rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
     del_rkmatrix(r);
   }
-  else {
-    assert(x->f != 0);
+  else if (x->f != 0) {
     triangularsolve_amatrix(true, unit, true, a, true, x->f);
   }
 }
@@ -1996,7 +1997,7 @@ uppersolve_amatrix_h2matrix(bool unit, bool atrans, pcamatrix A,
  ------------------------------------------------------------ */
 
 /* R = T^{-1}*X 
- T is lower triangular part of L */
+ * T is lower triangular part of L */
 static void
 lowersolve_h2matrix_1_h2matrix(bool unit, pch2matrix L, ph2matrix X,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2140,7 +2141,7 @@ lowersolve_h2matrix_2_h2matrix(bool unit, pch2matrix L, ph2matrix X,
 }
 
 /* L = T^{-T}X
- T is upper triangular part of R */
+ * T is upper triangular part of R */
 static void
 lowersolve_h2matrix_3_h2matrix(bool unit, pch2matrix R, ph2matrix X,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2159,12 +2160,13 @@ lowersolve_h2matrix_3_h2matrix(bool unit, pch2matrix R, ph2matrix X,
   (void) tm;
   (void) tol;
 
-  printf
-    ("Die Funktion lowersolve_hmatrix_hmatrix_3 muss noch implementiert werden!\n");
+  printf("The function lowersolve_h2matrix_3_h2matrix has not yet "
+	 "been implemented\n");
+  abort();
 }
 
 /* L^* = T^{-T}X^*
- T is upper triangular part of R */
+ * T is upper triangular part of R */
 static void
 lowersolve_h2matrix_4_h2matrix(bool unit, pch2matrix R, ph2matrix X,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2260,7 +2262,7 @@ lowersolve_h2matrix(bool aunit, bool atrans, pch2matrix A,
 }
 
 /* x = T^{-1}*x 
- T is upper triangular part of a */
+ * T is upper triangular part of a */
 static void
 uppersolve_h2matrix_1_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2306,7 +2308,7 @@ uppersolve_h2matrix_1_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 					 x->son[i + j * rsons], rw, cw, tm,
 					 tol);
 
-	  /* update the lower rows */
+	  /* update the upper rows */
 	  for (l = i; l-- > 0;) {
 	    addmul_h2matrix(-1.0, a->son[l + i * rsons], false,
 			    x->son[i + j * rsons], x->son[l + j * rsons], rw,
@@ -2322,14 +2324,13 @@ uppersolve_h2matrix_1_h2matrix(bool unit, pch2matrix a, ph2matrix x,
       p = new_rkmatrix(r->A.rows, r->B.rows, r->k);
       copy_amatrix(false, &r->A, &p->A);
       copy_amatrix(false, &r->B, &p->B);
-      lowersolve_h2matrix_amatrix(unit, false, a, false, &r->A);
+      uppersolve_h2matrix_amatrix(unit, false, a, false, &r->A);
       add_rkmatrix(-1.0, p, 0, tol, r);
       rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
       del_rkmatrix(r);
     }
-    else {
-      assert(x->f != 0);
-      lowersolve_h2matrix_amatrix(unit, false, a, false, x->f);
+    else if (x->f != 0) {
+      uppersolve_h2matrix_amatrix(unit, false, a, false, x->f);
     }
   }
   else {
@@ -2340,7 +2341,7 @@ uppersolve_h2matrix_1_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 }
 
 /* x^* = T^{-1}*x^*
- T is upper triangular part of a */
+ * T is upper triangular part of a */
 static void
 uppersolve_h2matrix_2_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2354,12 +2355,13 @@ uppersolve_h2matrix_2_h2matrix(bool unit, pch2matrix a, ph2matrix x,
   (void) tm;
   (void) tol;
 
-  printf
-    ("Die Funktion uppersolve_hmatrix_hmatrix_2 muss noch implementiert werden!\n");
+  printf("The function uppersolve_h2matrix_2_h2matrix has not yet "
+	 "been implemented\n");
+  abort();
 }
 
 /* x = T^{-T}*x
- T is lower triangular part of a */
+ * T is lower triangular part of a */
 static void
 uppersolve_h2matrix_3_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2373,12 +2375,13 @@ uppersolve_h2matrix_3_h2matrix(bool unit, pch2matrix a, ph2matrix x,
   (void) tm;
   (void) tol;
 
-  printf
-    ("Die Funktion uppersolve_hmatrix_hmatrix_3 muss noch implementiert werden!\n");
+  printf("The function uppersolve_h2matrix_3_h2matrix has not yet "
+	 "been implemented\n");
+  abort();
 }
 
 /* x^* = T^{-T}*x^*
- T is lower triangular part of a */
+ * T is lower triangular part of a */
 static void
 uppersolve_h2matrix_4_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 			       pclusteroperator rwf, pclusteroperator cwf,
@@ -2424,7 +2427,7 @@ uppersolve_h2matrix_4_h2matrix(bool unit, pch2matrix a, ph2matrix x,
 					 x->son[j + i * rsons], rw, cw, tm,
 					 tol);
 
-	  /* update the lower block */
+	  /* update the upper block */
 	  for (l = i + 1; l < csons; l++) {
 	    addmul_h2matrix(-1.0, x->son[j + i * rsons], false,
 			    a->son[i + l * csons], x->son[j + l * rsons], rw,
@@ -2440,14 +2443,13 @@ uppersolve_h2matrix_4_h2matrix(bool unit, pch2matrix a, ph2matrix x,
       p = new_rkmatrix(r->A.rows, r->B.rows, r->k);
       copy_amatrix(false, &r->A, &p->A);
       copy_amatrix(false, &r->B, &p->B);
-      lowersolve_h2matrix_amatrix(unit, true, a, true, &r->B);
+      uppersolve_h2matrix_amatrix(unit, true, a, true, &r->B);
       add_rkmatrix(-1.0, p, 0, tol, r);
       rkupdate_h2matrix(r, x, rwf, cwf, tm, tol);
       del_rkmatrix(r);
     }
-    else {
-      assert(x->f != 0);
-      lowersolve_h2matrix_amatrix(unit, true, a, false, x->f);
+    else if (x->f != 0) {
+      uppersolve_h2matrix_amatrix(unit, true, a, false, x->f);
     }
   }
   else {

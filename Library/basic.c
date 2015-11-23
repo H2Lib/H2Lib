@@ -213,7 +213,7 @@ freemem(void *ptr)
    ------------------------------------------------------------ */
 
 static void
-heap_down(uint root, uint n, uint leq(uint, uint, void *),
+heap_down(uint root, uint n, bool leq(uint, uint, void *),
 	  void swap(uint, uint, void *), void *data)
 {
   uint      child;
@@ -236,7 +236,7 @@ heap_down(uint root, uint n, uint leq(uint, uint, void *),
 }
 
 void
-_h2_heapsort(uint n, uint leq(uint, uint, void *),
+_h2_heapsort(uint n, bool leq(uint, uint, void *),
 	     void swap(uint, uint, void *), void *data)
 {
   uint      root;

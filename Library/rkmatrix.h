@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "rkmatrix.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2010
-   ------------------------------------------------------------ */
+ This is the file "rkmatrix.h" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2010
+ ------------------------------------------------------------ */
 
 /** @file rkmatrix.h
  *  @author Steffen B&ouml;rm
@@ -44,8 +43,8 @@ struct _rkmatrix {
 };
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ Constructors and destructors
+ ------------------------------------------------------------ */
 
 /** @brief Initialize an @ref rkmatrix object.
  *
@@ -84,8 +83,8 @@ init_rkmatrix(prkmatrix r, uint rows, uint cols, uint k);
  *  @param coff Column offset, should satisfy <tt>cols+coff<=src->cols</tt>.
  *  @returns Initialized @ref rkmatrix object. */
 HEADER_PREFIX pcrkmatrix
-init_sub_rkmatrix(prkmatrix r, pcrkmatrix src,
-		  uint rows, uint roff, uint cols, uint coff);
+init_sub_rkmatrix(prkmatrix r, pcrkmatrix src, uint rows, uint roff, uint cols,
+    uint coff);
 
 /** @brief Uninitialize an @ref rkmatrix object.
  *
@@ -129,9 +128,7 @@ new_rkmatrix(uint rows, uint cols, uint k);
  *  @param coff Column offset, should satisfy <tt>cols+coff<=src->cols</tt>.
  *  @returns New @ref rkmatrix object. */
 HEADER_PREFIX pcrkmatrix
-new_sub_rkmatrix(pcrkmatrix src,
-		 uint rows, uint roff,
-		 uint cols, uint coff);
+new_sub_rkmatrix(pcrkmatrix src, uint rows, uint roff, uint cols, uint coff);
 
 /** @brief Delete an @ref rkmatrix object.
  *
@@ -146,37 +143,47 @@ HEADER_PREFIX void
 del_rkmatrix(prkmatrix r);
 
 /* ------------------------------------------------------------
-   Access methods
-   ------------------------------------------------------------ */
+ Access methods
+ ------------------------------------------------------------ */
 
 #ifdef __GNUC__
 INLINE_PREFIX uint
 getrows_rkmatrix(pcrkmatrix) __attribute__ ((const,unused));
 INLINE_PREFIX uint
 getcols_rkmatrix(pcrkmatrix) __attribute__ ((const,unused));
+INLINE_PREFIX uint
+getrank_rkmatrix(pcrkmatrix r) __attribute__ ((const, unused));
 #endif
 
-/** @brief Get the number of rows of an @ref rkmatrix.
+/** @brief Get the number of rows of an @ref rkmatrix @f$R=A B^*@f$.
  *
- *  @param r Matrix. */
-INLINE_PREFIX uint
-getrows_rkmatrix(pcrkmatrix r)
-{
+ *  @param r Matrix @f$R@f$.
+ *  @return Number of rows of @f$R@f$, i.e., number of rows of @f$A@f$. */
+INLINE_PREFIX uint getrows_rkmatrix(pcrkmatrix r) {
   return r->A.rows;
 }
 
-/** @brief Get the number of columns of an @ref rkmatrix.
+/** @brief Get the number of columns of an @ref rkmatrix @f$R=A B^*@f$.
  *
- *  @param r Matrix. */
-INLINE_PREFIX uint
-getcols_rkmatrix(pcrkmatrix r)
-{
+ *  @param r Matrix @f$R@f$.
+ *  @returns Number of columns of @f$R@f$, i.e., number of rows of @f$B@f$. */
+INLINE_PREFIX uint getcols_rkmatrix(pcrkmatrix r) {
   return r->B.rows;
 }
 
+/** @brief Get the rank of an @ref rkmatrix @f$R=A B^*@f$.
+ *
+ *  @param r Matrix @f$R@f$.
+ *  @returns Maximal rank of @f$R@f$, i.e., number of columns of @f$A@f$ and @f$B@f$. */
+INLINE_PREFIX uint getrank_rkmatrix(pcrkmatrix r) {
+  assert(r->A.cols == r->B.cols);
+
+  return r->A.cols;
+}
+
 /* ------------------------------------------------------------
-   Change rank
-   ------------------------------------------------------------ */
+ Change rank
+ ------------------------------------------------------------ */
 
 /** @brief Change the rank of an @ref rkmatrix.
  *
@@ -205,8 +212,8 @@ void
 resize_rkmatrix(prkmatrix r, uint rows, uint cols, uint k);
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ Statistics
+ ------------------------------------------------------------ */
 
 /** @brief Get size of a given @ref rkmatrix object.
  *
@@ -235,8 +242,8 @@ HEADER_PREFIX size_t
 getsize_heap_rkmatrix(pcrkmatrix r);
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ Simple utility functions
+ ------------------------------------------------------------ */
 
 /** @brief Create a copy of an @ref rkmatrix.
  *
@@ -248,12 +255,21 @@ getsize_heap_rkmatrix(pcrkmatrix r);
 HEADER_PREFIX prkmatrix
 clone_rkmatrix(pcrkmatrix r);
 
+/** @brief Copy an @ref rkmatrix into another @ref rkmatrix.
+ *
+ *  Copies the contents of <tt>a->A</tt> and <tt>a->B</tt> to
+ *  <tt>b->A</tt> and <tt>b->B</tt>.
+ *
+ *  @param atrans Determines wether @f$A@f$ or @f$A^*@f$ should be copied.
+ *  @param a Source @ref rkmatrix.
+ *  @param b Target @ref rkmatrix.
+ */
 HEADER_PREFIX void
 copy_rkmatrix(bool atrans, pcrkmatrix a, prkmatrix b);
 
 /* ------------------------------------------------------------
-   Matrix-vector multiplication
-   ------------------------------------------------------------ */
+ Matrix-vector multiplication
+ ------------------------------------------------------------ */
 
 /** @brief Multiply a low-rank matrix @f$R@f$ by a vector @f$x@f$,
  *  @f$y \gets y + \alpha R x@f$.
@@ -267,8 +283,7 @@ copy_rkmatrix(bool atrans, pcrkmatrix a, prkmatrix b);
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-addeval_rkmatrix_avector(field alpha, pcrkmatrix r,
-			 pcavector x, pavector y);
+addeval_rkmatrix_avector(field alpha, pcrkmatrix r, pcavector x, pavector y);
 
 /** @brief Multiply the adjoint of a low-rank matrix @f$R@f$ by a
  *  vector @f$x@f$, @f$y \gets y + \alpha R^* x@f$.
@@ -282,8 +297,8 @@ addeval_rkmatrix_avector(field alpha, pcrkmatrix r,
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-addevaltrans_rkmatrix_avector(field alpha, pcrkmatrix r,
-			      pcavector x, pavector y);
+addevaltrans_rkmatrix_avector(field alpha, pcrkmatrix r, pcavector x,
+    pavector y);
 
 /** @brief Multiply a low-rank matrix @f$R@f$ or its adjoint @f$R^*@f$ by
  *  a vector, @f$y \gets y + \alpha R x@f$ or @f$y \gets y + \alpha R^* x@f$.
@@ -294,12 +309,41 @@ addevaltrans_rkmatrix_avector(field alpha, pcrkmatrix r,
  *
  *  @param alpha Scaling factor @f$\alpha@f$.
  *  @param rtrans Set if @f$R^*@f$ is to be used instead of @f$R@f$.
- *  @param r Matrix @f$A@f$.
+ *  @param r Matrix @f$R@f$.
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-mvm_rkmatrix_avector(field alpha, bool rtrans, pcamatrix r,
-		     pcavector x, pavector y);
+mvm_rkmatrix_avector(field alpha, bool rtrans, pcrkmatrix r, pcavector x,
+    pavector y);
+
+/* ------------------------------------------------------------
+ Spectral norm
+ ------------------------------------------------------------ */
+
+/** @brief Approximate the spectral norm @f$\|R\|_2@f$ of a low-rank matrix
+ *  @f$R@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$R^* R@f$ and computing the square root of
+ *  the resulting eigenvalue approximation.
+ *
+ *  @param r Matrix @f$R@f$.
+ *  @returns Approximation of @f$\|R\|_2@f$. */
+HEADER_PREFIX real
+norm2_rkmatrix(pcrkmatrix r);
+
+/** @brief Approximate the spectral norm @f$\|R_A-R_B\|_2@f$ of the difference
+ *  of two low-rank matrices @f$R_A@f$ and @f$R_B@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$(R_A-R_B)^* (R_A-R_B)@f$ and computing the
+ *  square root of the resulting eigenvalue approximation.
+ *
+ *  @param ra Matrix @f$R_A@f$.
+ *  @param rb Matrix @f$R_B@f$.
+ *  @returns Approximation of @f$\|R_A-R_B\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_rkmatrix(pcrkmatrix ra, pcrkmatrix rb);
 
 /** @} */
 

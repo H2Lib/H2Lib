@@ -117,7 +117,9 @@ uninit_clusteroperator(pclusteroperator co);
  *  This call happens automatically if the last object referencing
  *  this object (see @ref ref_clusteroperator) is deleted.
  *
- *  @param t corresponding cluster. */
+ *  @param t corresponding cluster.
+ *  @return Returns the newly created @ref clusteroperator object.
+ */
 HEADER_PREFIX pclusteroperator
 new_clusteroperator(pccluster t);
 
@@ -129,7 +131,9 @@ new_clusteroperator(pccluster t);
  *  This call happens automatically if the last object referencing
  *  this object (see @ref ref_clusteroperator) is deleted.
  *
- *  @param t Corresponding cluster. */
+ *  @param t Corresponding cluster.
+ *  @return Returns the newly created @ref clusteroperator object.
+ */
 HEADER_PREFIX pclusteroperator
 new_leaf_clusteroperator(pccluster t);
 

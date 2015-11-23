@@ -762,11 +762,78 @@ HEADER_PREFIX real
 norm2diff_h2matrix(pch2matrix a, pch2matrix b);
 
 /* ------------------------------------------------------------
+ * File I/O
+ * ------------------------------------------------------------ */
+
+#ifdef USE_NETCDF
+/** @brief Write @ref h2matrix to NetCDF file.
+ *
+ *  @param G Matrix.
+ *  @param name File name. */
+HEADER_PREFIX void
+write_cdf_h2matrix(pch2matrix G, const char *name);
+
+/** @brief Write @ref h2matrix to part of a NetCDF file.
+ *
+ *  @param G Matrix.
+ *  @param nc_file File handle.
+ *  @param prefix Prefix for variable names. */
+HEADER_PREFIX void
+write_cdfpart_h2matrix(pch2matrix G, int nc_file, const char *prefix);
+
+/** @brief Read @ref h2matrix from NetCDF file.
+ *
+ *  @param name File name.
+ *  @param rb Row cluster basis.
+ *  @param cb Column cluster basis.
+ *  @returns @ref h2matrix read from file. */
+HEADER_PREFIX ph2matrix
+read_cdf_h2matrix(const char *name, pclusterbasis rb, pclusterbasis cb);
+
+/** @brief Read @ref h2matrix from part of a NetCDF file.
+ *
+ *  @param nc_file File handle.
+ *  @param prefix Prefix for variable names.
+ *  @param rb Row cluster basis.
+ *  @param cb Column cluster basis.
+ *  @returns @ref h2matrix read from file. */
+HEADER_PREFIX ph2matrix
+read_cdfpart_h2matrix(int nc_file, const char *prefix,
+		      pclusterbasis rb, pclusterbasis cb);
+
+/** @brief Write @ref h2matrix to NetCDF file, including cluster trees
+ *  and cluster bases.
+ *
+ *  @param G Matrix.
+ *  @param name File name. */
+HEADER_PREFIX void
+write_cdfcomplete_h2matrix(pch2matrix G, const char *name);
+
+/** @brief Read @ref h2matrix from NetCDF file, including cluster trees
+ *  and cluster bases.
+ *
+ *  @param name File name.
+ *  @returns @ref h2matrix read from file. */
+HEADER_PREFIX ph2matrix
+read_cdfcomplete_h2matrix(const char *name);
+#endif
+
+/* ------------------------------------------------------------
  Drawing
  ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
-void
+/**
+ * @brief Draw a @ref h2matrix to a cairo surface.
+ *
+ * @param cr Cairo surface to be drawn to.
+ * @param G The @ref h2matrix that should be drawn.
+ * @param storage Flag that indicates if the storage requirements for every block
+ *   should be depicted into the graphic.
+ * @param levels Number of levels of the @ref h2matrix that should be drawn.
+ *   If @p level == 0 holds, all levels will be drawn.
+ */
+HEADER_PREFIX void
 draw_cairo_h2matrix(cairo_t *cr, pch2matrix G, bool storage, uint levels);
 #endif
 

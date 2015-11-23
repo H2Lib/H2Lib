@@ -137,7 +137,7 @@ decomp_fullaca_rkmatrix(pamatrix A, const real accur, uint ** ridx,
       d[i + j * ldd] = 0.0;
     }
     for (i = j; i < cols; i++) {
-      d[i + j * ldd] = a[j + i * ld];
+      d[i + j * ldd] = CONJ(a[j + i * ld]);
     }
   }
 
@@ -177,8 +177,7 @@ decomp_fullaca_rkmatrix(pamatrix A, const real accur, uint ** ridx,
 void
 decomp_partialaca_rkmatrix(matrixentry_t entry, void *data,
 			   const uint * ridx, const uint rows,
-			   const uint * cidx, const uint cols,
-			   real accur,
+			   const uint * cidx, const uint cols, real accur,
 			   uint ** rpivot, uint ** cpivot, prkmatrix R)
 {
   pamatrix  A, B;
@@ -236,6 +235,7 @@ decomp_partialaca_rkmatrix(matrixentry_t entry, void *data,
 
     /* Get next column for B. */
     entry(rpiv + i_k, cpiv + k, data, true, &B_k);
+    conjugate_amatrix(&B_k);
 
     /* Subtract current rank-k-approximation. */
     for (j = 0; j < k; ++j) {
@@ -313,7 +313,7 @@ decomp_partialaca_rkmatrix(matrixentry_t entry, void *data,
       for (j = k - 1; j < cols; ++j) {
 	error += ABSSQR(bb[j]);
       }
-      starterror = 1.0 / REAL_SQRT(starterror * error);
+      starterror = REAL_RSQRT(starterror * error);
     }
 
     /* Computation of current relative error. */
@@ -347,6 +347,8 @@ decomp_partialaca_rkmatrix(matrixentry_t entry, void *data,
       bb[cperm[i] + j * cols] = Aij;
     }
   }
+
+  conjugate_amatrix(B);
 
   if (rpivot != NULL) {
     *rpivot = allocuint(k);

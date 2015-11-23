@@ -9,6 +9,12 @@
 #include "basic.h"
 #include "factorizations.h"
 
+#ifdef USE_NETCDF
+#include <stdio.h>
+#include <string.h>
+#include <netcdf.h>
+#endif
+
 static uint active_clusterbasis = 0;
 
 /* ------------------------------------------------------------
@@ -1763,3 +1769,524 @@ weight_enum_clusterbasis_clusteroperator(pcclusterbasis cb)
 
   return wd.R;
 }
+
+/* ------------------------------------------------------------
+ * File I/O
+ * ------------------------------------------------------------ */
+
+#ifdef USE_NETCDF
+static void
+write_count(pcclusterbasis cb, size_t * clusters, size_t * coeffs)
+{
+  uint      sons;
+  uint      i;
+
+  /* Increase cluster counter */
+  (*clusters)++;
+
+  /* Add number of coefficients of transfer matrix */
+  (*coeffs) += cb->E.rows * cb->E.cols;
+
+  if (cb->sons > 0) {
+    sons = cb->sons;
+
+    /* Handle sons (and check that their transfer matrices are of
+     * the expected size */
+    for (i = 0; i < sons; i++) {
+      assert(cb->son[i]->E.rows == cb->k);
+      assert(cb->son[i]->E.cols == cb->son[i]->k);
+
+      write_count(cb->son[i], clusters, coeffs);
+    }
+  }
+  else
+    (*coeffs) += cb->V.rows * cb->V.cols;
+}
+
+static void
+write_cdf(pcclusterbasis cb,
+	  size_t clusters, size_t coeffs,
+	  size_t * clusteridx, size_t * coeffidx,
+	  int nc_file, int nc_sons, int nc_size, int nc_rank, int nc_coeff)
+{
+  size_t    start, count;
+  ptrdiff_t stride;
+  int       val, result;
+  uint      i, j;
+
+  assert(*clusteridx <= clusters);
+
+  /* Write number of sons to nc_sons[*clusteridx] */
+  start = *clusteridx;
+  count = 1;
+  stride = 1;
+  val = cb->sons;
+  result = nc_put_vars(nc_file, nc_sons, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+
+  /* Write size of cluster to nc_size[*clusteridx] */
+  val = cb->t->size;
+  result = nc_put_vars(nc_file, nc_size, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+
+  /* Write rank to nc_rank[*clusteridx] */
+  val = cb->k;
+  result = nc_put_vars(nc_file, nc_rank, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+
+  /* Increment cluster counter */
+  (*clusteridx)++;
+
+  if (cb->sons > 0) {
+    /* Take care of sons */
+    for (i = 0; i < cb->sons; i++)
+      write_cdf(cb->son[i],
+		clusters, coeffs,
+		clusteridx, coeffidx,
+		nc_file, nc_sons, nc_size, nc_rank, nc_coeff);
+
+    /* Write transfer matrices */
+    start = *coeffidx;
+    stride = 1;
+    for (i = 0; i < cb->sons; i++) {
+      count = cb->son[i]->k;
+      assert(start + cb->son[i]->k * cb->k <= coeffs);
+
+      for (j = 0; j < cb->k; j++) {
+	result =
+	  nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
+		      cb->son[i]->E.a + j * cb->son[i]->E.ld);
+	assert(result == NC_NOERR);
+
+	start += cb->son[i]->k;
+      }
+    }
+    (*coeffidx) = start;
+  }
+  else {
+    /* Write leaf matrix to nc_coeff */
+    start = *coeffidx;
+    count = cb->V.rows;
+    assert(start + cb->V.rows * cb->V.cols <= coeffs);
+    for (j = 0; j < cb->V.cols; j++) {
+      result =
+	nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
+		    cb->V.a + j * cb->V.ld);
+      assert(result == NC_NOERR);
+
+      start += cb->V.rows;
+    }
+    *coeffidx = start;
+  }
+}
+
+void
+write_cdf_clusterbasis(pcclusterbasis cb, const char *name)
+{
+  size_t    clusters, clusteridx;
+  size_t    coeffs, coeffidx;
+  int       nc_file, nc_sons, nc_size, nc_rank, nc_coeff;
+  int       nc_clusters, nc_coeffs;
+  int       result;
+
+  /* Count number of clusters and coefficients */
+  clusters = 0;
+  coeffs = 0;
+  write_count(cb, &clusters, &coeffs);
+
+  /* Create NetCDF file */
+  result = nc_create(name, NC_64BIT_OFFSET, &nc_file);
+  assert(result == NC_NOERR);
+
+  /* Define "clusters" dimension */
+  result = nc_def_dim(nc_file, "clusters", clusters, &nc_clusters);
+  assert(result == NC_NOERR);
+
+  /* Define "coeffs" dimension */
+  result = nc_def_dim(nc_file, "coeffs", coeffs, &nc_coeffs);
+  assert(result == NC_NOERR);
+
+  /* Define "sons" variable */
+  result = nc_def_var(nc_file, "sons", NC_INT, 1, &nc_clusters, &nc_sons);
+  assert(result == NC_NOERR);
+
+  /* Define "size" variable */
+  result = nc_def_var(nc_file, "size", NC_INT, 1, &nc_clusters, &nc_size);
+  assert(result == NC_NOERR);
+
+  /* Define "rank" variable */
+  result = nc_def_var(nc_file, "rank", NC_INT, 1, &nc_clusters, &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Define "coeff" variable */
+  result = nc_def_var(nc_file, "coeff", NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Finish NetCDF define mode */
+  result = nc_enddef(nc_file);
+  assert(result == NC_NOERR);
+
+  /* Write matrices to NetCDF variables */
+  clusteridx = 0;
+  coeffidx = 0;
+  write_cdf(cb, clusters, coeffs, &clusteridx, &coeffidx,
+	    nc_file, nc_sons, nc_size, nc_rank, nc_coeff);
+  assert(clusteridx == clusters);
+  assert(coeffidx == coeffs);
+
+  /* Close file */
+  result = nc_close(nc_file);
+  assert(result == NC_NOERR);
+}
+
+static void
+prefix_name(char *buf, int bufsize, const char *prefix, const char *name)
+{
+  if (prefix)
+    snprintf(buf, bufsize, "%s_%s", prefix, name);
+  else
+    strncpy(buf, name, bufsize);
+}
+
+void
+write_cdfpart_clusterbasis(pcclusterbasis cb, int nc_file, const char *prefix)
+{
+  size_t    clusters, clusteridx;
+  size_t    coeffs, coeffidx;
+  char     *buf;
+  int       bufsize;
+  int       nc_sons, nc_size, nc_rank, nc_coeff;
+  int       nc_clusters, nc_coeffs;
+  int       result;
+
+  /* Prepare buffer for prefixed names */
+  bufsize = strlen(prefix) + 16;
+  buf = (char *) allocmem(sizeof(char) * bufsize);
+
+  /* Count number of clusters and coefficients */
+  clusters = 0;
+  coeffs = 0;
+  write_count(cb, &clusters, &coeffs);
+
+  /* Switch NetCDF file to define mode */
+  result = nc_redef(nc_file);
+  assert(result == NC_NOERR || result == NC_EINDEFINE);
+
+  /* Define "clusters" dimension */
+  prefix_name(buf, bufsize, prefix, "clusters");
+  result = nc_def_dim(nc_file, buf, clusters, &nc_clusters);
+  assert(result == NC_NOERR);
+
+  /* Define "coeffs" dimension */
+  prefix_name(buf, bufsize, prefix, "coeffs");
+  result = nc_def_dim(nc_file, buf, coeffs, &nc_coeffs);
+  assert(result == NC_NOERR);
+
+  /* Define "sons" variable */
+  prefix_name(buf, bufsize, prefix, "sons");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_clusters, &nc_sons);
+  assert(result == NC_NOERR);
+
+  /* Define "size" variable */
+  prefix_name(buf, bufsize, prefix, "size");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_clusters, &nc_size);
+  assert(result == NC_NOERR);
+
+  /* Define "rank" variable */
+  prefix_name(buf, bufsize, prefix, "rank");
+  result = nc_def_var(nc_file, buf, NC_INT, 1, &nc_clusters, &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Define "coeff" variable */
+  prefix_name(buf, bufsize, prefix, "coeff");
+  result = nc_def_var(nc_file, buf, NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Finish NetCDF define mode */
+  result = nc_enddef(nc_file);
+  assert(result == NC_NOERR);
+
+  /* Write matrices to NetCDF variables */
+  clusteridx = 0;
+  coeffidx = 0;
+  write_cdf(cb, clusters, coeffs, &clusteridx, &coeffidx,
+	    nc_file, nc_sons, nc_size, nc_rank, nc_coeff);
+  assert(clusteridx == clusters);
+  assert(coeffidx == coeffs);
+
+  /* Clean up */
+  nc_sync(nc_file);
+  freemem(buf);
+}
+
+static    pclusterbasis
+read_cdf_part(int nc_file, size_t clusters, size_t coeffs,
+	      int nc_sons, int nc_size, int nc_rank,
+	      int nc_coeff,
+	      pcluster *t, uint * idx, size_t * clusteridx, size_t * coeffidx)
+{
+  pclusterbasis cb, cb1;
+  uint     *idx1;
+  uint      size;
+  uint      sons;
+  uint      k;
+  uint      i, j;
+  size_t    start, count;
+  ptrdiff_t stride;
+  int       val, result;
+
+  /* Get number of sons */
+  start = *clusteridx;
+  count = 1;
+  stride = 1;
+  result = nc_get_vars(nc_file, nc_sons, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+  sons = val;
+
+  /* Get size of cluster */
+  result = nc_get_vars(nc_file, nc_size, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+  size = val;
+
+  /* Get rank */
+  result = nc_get_vars(nc_file, nc_rank, &start, &count, &stride, &val);
+  assert(result == NC_NOERR);
+  k = val;
+
+  if (sons > 0) {
+    /* If we have not inherited a cluster, create one */
+    if (*t == 0) {
+      /* If we have not inherited an index, create one */
+      if (idx == 0) {
+	idx = (uint *) allocmem(sizeof(uint) * size);
+	for (i = 0; i < size; i++)
+	  idx[i] = i;
+      }
+
+      *t = new_cluster(size, idx, sons, 1);
+    }
+    else {
+      assert((*t)->size == size);
+      assert((*t)->sons == sons);
+
+      idx = (*t)->idx;
+    }
+
+    /* Create the new cluster basis */
+    cb = new_clusterbasis(*t);
+
+    /* Increment cluster counter */
+    (*clusteridx)++;
+
+    /* Handle sons */
+    idx1 = idx;
+    for (i = 0; i < sons; i++) {
+      cb1 = read_cdf_part(nc_file, clusters, coeffs,
+			  nc_sons, nc_size, nc_rank,
+			  nc_coeff,
+			  (*t)->son + i, idx1, clusteridx, coeffidx);
+      ref_clusterbasis(cb->son + i, cb1);
+
+      idx1 += cb1->t->size;
+    }
+    assert(idx1 == idx + cb->t->size);
+
+    /* Set rank */
+    resize_clusterbasis(cb, k);
+
+    /* Read transfer matrices */
+    start = (*coeffidx);
+    stride = 1;
+    for (i = 0; i < sons; i++) {
+      assert(cb->son[i]->E.rows == cb->son[i]->k);
+      assert(cb->son[i]->E.cols == k);
+
+      count = cb->son[i]->k;
+      for (j = 0; j < k; j++) {
+	result =
+	  nc_get_vars(nc_file, nc_coeff, &start, &count, &stride,
+		      cb->son[i]->E.a + j * cb->son[i]->E.ld);
+	assert(result == NC_NOERR);
+
+	start += cb->son[i]->k;
+      }
+    }
+    (*coeffidx) = start;
+  }
+  else {
+    /* If we have not inherited a cluster, create one */
+    if (*t == 0) {
+      /* If we have not inherited an index, create one */
+      if (idx == 0) {
+	idx = (uint *) allocmem(sizeof(uint) * size);
+	for (i = 0; i < size; i++)
+	  idx[i] = i;
+      }
+
+      *t = new_cluster(size, idx, 0, 1);
+    }
+    else {
+      assert((*t)->size == size);
+
+      idx = (*t)->idx;
+    }
+
+    /* Create the new cluster basis */
+    cb = new_leaf_clusterbasis(*t);
+
+    /* Set rank */
+    resize_clusterbasis(cb, k);
+
+    /* Increment cluster counter */
+    (*clusteridx)++;
+
+    /* Read leaf matrix */
+    start = (*coeffidx);
+    count = size;
+    stride = 1;
+    for (j = 0; j < k; j++) {
+      result =
+	nc_get_vars(nc_file, nc_coeff, &start, &count, &stride,
+		    cb->V.a + j * cb->V.ld);
+      assert(result == NC_NOERR);
+
+      start += size;
+    }
+    (*coeffidx) = start;
+  }
+
+  update_clusterbasis(cb);
+
+  return cb;
+}
+
+pclusterbasis
+read_cdf_clusterbasis(const char *name, pccluster t)
+{
+  pclusterbasis cb;
+  pcluster  t0;
+  size_t    clusters, clusteridx;
+  size_t    coeffs, coeffidx;
+  char      dimname[NC_MAX_NAME + 1];
+  int       nc_file, nc_sons, nc_size, nc_rank, nc_coeff;
+  int       nc_clusters, nc_coeffs;
+  int       result;
+
+  /* Open NetCDF file */
+  result = nc_open(name, NC_NOWRITE, &nc_file);
+  assert(result == NC_NOERR);
+
+  /* Get "clusters" dimension */
+  result = nc_inq_dimid(nc_file, "clusters", &nc_clusters);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_clusters, dimname, &clusters);
+  assert(result == NC_NOERR);
+
+  /* Get "coeffs" dimension */
+  result = nc_inq_dimid(nc_file, "coeffs", &nc_coeffs);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
+  assert(result == NC_NOERR);
+
+  /* Get "sons" variable */
+  result = nc_inq_varid(nc_file, "sons", &nc_sons);
+  assert(result == NC_NOERR);
+
+  /* Get "size" variable */
+  result = nc_inq_varid(nc_file, "size", &nc_size);
+  assert(result == NC_NOERR);
+
+  /* Get "rank" variable */
+  result = nc_inq_varid(nc_file, "rank", &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Get "coeff" variable */
+  result = nc_inq_varid(nc_file, "coeff", &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Read cluster basis from NetCDF variables */
+  t0 = (pcluster) t;
+  clusteridx = 0;
+  coeffidx = 0;
+
+  cb = read_cdf_part(nc_file, clusters, coeffs,
+		     nc_sons, nc_size, nc_rank, nc_coeff,
+		     &t0, 0, &clusteridx, &coeffidx);
+  assert(clusteridx == clusters);
+  assert(coeffidx == coeffs);
+
+  /* Closer NetCDF file */
+  nc_close(nc_file);
+
+  return cb;
+}
+
+pclusterbasis
+read_cdfpart_clusterbasis(int nc_file, const char *prefix, pccluster t)
+{
+  pclusterbasis cb;
+  pcluster  t0;
+  size_t    clusters, clusteridx;
+  size_t    coeffs, coeffidx;
+  char      dimname[NC_MAX_NAME + 1];
+  char     *buf;
+  int       bufsize;
+  int       nc_sons, nc_size, nc_rank, nc_coeff;
+  int       nc_clusters, nc_coeffs;
+  int       result;
+
+  /* Prepare buffer for prefixed names */
+  bufsize = strlen(prefix) + 16;
+  buf = (char *) allocmem(sizeof(char) * bufsize);
+
+  /* Get "clusters" dimension */
+  prefix_name(buf, bufsize, prefix, "clusters");
+  result = nc_inq_dimid(nc_file, buf, &nc_clusters);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_clusters, dimname, &clusters);
+  assert(result == NC_NOERR);
+
+  /* Get "coeffs" dimension */
+  prefix_name(buf, bufsize, prefix, "coeffs");
+  result = nc_inq_dimid(nc_file, buf, &nc_coeffs);
+  assert(result == NC_NOERR);
+  result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
+  assert(result == NC_NOERR);
+
+  /* Get "sons" variable */
+  prefix_name(buf, bufsize, prefix, "sons");
+  result = nc_inq_varid(nc_file, buf, &nc_sons);
+  assert(result == NC_NOERR);
+
+  /* Get "size" variable */
+  prefix_name(buf, bufsize, prefix, "size");
+  result = nc_inq_varid(nc_file, buf, &nc_size);
+  assert(result == NC_NOERR);
+
+  /* Get "rank" variable */
+  prefix_name(buf, bufsize, prefix, "rank");
+  result = nc_inq_varid(nc_file, buf, &nc_rank);
+  assert(result == NC_NOERR);
+
+  /* Get "coeff" variable */
+  prefix_name(buf, bufsize, prefix, "coeff");
+  result = nc_inq_varid(nc_file, buf, &nc_coeff);
+  assert(result == NC_NOERR);
+
+  /* Read cluster basis from NetCDF variables */
+  t0 = (pcluster) t;
+  clusteridx = 0;
+  coeffidx = 0;
+
+  cb = read_cdf_part(nc_file, clusters, coeffs,
+		     nc_sons, nc_size, nc_rank, nc_coeff,
+		     &t0, 0, &clusteridx, &coeffidx);
+  assert(clusteridx == clusters);
+  assert(coeffidx == coeffs);
+
+  /* Clean up */
+  freemem(buf);
+
+  return cb;
+}
+#endif

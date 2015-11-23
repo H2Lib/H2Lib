@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "avector.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ * This is the file "avector.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 #include "avector.h"
 
@@ -15,8 +15,8 @@
 static uint active_avector = 0;
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 pavector
 init_avector(pavector v, uint dim)
@@ -50,6 +50,17 @@ init_sub_avector(pavector v, pavector src, uint dim, uint off)
 #pragma omp atomic
 #endif
   active_avector++;
+
+  return v;
+}
+
+pavector
+init_zero_avector(pavector v, uint dim)
+{
+  assert(v != NULL);
+
+  init_avector(v, dim);
+  clear_avector(v);
 
   return v;
 }
@@ -134,6 +145,18 @@ new_sub_avector(pavector src, uint dim, uint off)
 }
 
 pavector
+new_zero_avector(uint dim)
+{
+  pavector  v;
+
+  v = (pavector) allocmem(sizeof(amatrix));
+
+  init_zero_avector(v, dim);
+
+  return v;
+}
+
+pavector
 new_pointer_avector(pfield src, uint dim)
 {
   pavector  v;
@@ -164,9 +187,17 @@ resize_avector(pavector v, uint dim)
   }
 }
 
+void
+shrink_avector(pavector v, uint dim)
+{
+  assert(dim <= v->dim);
+
+  v->dim = dim;
+}
+
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 uint
 getactives_avector()
@@ -199,8 +230,8 @@ getsize_heap_avector(pcavector v)
 }
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 void
 clear_avector(pavector v)
@@ -225,8 +256,9 @@ random_avector(pavector v)
 {
   uint      i;
 
-  for (i = 0; i < v->dim; i++)
-    v->v[i] = 2.0 * rand() / RAND_MAX - 1.0;
+  for (i = 0; i < v->dim; i++) {
+    v->v[i] = FIELD_RAND();
+  }
 }
 
 void
@@ -261,30 +293,21 @@ print_avector(pcavector v)
   if (dim == 0)
     return;
 
-  (void) printf("  (% .5e", v->v[0]);
+  (void) printf("  (" FIELD_CS(.5, e), FIELD_ARG(v->v[0]));
   for (i = 1; i < dim; i++)
-    (void) printf(" % .5e", v->v[i]);
+    (void) printf(" " FIELD_CS(.5, e), FIELD_ARG(v->v[i]));
   (void) printf(")\n");
 }
 
 /* ------------------------------------------------------------
-   Very basic linear algebra
-   ------------------------------------------------------------ */
+ * Very basic linear algebra
+ * ------------------------------------------------------------ */
 
 #ifdef USE_BLAS
-IMPORT_PREFIX void
-
-
-
-
-
-
-
-   dscal_(const unsigned *n, const double *alpha, double *x, const int *incx);
 void
 scale_avector(field alpha, pavector v)
 {
-  dscal_(&v->dim, &alpha, v->v, &i_one);
+  h2_scal(&v->dim, &alpha, v->v, &u_one);
 }
 #else
 void
@@ -298,13 +321,10 @@ scale_avector(field alpha, pavector v)
 #endif
 
 #ifdef USE_BLAS
-IMPORT_PREFIX double
-          dnrm2_(const unsigned *n, const double *x, const int *incx);
-
 real
 norm2_avector(pcavector v)
 {
-  return dnrm2_(&v->dim, v->v, &i_one);
+  return h2_nrm2(&v->dim, v->v, &u_one);
 }
 #else
 real
@@ -322,26 +342,12 @@ norm2_avector(pcavector v)
 #endif
 
 #ifdef USE_BLAS
-IMPORT_PREFIX double
-
-
-
-
-
-
-
-
-
-
-ddot_(const unsigned *n,
-      const double *x, const int *incx, const double *y, const int *incy);
-
 field
 dotprod_avector(pcavector x, pcavector y)
 {
   assert(x->dim == y->dim);
 
-  return ddot_(&x->dim, x->v, &i_one, y->v, &i_one);
+  return h2_dot(&x->dim, x->v, &u_one, y->v, &u_one);
 }
 #else
 field
@@ -361,28 +367,12 @@ dotprod_avector(pcavector x, pcavector y)
 #endif
 
 #ifdef USE_BLAS
-IMPORT_PREFIX void
-
-
-
-
-
-
-
-
-
-
-daxpy_(const unsigned *n,
-       const double *alpha,
-       const double *x,
-       const unsigned *incx, double *y, const unsigned *incy);
-
 void
 add_avector(field alpha, pcavector x, pavector y)
 {
-  assert(x->dim == y->dim);
+  assert(y->dim >= x->dim);
 
-  daxpy_(&x->dim, &alpha, x->v, &u_one, y->v, &u_one);
+  h2_axpy(&x->dim, &alpha, x->v, &u_one, y->v, &u_one);
 }
 #else
 void
@@ -390,7 +380,10 @@ add_avector(field alpha, pcavector x, pavector y)
 {
   uint      i;
 
-  for (i = 0; i < x->dim; i++)
+  assert(y->dim >= x->dim);
+
+  for (i = 0; i < x->dim; i++) {
     y->v[i] += alpha * x->v[i];
+  }
 }
 #endif

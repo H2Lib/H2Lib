@@ -177,11 +177,26 @@ typedef enum _basisfunctionbem3d basisfunctionbem3d;
  *
  * @param x 3D-point the boundary @f$ \Gamma @f$.
  * @param n Corresponding outpointing normal vector to <tt>x</tt>.
+ * @param data Additional data for evaluating the functional.
  *
  * @return Returns evaluation of the function in <tt>x</tt> with normal vector
  * <tt>n</tt>.
  */
-typedef field (*boundary_func3d)(const real *x, const real *n);
+typedef field (*boundary_func3d)(const real *x, const real *n, void *data);
+
+/**
+ * @brief Evaluate a fundamental solution or its normal derivatives at points
+ * @p x and @p y.
+ *
+ * @param x First evaluation point.
+ * @param y Second evaluation point.
+ * @param nx Normal vector that belongs to @p x.
+ * @param ny Normal vector that belongs to @p y.
+ * @param data Additional data that is needed to evaluate the function.
+ * @return
+ */
+typedef field (*kernel_func3d)(const real *x, const real *y, const real *nx,
+    const real *ny, void *data);
 
 /**
  * This is just an abbreviation for the struct @ref _listnode .
@@ -286,6 +301,24 @@ struct _bem3d {
   field alpha;
 
   /**
+   * @brief Wavevector for Helmholtz type kernels
+   */
+
+  field *kvec;
+
+  /**
+   * @brief Wavenumber, which is equal to the 2-norm of the wavevector
+   * <tt>kvec</tt>.
+   */
+  real k;
+
+  /**
+   * @brief A constant factor extracted from the kernel function to speed up
+   * quadrature.
+   */
+  field kernel_const;
+
+  /**
    * @brief This field describes the mapping from the vertices of a geometry to
    * the triangles they belong to.
    *
@@ -300,15 +333,15 @@ struct _bem3d {
   /**
    * @brief Computes nearfield entries of Galkerin matrices.
    *
-   * This callback function computes
+   *   This callback function computes
    *  'nearfield' entries of the underlying problem and integral-operator.
    *  @param ridx Defines the indices of row boundary elements used. If
    *  <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
    *  @param cidx Defines the indices of column boundary elements used.
    *  If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
    *  used.
-   *  @param bem Contains additional Information for the computation of the matrix
-   *  entries.
+   *  @param bem @ref _bem3d "Bem3d" object, that contains additional
+   *         Information for the computation of the matrix entries.
    *  @param ntrans Is a boolean flag to indicates the way of storing the entries
    *  in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
    *  be stored in a transposed way.
@@ -320,6 +353,31 @@ struct _bem3d {
    * \mathrm d y \, \mathrm d x \, .@f]
    */
   void (*nearfield)(const uint *ridx, const uint *cidx, pcbem3d bem,
+      bool ntrans, pamatrix N);
+
+  /**
+   * @brief Computes nearfield entries of Galkerin matrices for disjoint clusters.
+   *
+   *   This callback function computes
+   *  'nearfield' entries of the underlying problem and integral-operator.
+   *  @param ridx Defines the indices of row boundary elements used. If
+   *  <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+   *  @param cidx Defines the indices of column boundary elements used.
+   *  If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+   *  used.
+   *  @param bem @ref _bem3d "Bem3d" object, that contains additional
+   *         Information for the computation of the matrix entries.
+   *  @param ntrans Is a boolean flag to indicates the way of storing the entries
+   *  in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+   *  be stored in a transposed way.
+   *  @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+   *  @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+   *  \mathrm d y \, \mathrm d x \, ,@f]
+   *  otherwise they are stored as
+   *  @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+   * \mathrm d y \, \mathrm d x \, .@f]
+   */
+  void (*nearfield_far)(const uint *ridx, const uint *cidx, pcbem3d bem,
       bool ntrans, pamatrix N);
 
   /**
@@ -515,6 +573,8 @@ struct _kernelbem3d {
    * This callback will evaluate the fundamental solution @f$ g @f$ at points
    * @f$ x_i, y_j \in \mathbb R^3 @f$ and store the result into matrix V
    * at position @f$ V_{ij} @f$ .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
    * @param X An array of 3D-vectors. <tt>X[i][0]</tt> will be the first
    * component of the i-th vector. Analogous <tt>X[i][1]</tt> will be the second
    * component of the i-th vector. The length of this array is determined by
@@ -528,7 +588,8 @@ struct _kernelbem3d {
    * V_{ij} = g(\vec x_i, \vec y_j) .
    * @f]
    */
-  void (*fundamental)(const real (*X)[3], const real (*Y)[3], pamatrix V);
+  void (*fundamental)(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
+      pamatrix V);
 
   /**
    * @brief Evaluate the normal derivative of the fundamental solution in respect
@@ -539,6 +600,8 @@ struct _kernelbem3d {
    * solution @f$ g @f$ corresponding to @f$ y @f$ at points
    * @f$ x_i, y_j \in \mathbb R^3 @f$ and store the result into matrix V
    * at position @f$ V_{ij} @f$ .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
    * @param X An array of 3D-vectors. <tt>X[i][0]</tt> will be the first
    * component of the i-th vector. Analogously <tt>X[i][1]</tt> will be the second
    * component of the i-th vector. The length of this array is determined by
@@ -554,7 +617,7 @@ struct _kernelbem3d {
    * V_{ij} = \frac{\partial g}{\partial n_y}(\vec x_i, \vec y_j) .
    * @f]
    */
-  void (*dny_fundamental)(const real (*X)[3], const real (*Y)[3],
+  void (*dny_fundamental)(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
       const real (*NY)[3], pamatrix V);
 
   /**
@@ -566,6 +629,8 @@ struct _kernelbem3d {
    * solution @f$ g @f$ corresponding to @f$ x @f$ and @f$ y @f$ at points
    * @f$ x_i, y_j \in \mathbb R^3 @f$ and store the result into matrix V
    * at position @f$ V_{ij} @f$ .
+   * * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
    * @param X An array of 3D-vectors. <tt>X[i][0]</tt> will be the first
    * component of the i-th vector. Analogously <tt>X[i][1]</tt> will be the second
    * component of the i-th vector. The length of this array is determined by
@@ -583,8 +648,8 @@ struct _kernelbem3d {
    * V_{ij} = \frac{\partial^2 g}{\partial n_x \partial n_y}(\vec x_i, \vec y_j) .
    * @f]
    */
-  void (*dnx_dny_fundamental)(const real (*X)[3], const real (*NX)[3],
-      const real (*Y)[3], const real (*NY)[3], pamatrix V);
+  void (*dnx_dny_fundamental)(pcbem3d bem, const real (*X)[3],
+      const real (*NX)[3], const real (*Y)[3], const real (*NY)[3], pamatrix V);
 
   /**
    * @brief Integrate the kernel function within the 1st component.
@@ -1108,6 +1173,449 @@ HEADER_PREFIX pclustergeometry build_bem3d_clustergeometry(pcbem3d bem,
  */
 HEADER_PREFIX pcluster build_bem3d_cluster(pcbem3d bem, uint clf,
     basisfunctionbem3d basis);
+
+/****************************************************
+ * Nearfield quadrature rountines
+ ****************************************************/
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise constant basis functions for both Ansatz and test functions.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_cc_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise constant basis functions for both Ansatz and test functions.
+ *
+ * @attention This routines assumes that all pairs of triangles are disjoint and
+ * therefore optimizes the quadrature routine.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_cc_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise constant basis functions for Test and piecewise linear basis
+ * functions for Ansatz functions.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_cl_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise constant basis functions for Test and piecewise linear basis
+ * functions for Ansatz functions.
+ *
+ * @attention This routines assumes that all pairs of triangles are disjoint and
+ * therefore optimizes the quadrature routine.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_cl_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise linear basis functions for both Ansatz and test functions.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_ll_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise linear basis functions for both Ansatz and test functions.
+ *
+ * @attention This routines assumes that all pairs of triangles are disjoint and
+ * therefore optimizes the quadrature routine.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_ll_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+
+/****************************************************
+ * Compute single integrals with kernel functions
+ ****************************************************/
+
+/**
+ *
+ * @param bem
+ * @param X
+ * @param Y
+ * @param NX
+ * @param NY
+ * @param V
+ * @param kernel
+ */
+HEADER_PREFIX void
+fill_bem3d(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
+    const real (*NX)[3], const real (*NY)[3], pamatrix V, kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a kernel function @f$g@f$ on
+ * the boundary domain in the first argument
+ * using piecewise constant basis function. For the second argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \varphi_i(\vec x) \,
+ * g(x, z_j) \, \mathrm d \vec x
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_row_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
+    kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a kernel function @f$g@f$ on
+ * the boundary domain in the second argument
+ * using piecewise constant basis function. For the first argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \psi_i(\vec y) \,
+ * g(z_j, y) \, \mathrm d \vec y
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_col_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
+    kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a kernel function @f$g@f$ on
+ * the boundary domain in the first argument
+ * using piecewise linear basis function. For the second argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \varphi_i(\vec x) \,
+ * g(x, z_j) \, \mathrm d \vec x
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_row_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
+    kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a kernel function @f$g@f$ on
+ * the boundary domain in the second argument
+ * using piecewise linear basis function. For the first argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \psi_i(\vec y) \,
+ * g(z_j, y) \, \mathrm d \vec y
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_col_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
+    kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a normal derivative of a kernel function
+ * @f$g@f$ with respect to @f$z@f$ on
+ * the boundary domain in the first argument
+ * using piecewise constant basis function. For the second argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \varphi_i(\vec x) \,
+ * \frac{\partial g}{\partial n_z}(x, z_j) \, \mathrm d \vec x
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param N An array of normal vectors corresponding to the vectors @p Z.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_dnz_row_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
+    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a normal derivative of a kernel function
+ * @f$g@f$ with respect to @f$z@f$ on
+ * the boundary domain in the second argument
+ * using piecewise constant basis function. For the first argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \psi_i(\vec y) \,
+ * \frac{\partial g}{\partial n_z}(z_j,y) \, \mathrm d \vec y
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param N An array of normal vectors corresponding to the vectors @p Z.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_dnz_col_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
+    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a normal derivative of a kernel function
+ * @f$g@f$ with respect to @f$z@f$ on
+ * the boundary domain in the first argument
+ * using piecewise linear basis function. For the second argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \varphi_i(\vec x) \,
+ * \frac{\partial g}{\partial n_z}(x, z_j) \, \mathrm d \vec x
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param N An array of normal vectors corresponding to the vectors @p Z.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_dnz_row_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
+    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+
+/**
+ * @brief This function will integrate a normal derivative of a kernel function
+ * @f$g@f$ with respect to @f$z@f$ on
+ * the boundary domain in the second argument
+ * using piecewise linear basis function. For the first argument some
+ * given points @f$Z_j@f$ will be used.
+ * The results will be stored in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{ij} := \int_\Gamma \, \psi_i(\vec y) \,
+ * \frac{\partial g}{\partial n_z}(z_j,y) \, \mathrm d \vec y
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param Z An array of 3D-vectors. <tt>Z[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Z[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>A->cols</tt> .
+ * @param N An array of normal vectors corresponding to the vectors @p Z.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ * @param kernel The kernel function to be integrated.
+ */
+HEADER_PREFIX void
+fill_dnz_col_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
+    pcbem3d bem, pamatrix V, kernel_func3d kernel);
 
 /* ------------------------------------------------------------
  Initializerfunctions for h-matrix approximations
@@ -1930,7 +2438,7 @@ HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_ortho_bem3d(pbem3d bem,
  ------------------------------------------------------------ */
 
 /**
- * @brief Fills an @ref _hmatrix "hmatrix" with a predefined approximation
+ * @brief Fills a @ref _hmatrix "hmatrix" with a predefined approximation
  * technique.
  *
  * This will traverse the block tree until it reaches its leafs.
@@ -1953,7 +2461,7 @@ HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_ortho_bem3d(pbem3d bem,
 HEADER_PREFIX void assemble_bem3d_hmatrix(pbem3d bem, pblock b, phmatrix G);
 
 /**
- * @brief Fills an @ref _hmatrix "hmatrix" with a predefined approximation
+ * @brief Fills a @ref _hmatrix "hmatrix" with a predefined approximation
  * technique using coarsening strategy.
  *
  * This will traverse the block tree until it reaches its leafs.
@@ -1981,6 +2489,46 @@ HEADER_PREFIX void assemble_bem3d_hmatrix(pbem3d bem, pblock b, phmatrix G);
  * appropriate to <tt>G</tt>.
  */
 HEADER_PREFIX void assemblecoarsen_bem3d_hmatrix(pbem3d bem, pblock b,
+    phmatrix G);
+
+/**
+ * @brief Fills the nearfield blocks of a @ref _hmatrix "hmatrix".
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For an inadmissible leaf block the full matrix @f$
+ * G_{|t \times s} @f$ is computed. In case of an admissible leaf no operations
+ * are performed.
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _hmatrix "hmatrix" <tt>G</tt> .
+ * @param b Root of the @ref _block "blocktree".
+ * @param G @ref _hmatrix "hmatrix" to be filled. <tt>b</tt> has to be
+ * appropriate to <tt>G</tt>.
+ */
+HEADER_PREFIX void assemble_nearfield_bem3d_hmatrix(pbem3d bem, pblock b,
+    phmatrix G);
+
+/**
+ * @brief Fills the farfield blocks of a @ref _hmatrix "hmatrix" with a
+ * predefined approximation technique.
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For an admissible leaf block a rank-k-approximation specified within the
+ * @ref _bem3d "bem3d" object is created as @f$ G_{|t \times s} \approx A_b
+ * \, B_b^* @f$
+ *
+ * @attention Before using this function to fill an @ref _hmatrix "hmatrix" one has to
+ * initialize the @ref _bem3d "bem3d" object with one of the approximation
+ * techniques such as @ref setup_hmatrix_aprx_inter_row_bem3d. Otherwise the
+ * behavior of the function is undefined.
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _hmatrix "hmatrix" <tt>G</tt> .
+ * @param b Root of the @ref _block "blocktree".
+ * @param G @ref _hmatrix "hmatrix" to be filled. <tt>b</tt> has to be
+ * appropriate to <tt>G</tt>.
+ */
+HEADER_PREFIX void assemble_farfield_bem3d_hmatrix(pbem3d bem, pblock b,
     phmatrix G);
 
 /* ------------------------------------------------------------
@@ -2044,7 +2592,7 @@ HEADER_PREFIX void assemble_bem3d_h2matrix_col_clusterbasis(pcbem3d bem,
     pclusterbasis cb);
 
 /**
- * @brief Fills an @ref _h2matrix "h2matrix" with a predefined approximation
+ * @brief Fills a @ref _h2matrix "h2matrix" with a predefined approximation
  * technique.
  *
  * This will traverse the block tree until it reaches its leafs.
@@ -2071,6 +2619,52 @@ HEADER_PREFIX void assemble_bem3d_h2matrix_col_clusterbasis(pcbem3d bem,
  * appropriate to <tt>G</tt>.
  */
 HEADER_PREFIX void assemble_bem3d_h2matrix(pbem3d bem, pblock b, ph2matrix G);
+
+/**
+ * @brief Fills the nearfield part of a @ref _h2matrix "h2matrix".
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For an inadmissiböe leaf block the full matrix @f$
+ * G_{|t \times s} @f$ is computed.
+ *
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
+ * @param b Root of the @ref _block "blocktree".
+ * @param G @ref _h2matrix "h2matrix" to be filled. <tt>b</tt> has to be
+ * appropriate to <tt>G</tt>.
+ */
+HEADER_PREFIX void assemble_nearfield_bem3d_h2matrix(pbem3d bem, pblock b,
+    ph2matrix G);
+
+/**
+ * @brief Fills a @ref _h2matrix "h2matrix" with a predefined approximation
+ * technique.
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For an admissible leaf block a @ref _uniform "uniform"
+ * rank-k-approximation specified
+ * within the @ref _bem3d "bem3d" object is created as
+ * @f$ G_{|t \times s} \approx V_t \, S_b \, W_s^* @f$
+ *
+ * @attention Before using this function to fill an @ref _h2matrix
+ * "h2matrix" one has to initialize the @ref _bem3d "bem3d" object with
+ * one of the approximation techniques such as @ref
+ * setup_h2matrix_aprx_inter_bem3d. Otherwise the
+ * behavior of the function is undefined.
+ * @attention The @ref _clusterbasis "clusterbasis" @f$ V_t @f$ and @f$ W_s @f$
+ * have to be computed before
+ * calling this function because some approximation schemes depend on information
+ * residing within the @ref _clusterbasis "clusterbasis".
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
+ * @param b Root of the @ref _block "blocktree".
+ * @param G @ref _h2matrix "h2matrix" to be filled. <tt>b</tt> has to be
+ * appropriate to <tt>G</tt>.
+ */
+HEADER_PREFIX void assemble_farfield_bem3d_h2matrix(pbem3d bem, pblock b,
+    ph2matrix G);
 
 /**
  * @brief Fills an @ref _h2matrix "h2matrix" with a predefined approximation
@@ -2296,8 +2890,56 @@ HEADER_PREFIX void assemble_bem3d_lagrange_amatrix(const real (*X)[3],
  ------------------------------------------------------------ */
 
 /**
+ * @brief Computes the integral of a given function using piecewise
+ * constant basis functions over the boundary of a domain.
+ *
+ * The entries of the vector @f$ f @f$ are defined as:
+ * @f[
+ * f_i :=  \int_\Gamma \, \varphi_i(\vec x)
+ * \, r(\vec x, n(\vec x) ) \, \mathrm d \vec x \, ,
+ * @f]
+ * with @f$ n(\vec x) @f$ being the outpointing normal vector at the point
+ * @f$ \vec x @f$.
+ *
+ * @param bem BEM-object containing additional information for computation
+ * of the vector entries.
+ * @param rhs This callback defines the function to be integrated. Its
+ * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
+ * @param f The integration coefficients are stored within this vector.
+ * Therefore its length has to be at least <tt>bem->gr->triangles</tt>.
+ * @param data Additional data for evaluating the functional
+ */
+HEADER_PREFIX void
+integrate_bem3d_const_avector(pbem3d bem, boundary_func3d rhs, pavector f,
+    void *data);
+
+/**
+ * @brief Computes the integral of a given function using piecewise
+ * linear basis functions over the boundary of a domain.
+ *
+ * The entries of the vector @f$ f @f$ are defined as:
+ * @f[
+ * f_i :=  \int_\Gamma \, \varphi_i(\vec x)
+ * \, r(\vec x, n(\vec x) ) \, \mathrm d \vec x \, ,
+ * @f]
+ * with @f$ n(\vec x) @f$ being the outpointing normal vector at the point
+ * @f$ \vec x @f$.
+ *
+ * @param bem BEM-object containing additional information for computation
+ * of the vector entries.
+ * @param rhs This callback defines the function to be integrated. Its
+ * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
+ * @param f The integration coefficients are stored within this vector.
+ * Therefore its length has to be at least <tt>bem->gr->vertices</tt>.
+ * @param data Additional data for evaluating the functional
+ */
+HEADER_PREFIX void
+integrate_bem3d_linear_avector(pbem3d bem, boundary_func3d rhs, pavector f,
+    void *data);
+
+/**
  * @brief Computes the @f$ L_2 @f$-projection of a given function using piecewise
- * constant basis functions.
+ * constant basis functions over the boundary of a domain.
  *
  * In case of piecewise constant basis functions the @f$ L_2 @f$-projection of a
  * function @f$ r @f$ is defined as:
@@ -2315,13 +2957,14 @@ HEADER_PREFIX void assemble_bem3d_lagrange_amatrix(const real (*X)[3],
  * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
  * @param f The @f$ L_2 @f$-projection coefficients are stored within this vector.
  * Therefore its length has to be at least <tt>bem->gr->triangles</tt>.
+ * @param data Additional data for evaluating the functional
  */
 HEADER_PREFIX void projectl2_bem3d_const_avector(pbem3d bem,
-    boundary_func3d rhs, pavector f);
+    boundary_func3d rhs, pavector f, void *data);
 
 /**
  * @brief Computes the @f$ L_2 @f$-projection of a given function using linear
- * basis functions.
+ * basis functions over the boundary of a domain.
  *
  * In case of linear basis functions the @f$ L_2 @f$-projection of a
  * function @f$ r @f$ is defined as:
@@ -2348,9 +2991,10 @@ HEADER_PREFIX void projectl2_bem3d_const_avector(pbem3d bem,
  * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
  * @param f The @f$ L_2 @f$-projection coefficients are stored within this vector.
  * Therefore its length has to be at least <tt>bem->gr->triangles</tt>.
+ * @param data Additional data for evaluating the functional
  */
 HEADER_PREFIX void projectl2_bem3d_linear_avector(pbem3d bem,
-    boundary_func3d rhs, pavector f);
+    boundary_func3d rhs, pavector f, void *data);
 
 /**
  * @brief initializes the field <tt>bem->v2t</tt> when using linear basis

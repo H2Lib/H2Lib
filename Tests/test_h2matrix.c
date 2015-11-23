@@ -16,6 +16,18 @@ static uint problems = 0;
 
 #define IS_IN_RANGE(a, b, c) (((a) < (b)) && ((b) < (c)))
 
+#ifdef USE_COMPLEX
+static field alpha = 1.0 + 1.0 * I;
+#else
+static field alpha = 1.0;
+#endif
+
+#ifdef USE_FLOAT
+static real tolerance = 1.0e-6;
+#else
+static real tolerance = 1.0e-12;
+#endif
+
 int
 main()
 {
@@ -35,13 +47,13 @@ main()
   real      tol, eta, delta, eps_aca;
 
   n = 579;
-  tol = 1.0e-13;
+  tol = tolerance;
 
   clf = 16;
   eta = 1.0;
   m = 4;
   delta = 1.0;
-  eps_aca = 1.0e-13;
+  eps_aca = tolerance;
 
   gr2 = new_circle_curve2d(n, 0.333);
   bem2 = new_slp_laplace_bem2d(gr2, 2, BASIS_CONSTANT_BEM2D);
@@ -67,14 +79,13 @@ main()
   random_avector(x);
   b = new_avector(n);
   clear_avector(b);
-  mvm_h2matrix_avector(1.0, false, h2, x, b);
+  mvm_h2matrix_avector(alpha, false, h2, x, b);
 
   (void) printf("Copying matrix\n");
 
   rbcopy = clone_clusterbasis(h2->rb);
   cbcopy = clone_clusterbasis(h2->cb);
   h2copy = clone_h2matrix(h2, rbcopy, cbcopy);
-
 
   (void) printf("Computing Cholesky factorization\n");
 
@@ -94,11 +105,11 @@ main()
 
   cholsolve_h2matrix_avector(L, b);
 
-  add_avector(-1.0, x, b);
+  add_avector(-alpha, x, b);
   error = norm2_avector(b) / norm2_avector(x);
   (void) printf("  Accuracy %g, %sokay\n", error,
-		IS_IN_RANGE(2.0e-13, error, 3.0e-12) ? "" : "    NOT ");
-  if (!IS_IN_RANGE(2.0e-13, error, 3.0e-12))
+		IS_IN_RANGE(0.0, error, 25.0 * tol) ? "" : "    NOT ");
+  if (!IS_IN_RANGE(0.0, error, 25.0 * tol))
     problems++;
 
   rwfh2 = prepare_row_clusteroperator(h2copy->rb, h2copy->cb, tm);
@@ -109,12 +120,9 @@ main()
   addmul_h2matrix(-1.0, L, true, L, h2copy, rwfh2, cwfh2, tm, tol);
   error = norm2_h2matrix(h2copy) / error;
   (void) printf("  Accuracy %g, %sokay\n", error,
-		IS_IN_RANGE(4.0e-15, error, 4.0e-14) ? "" : "    NOT ");
-  if (!IS_IN_RANGE(4.0e-15, error, 4.0e-14))
+		IS_IN_RANGE(0.0, error, 25.0 * tol) ? "" : "    NOT ");
+  if (!IS_IN_RANGE(0.0, error, 25.0 * tol))
     problems++;
-
-
-
 
   del_h2matrix(h2copy);
   del_h2matrix(h2);
@@ -129,7 +137,6 @@ main()
   del_clusteroperator(cwf);
   del_clusteroperator(rwfh2);
   del_clusteroperator(cwfh2);
-
 
   rb = build_from_cluster_clusterbasis(root2);
   cb = build_from_cluster_clusterbasis(root2);
@@ -150,7 +157,7 @@ main()
   random_avector(x);
   b = new_avector(n);
   clear_avector(b);
-  mvm_h2matrix_avector(1.0, false, h2, x, b);
+  mvm_h2matrix_avector(alpha, false, h2, x, b);
 
   (void) printf("Copying matrix\n");
   rbcopy = clone_clusterbasis(h2->rb);
@@ -180,13 +187,12 @@ main()
   (void) printf("Solving\n");
   lrsolve_h2matrix_avector(L, R, b);
 
-  add_avector(-1.0, x, b);
+  add_avector(-alpha, x, b);
   error = norm2_avector(b) / norm2_avector(x);
   (void) printf("  Accuracy %g, %sokay\n", error,
-		IS_IN_RANGE(2e-13, error, 2e-12) ? "" : "    NOT ");
-  if (!IS_IN_RANGE(2e-13, error, 2e-12))
+		IS_IN_RANGE(0.0, error, 25.0 * tol) ? "" : "    NOT ");
+  if (!IS_IN_RANGE(0.0, error, 25.0 * tol))
     problems++;
-
 
   rwfh2 = prepare_row_clusteroperator(h2copy->rb, h2copy->cb, tm);
   cwfh2 = prepare_col_clusteroperator(h2copy->rb, h2copy->cb, tm);
@@ -196,10 +202,9 @@ main()
   addmul_h2matrix(-1.0, L, false, R, h2copy, rwfh2, cwfh2, tm, tol);
   error = norm2_h2matrix(h2copy) / error;
   (void) printf("  Accuracy %g, %sokay\n", error,
-		IS_IN_RANGE(4.0e-15, error, 5.0e-14) ? "" : "    NOT ");
-  if (!IS_IN_RANGE(4.0e-15, error, 5.0e-14))
+		IS_IN_RANGE(0.0, error, 25.0 * tol) ? "" : "    NOT ");
+  if (!IS_IN_RANGE(0.0, error, 25.0 * tol))
     problems++;
-
 
   /* Final clean-up */
   (void) printf("Cleaning up\n");

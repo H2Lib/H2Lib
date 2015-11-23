@@ -1,16 +1,15 @@
-
 /* ------------------------------------------------------------
-   This is the file "rkmatrix.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2010
-   ------------------------------------------------------------ */
+ This is the file "rkmatrix.c" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2010
+ ------------------------------------------------------------ */
 
 #include "rkmatrix.h"
 
 #include "basic.h"
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ Constructors and destructors
+ ------------------------------------------------------------ */
 
 prkmatrix
 init_rkmatrix(prkmatrix r, uint rows, uint cols, uint k)
@@ -23,8 +22,8 @@ init_rkmatrix(prkmatrix r, uint rows, uint cols, uint k)
 }
 
 pcrkmatrix
-init_sub_rkmatrix(prkmatrix r, pcrkmatrix src,
-		  uint rows, uint roff, uint cols, uint coff)
+init_sub_rkmatrix(prkmatrix r, pcrkmatrix src, uint rows, uint roff,
+		  uint cols, uint coff)
 {
   prkmatrix wsrc = (prkmatrix) src;
   uint      k = src->k;
@@ -72,8 +71,8 @@ del_rkmatrix(prkmatrix r)
 }
 
 /* ------------------------------------------------------------
-   Change rank
-   ------------------------------------------------------------ */
+ Change rank
+ ------------------------------------------------------------ */
 
 void
 setrank_rkmatrix(prkmatrix r, uint k)
@@ -92,8 +91,8 @@ resize_rkmatrix(prkmatrix r, uint rows, uint cols, uint k)
 }
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ Statistics
+ ------------------------------------------------------------ */
 
 size_t
 getsize_rkmatrix(pcrkmatrix r)
@@ -119,8 +118,8 @@ getsize_heap_rkmatrix(pcrkmatrix r)
 }
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ Simple utility functions
+ ------------------------------------------------------------ */
 
 prkmatrix
 clone_rkmatrix(pcrkmatrix r)
@@ -160,8 +159,8 @@ copy_rkmatrix(bool atrans, pcrkmatrix a, prkmatrix b)
 }
 
 /* ------------------------------------------------------------
-   Matrix-vector multiplication
-   ------------------------------------------------------------ */
+ Matrix-vector multiplication
+ ------------------------------------------------------------ */
 
 void
 addeval_rkmatrix_avector(field alpha, pcrkmatrix r, pcavector x, pavector y)
@@ -215,11 +214,82 @@ addevaltrans_rkmatrix_avector(field alpha, pcrkmatrix r, pcavector x,
 }
 
 void
-mvm_rkmatrix_avector(field alpha, bool rtrans, pcamatrix r,
-		     pcavector x, pavector y)
+mvm_rkmatrix_avector(field alpha, bool rtrans, pcrkmatrix r, pcavector x,
+		     pavector y)
 {
   if (rtrans)
-    addevaltrans_amatrix_avector(alpha, r, x, y);
+    addevaltrans_rkmatrix_avector(alpha, r, x, y);
   else
-    addeval_amatrix_avector(alpha, r, x, y);
+    addeval_rkmatrix_avector(alpha, r, x, y);
+}
+
+real
+norm2_rkmatrix(pcrkmatrix r)
+{
+  avector   tmp1, tmp2;
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  x = init_avector(&tmp1, r->B.rows);
+  y = init_avector(&tmp2, r->A.rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  i = 0;
+  while (i < NORM_STEPS && norm > 0.0) {
+    scale_avector(1.0 / norm, x);
+
+    clear_avector(y);
+    mvm_rkmatrix_avector(1.0, false, r, x, y);
+
+    clear_avector(x);
+    mvm_rkmatrix_avector(1.0, true, r, y, x);
+
+    norm = norm2_avector(x);
+    i++;
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
+}
+
+real
+norm2diff_rkmatrix(pcrkmatrix ra, pcrkmatrix rb)
+{
+  avector   tmp1, tmp2;
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  assert(ra->A.rows == rb->A.rows);
+  assert(ra->B.rows == rb->B.rows);
+
+  x = init_avector(&tmp1, ra->B.rows);
+  y = init_avector(&tmp2, ra->A.rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  i = 0;
+  while (i < NORM_STEPS && norm > 0.0) {
+    scale_avector(1.0 / norm, x);
+
+    clear_avector(y);
+    mvm_rkmatrix_avector(1.0, false, ra, x, y);
+    mvm_rkmatrix_avector(-1.0, false, rb, x, y);
+
+    clear_avector(x);
+    mvm_rkmatrix_avector(1.0, true, ra, y, x);
+    mvm_rkmatrix_avector(-1.0, true, rb, y, x);
+
+    norm = norm2_avector(x);
+    i++;
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
 }

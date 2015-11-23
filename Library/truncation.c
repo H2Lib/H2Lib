@@ -1,15 +1,14 @@
-
- /* ------------------------------------------------------------
-    This is the file "truncation.c" of the H2Lib package.
-    All rights reserved, Steffen Boerm 2014
-    ------------------------------------------------------------ */
+/* ------------------------------------------------------------
+ This is the file "truncation.c" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2014
+ ------------------------------------------------------------ */
 
 #include "truncation.h"
 #include "basic.h"
 
 /* ------------------------------------------------------------
-   Constructors for standard truncation strategies
-   ------------------------------------------------------------ */
+ Constructors for standard truncation strategies
+ ------------------------------------------------------------ */
 
 ptruncmode
 new_truncmode()
@@ -99,11 +98,11 @@ new_abseucl_truncmode()
 }
 
 /* ------------------------------------------------------------
-   Find minimal acceptable rank
-   ------------------------------------------------------------ */
+ Find minimal acceptable rank
+ ------------------------------------------------------------ */
 
 uint
-findrank_truncmode(pctruncmode tm, real eps, pcavector sigma)
+findrank_truncmode(pctruncmode tm, real eps, pcrealavector sigma)
 {
   real      norm, sum;
   uint      k;

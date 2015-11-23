@@ -63,7 +63,13 @@ struct _clustergeometry {
   /** @brief internal fields used to build the @ref cluster tree from the 
    clustergeometry object.*/
   real *hmin;
+
+  /** @brief internal fields used to build the @ref cluster tree from the
+   clustergeometry object.*/
   real *hmax;
+
+  /** @brief internal fields used to build the @ref cluster tree from the
+   clustergeometry object.*/
   real *buf;
 };
 
@@ -79,7 +85,9 @@ struct _clustergeometry {
  * @remark Should always be matched by a call to @ref del_clustergeometry.
  * 
  * @param dim Spatial dimension of the domain.
- * @param nidx Number of characteristic points in the domain.*/
+ * @param nidx Number of characteristic points in the domain.
+ * @return Returns the newly created @ref clustergeometry object.
+ */
 HEADER_PREFIX pclustergeometry
 new_clustergeometry(uint dim, uint nidx);
 
@@ -91,125 +99,6 @@ new_clustergeometry(uint dim, uint nidx);
  *@param cf Object to be deleted. */
 HEADER_PREFIX void
 del_clustergeometry(pclustergeometry cf);
-
-/* ------------------------------------------------------------
- Clustering strategies
- ------------------------------------------------------------ */
-
-/** @brief Set the clustering strategy. 
- * 
- * Characterises the cluster strategy stored in clustermode.
- * 
- * @remark Used to forward a cluster strategy to @ref build_cluster.
- */
-
-typedef enum {
-  /** @brief  Geometrically adaptive clustering.*/
-  H2_ADAPTIVE,
-  /** @brief Geometrically regular clustering.*/
-  H2_REGULAR,
-  /** @brief Simultaneous subdivision clustering. */
-  H2_SIMSUB,
-  /** @brief Geometrically clustering based principal component analysis (PCA).*/
-  H2_PCA
-} clustermode;
-
-/**
- * @brief Build a @ref cluster tree from a @ref clustergeometry object using
- * adaptive clustering.
- * 
- * Builds an adaptive cluster tree (clustermode = H2_ADAPTIVE) basing on the 
- * geometrical informations of the clustergeometry object.
- * The boundig box is splitted adaptively into two parts corresponding to two
- * sons in the direction with the largest spatial extension and the index set
- * is splitted accordingl, if its size is greater than the leaf size, else the
- * cluster is a leaf cluster.
- * During this clustering the bounding boxes are updated.
- * 
- * @param cf clustergeometry object with geometrical information.
- * @param size Number of indices.
- * @param idx Index set.
- * @param clf Maximal leaf size.
- * @return Returns an adaptive @ref cluster tree object.
- */
-HEADER_PREFIX pcluster
-build_adaptive_cluster(pclustergeometry cf, uint size, uint *idx, uint clf);
-
-/**
- * @brief Build a @ref cluster tree from a @ref clustergeometry object using
- * regular clustering.
- * 
- * Builds a regular @ref cluster tree (clustermode = H2_REGULAR) basing on the 
- * geometrical informations of the @ref clustergeometry object.
- * The splitting starts with the forwarded direction and the following directions
- * are chosen via cycling through all possible directions.
- * The bounding box is splitted regularly in two parts corresponding to two sons
- * and the index set is subdivided accordingly, if its size is greater than the 
- * leaf size, else the cluster is a leaf cluster.
- * During this clustering the bounding boxes are updated.
- * 
- * @param cf @ref clustergeometry object with geometrical information.
- * @param size Number of indices.
- * @param idx Index set.
- * @param clf Maximal leaf size.
- * @param direction Direction for the next splitting step.
- * @return Returns a regular @ref cluster tree object.
- */
-HEADER_PREFIX pcluster
-build_regular_cluster(pclustergeometry cf, uint size, uint *idx, uint clf,
-    uint direction);
-
-/**
- * @brief Build a @ref cluster tree from a @ref clustergeometry object using
- *  simultaneous subdivision clustering.
- * 
- *  The bounding box of a cluster is regularly subdivided along each
- *  coordinate direction, then empty sub-boxes are removed.
- * 
- * @param cf @ref clustergeometry object with geometrical information.
- * @param size Number of indices.
- * @param idx Index set.
- * @param clf Maximal leaf size.
- * @return Returns a @ref cluster tree object basing on simultaneous subdivision
- * clustering
- */
-HEADER_PREFIX pcluster
-build_simsub_cluster(pclustergeometry cf, uint size, uint *idx, uint clf);
-
-/**
- * @brief Build a @ref cluster tree from a @ref clustergeometry object
- *  based on the principal component analysis.
- * 
- *  Compute the principal directions of a cluster and split it along
- *  the largest extent.
- * 
- * @param cf @ref clustergeometry object with geometrical information.
- * @param size Number of indices.
- * @param idx Index set.
- * @param clf Maximal leaf size.
- * @return Returns a @ref cluster tree object basing on pca.
- */
-HEADER_PREFIX pcluster
-build_pca_cluster(pclustergeometry cf, uint size, uint* idx, uint clf);
-
-/**
- * @brief Build a @ref cluster tree from a @ref clustergeometry object using
- * cluster strategy @ref clustermode.
- * 
- * Builds a cluster tree basing on the geometrical information of the 
- * @ref clustergeometry object.
- * The parameter @ref clustermode sets the used cluster strategy and the 
- * appropriate function defined above is called.
- * 
- * @param cf @ref clustergeometry object with geometrical information.
- * @param size Number of indices.
- * @param idx Index set.
- * @param clf Maximal leaf size.
- * @param mode Cluster strategy
- */
-HEADER_PREFIX pcluster
-build_cluster(pclustergeometry cf, uint size, uint *idx, uint clf,
-    clustermode mode);
 
 /* ------------------------------------------------------------
  Auxiliary routines

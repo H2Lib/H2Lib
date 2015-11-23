@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "factorizations.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2010
-   ------------------------------------------------------------ */
+ This is the file "factorizations.h" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2010
+ ------------------------------------------------------------ */
 
 /** @file factorizations.h
  *  @author Steffen B&ouml;rm
@@ -20,11 +19,13 @@
  *  QR factorization.
  *  @{ */
 
+#include "blas.h"
 #include "amatrix.h"
+#include "truncation.h"
 
 /* ------------------------------------------------------------
-   Diagonal matrices
-   ------------------------------------------------------------ */
+ Diagonal matrices
+ ------------------------------------------------------------ */
 
 /** @brief Solve @f$A x = b@f$ and variants for a diagonal matrix @f$A@f$.
  *
@@ -42,8 +43,16 @@ diagsolve_amatrix_avector(bool atrans, pcamatrix a, pavector x);
  *  @param xtrans Set if @f$X@f$ and @f$B@f$ have to be transposed.
  *  @param x Right-hand side @f$B@f$, gets overwritten by solution @f$X@f$. */
 HEADER_PREFIX void
-diagsolve_amatrix(bool atrans, pcamatrix a,
-			  bool xtrans, pamatrix x);
+diagsolve_amatrix(bool atrans, pcamatrix a, bool xtrans, pamatrix x);
+
+/** @brief Evaluate @f$b = A x@f$ and variants for a diagonal
+ *         matrix @f$A@f$.
+ *
+ *  @param atrans Set if @f$A@f$ has to be transposed.
+ *  @param a Diagonal matrix.
+ *  @param x Right-hand side @f$b@f$, gets overwritten by solution @f$x@f$. */
+HEADER_PREFIX void
+diageval_amatrix_avector(bool atrans, pcamatrix a, pavector x);
 
 /** @brief Evaluate @f$B = A X@f$ and variants for a diagonal
  *         matrix @f$A@f$.
@@ -53,12 +62,23 @@ diagsolve_amatrix(bool atrans, pcamatrix a,
  *  @param xtrans Set if @f$X@f$ and @f$B@f$ have to be transposed.
  *  @param x Right-hand side @f$B@f$, gets overwritten by solution @f$X@f$. */
 HEADER_PREFIX void
-diageval_amatrix(bool atrans, pcamatrix a,
-			 bool xtrans, pamatrix x);
+diageval_amatrix(bool atrans, pcamatrix a, bool xtrans, pamatrix x);
+
+/** @brief Evaluate @f$B = A X@f$ and variants for a diagonal
+ *         matrix @f$A@f$ represented by a vector of reals.
+ *
+ *  @param alpha Scaling factor for @f$A@f$.
+ *  @param atrans Set if @f$A@f$ has to be transposed.
+ *  @param a Vector containing the diagonal of @f$A@f$.
+ *  @param xtrans Set if @f$X@f$ and @f$B@f$ have to be transposed.
+ *  @param x Right-hand side @f$B@f$, gets overwritten by solution @f$X@f$. */
+HEADER_PREFIX void
+diageval_realavector_amatrix(field alpha, bool atrans, pcrealavector a,
+    bool xtrans, pamatrix x);
 
 /* ------------------------------------------------------------
-   Triangular matrices
-   ------------------------------------------------------------ */
+ Triangular matrices
+ ------------------------------------------------------------ */
 
 /** @brief Solve @f$A x = b@f$ for a triangular matrix @f$A@f$.
  *
@@ -70,7 +90,7 @@ diageval_amatrix(bool atrans, pcamatrix a,
  *  @param x Right-hand side @f$b@f$, gets overwritten by solution @f$x@f$ */
 HEADER_PREFIX void
 triangularsolve_amatrix_avector(bool alower, bool aunit, bool atrans,
-				pcamatrix a, pavector x);
+    pcamatrix a, pavector x);
 
 /** @brief Solve @f$A X = B@f$ and variants for a triangular
  *         matrix @f$A@f$.
@@ -83,8 +103,8 @@ triangularsolve_amatrix_avector(bool alower, bool aunit, bool atrans,
  *  @param x Right-hand side @f$B@f$, gets overwritten by solution @f$X@f$.
  *  @param xtrans Set if @f$X^*@f$ has to be used instead of @f$X@f$. */
 HEADER_PREFIX void
-triangularsolve_amatrix(bool alower, bool aunit, bool atrans,
-				pcamatrix a, bool xtrans, pamatrix x);
+triangularsolve_amatrix(bool alower, bool aunit, bool atrans, pcamatrix a,
+    bool xtrans, pamatrix x);
 
 /** @brief Evaluate @f$b = A x@f$ for a triangular matrix @f$A@f$.
  *
@@ -95,7 +115,8 @@ triangularsolve_amatrix(bool alower, bool aunit, bool atrans,
  *  @param a Triangular matrix @f$A@f$.
  *  @param x Right-hand side vector @f$x@f$, gets overwritten by @f$b@f$. */
 HEADER_PREFIX void
-triangulareval_amatrix_avector(bool alower, bool aunit, bool atrans, pcamatrix a, pavector x);
+triangulareval_amatrix_avector(bool alower, bool aunit, bool atrans,
+    pcamatrix a, pavector x);
 
 /** @brief Evaluate @f$B = A X@f$ and variants for a triangular
  *         matrix @f$A@f$.
@@ -109,8 +130,8 @@ triangulareval_amatrix_avector(bool alower, bool aunit, bool atrans, pcamatrix a
  *         instead of @f$X@f$ and @f$B@f$.
  *  @param x Right-hand side matrix @f$X@f$, gets overwritten by @f$B@f$. */
 HEADER_PREFIX void
-triangulareval_amatrix(bool alower, bool aunit, bool atrans,
-			       pcamatrix a, bool xtrans, pamatrix x);
+triangulareval_amatrix(bool alower, bool aunit, bool atrans, pcamatrix a,
+    bool xtrans, pamatrix x);
 
 /** @brief Add the product of two triangular matrices @f$A@f$ and
  *         @f$B@f$ to a matrix @f$C@f$, @f$C \gets C + \alpha A B@f$.
@@ -126,10 +147,8 @@ triangulareval_amatrix(bool alower, bool aunit, bool atrans,
  *  @param b Right triangular matrix @f$B@f$.
  *  @param c Target matrix @f$C@f$. */
 HEADER_PREFIX void
-triangularaddmul_amatrix(field alpha,
-				 bool alower, bool atrans, pcamatrix a,
-				 bool blower, bool btrans, pcamatrix b,
-				 pamatrix c);
+triangularaddmul_amatrix(field alpha, bool alower, bool atrans, pcamatrix a,
+    bool blower, bool btrans, pcamatrix b, pamatrix c);
 
 /** @brief Copy the lower triangular part of a matrix.
  *
@@ -148,8 +167,8 @@ HEADER_PREFIX void
 copy_upper_amatrix(pcamatrix a, bool aunit, pamatrix b);
 
 /* ------------------------------------------------------------
-   Triangular decompositions
-   ------------------------------------------------------------ */
+ Triangular decompositions
+ ------------------------------------------------------------ */
 
 /** @brief Compute the LR decomposition @f$A=LR@f$ of a matrix.
  *
@@ -171,6 +190,15 @@ lrdecomp_amatrix(pamatrix a);
 HEADER_PREFIX void
 lrsolve_amatrix_avector(pcamatrix a, pavector x);
 
+/** @brief Solve the linear system @f$A X = B@f$ using
+ *         a LR factorization.
+ *
+ *  @param a LR factorization of @f$A@f$,
+ *         as provided by @ref lrdecomp_amatrix.
+ *  @param x Right-hand side @f$B@f$, gets overwritten by @f$X@f$. */
+HEADER_PREFIX void
+lrsolve_amatrix(pcamatrix a, pamatrix x);
+
 /** @brief Compute the Cholesky decomposition @f$A=LL^*@f$ of a
  *         self-adjoint positiv definite matrix.
  *
@@ -189,6 +217,15 @@ choldecomp_amatrix(pamatrix a);
  *  @param x Right-hand side @f$b@f$, gets overwritten by @f$x@f$. */
 HEADER_PREFIX void
 cholsolve_amatrix_avector(pcamatrix a, pavector x);
+
+/** @brief Solve the linear system @f$A X = B@f$ using
+ *         a Cholesky factorization.
+ *
+ *  @param a Cholesky factorization of @f$A@f$
+ *         as provided by @ref choldecomp_amatrix.
+ *  @param x Right-hand side @f$B@f$, gets overwritten by @f$X@f$. */
+HEADER_PREFIX void
+cholsolve_amatrix(pcamatrix a, pamatrix x);
 
 /** @brief Compute the LDLT decomposition @f$A=LDL^*@f$ of a
  *         self-adjoint matrix.
@@ -211,9 +248,18 @@ ldltdecomp_amatrix(pamatrix a);
 HEADER_PREFIX void
 ldltsolve_amatrix_avector(pcamatrix a, pavector x);
 
+/** @brief Solve the linear system @f$A X = B@f$ using
+ *         a LDLT factorization.
+ *
+ *  @param a LDLT factorization of @f$A@f$
+ *         as provided by @ref ldltdecomp_amatrix.
+ *  @param x Right-hand side @f$B@f$, gets overwritten by @f$X@f$. */
+HEADER_PREFIX void
+ldltsolve_amatrix(pcamatrix a, pamatrix x);
+
 /* ------------------------------------------------------------
-   Orthogonal decompositions
-   ------------------------------------------------------------ */
+ Orthogonal decompositions
+ ------------------------------------------------------------ */
 
 /** @brief Compute the QR decomposition @f$A=QR@f$ of a matrix.
  *
@@ -223,6 +269,34 @@ ldltsolve_amatrix_avector(pcamatrix a, pavector x);
  *  @param tau Scaling factors of Householder reflections . */
 HEADER_PREFIX void
 qrdecomp_amatrix(pamatrix a, pavector tau);
+
+/** @brief Compute the QR decomposition @f$A=QR@f$ of a matrix
+ *         with column pivoting.
+ *
+ *  @param a Original matrix @f$A@f$.
+ *         Upper triangular part gets overwritten by @f$R@f$,
+ *         strictly lower triangular part by Householder vectors.
+ *  @param tau Scaling factors of Householder reflections.
+ *  @param colpiv If not null, will be filled with column pivots.
+ *  @returns Number of elementary reflections. */
+HEADER_PREFIX uint
+qrdecomp_pivot_amatrix(pamatrix a, pavector tau, uint *colpiv);
+
+/** @brief Compute the QR decomposition @f$A=QR@f$ of a matrix
+ *         with column pivoting, exit early if the remainder
+ *         becomes small enough.
+ *
+ *  @param a Original matrix @f$A@f$.
+ *         Upper triangular part gets overwritten by @f$R@f$,
+ *         strictly lower triangular part by Householder vectors.
+ *  @param tau Scaling factors of Householder reflections.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy.
+ *  @param colpiv If not null, will be filled with column pivots.
+ *  @returns Number of elementary reflections. */
+HEADER_PREFIX uint
+qrdecomp_rank_amatrix(pamatrix a, pavector tau, pctruncmode tm, real eps,
+    uint *colpiv);
 
 /** @brief Evaluate @f$b=Qx@f$ and variants for the matrix @f$Q@f$ of
  *         a QR decomposition.
@@ -244,8 +318,7 @@ qreval_amatrix_avector(bool qtrans, pcamatrix a, pcavector tau, pavector x);
  *  @param x Right-hand side matrix @f$X@f$,
  *         gets overwritten by @f$B@f$. */
 HEADER_PREFIX void
-qreval_amatrix(bool qtrans, pcamatrix a, pcavector tau,
-			pamatrix x);
+qreval_amatrix(bool qtrans, pcamatrix a, pcavector tau, pamatrix x);
 
 /** @brief Solve the linear system @f$A x = b@f$ using a
  *         QR factorization.

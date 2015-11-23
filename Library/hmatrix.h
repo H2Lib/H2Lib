@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "hmatrix.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ This is the file "hmatrix.h" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2009
+ ------------------------------------------------------------ */
 
 /** @file hmatrix.h
  *  @author Steffen B&ouml;rm
@@ -37,12 +36,13 @@ typedef const hmatrix *pchmatrix;
 #include "rkmatrix.h"
 #include "settings.h"
 #include "eigensolvers.h"
+#include "sparsematrix.h"
 
 /** @brief Representation of @f$\mathcal{H}@f$-matrices.
  *
  *  @f$\mathcal{H}@f$-matrices are represented recursively:
- *  an @ref hmatrix object can be either an @ref amatrix,
- *  an @ref rkmatrix or divided into submatrices represented
+ *  a @ref hmatrix object can be either an @ref amatrix,
+ *  a @ref rkmatrix or divided into submatrices represented
  *  again by @ref hmatrix objects. */
 struct _hmatrix {
   /** @brief Row cluster */
@@ -55,7 +55,7 @@ struct _hmatrix {
 
   /** @brief Standard matrix, for inadmissible leaves. */
   pamatrix f;
-  
+
   /** @brief Submatrices. */
   phmatrix *son;
   /** @brief Number of block rows. */
@@ -70,12 +70,28 @@ struct _hmatrix {
 };
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
-
+ Constructors and destructors
+ ------------------------------------------------------------ */
+/**
+ * @brief Initialize a @ref hmatrix object.
+ *
+ * @param hm @ref hmatrix object to be initialized.
+ * @param rc Row @ref cluster of current @ref hmatrix.
+ * @param cc Column @ref cluster of current @ref hmatrix.
+ * @return Initialized @ref hmatrix object.
+ */
 HEADER_PREFIX phmatrix
 init_hmatrix(phmatrix hm, pccluster rc, pccluster cc);
 
+/** @brief Uninitialize a @ref hmatrix object.
+ *
+ *  Releases the storage corresponding to the object.
+ *  If this @ref hmatrix contains pointers to submatrices,
+ *  the submatrices are released by @ref unref_hmatrix.
+ *
+ *  Only objects with <tt>hm->refs==0</tt> may be deleted.
+ *
+ *  @param hm Object to be uninitialized. */
 HEADER_PREFIX void
 uninit_hmatrix(phmatrix hm);
 
@@ -142,8 +158,7 @@ new_full_hmatrix(pccluster rc, pccluster cc);
  *  @param csons Number of block columns.
  *  @returns New @ref hmatrix object with submatrices. */
 HEADER_PREFIX phmatrix
-new_super_hmatrix(pccluster rc, pccluster cc,
-		  uint rsons, uint csons);
+new_super_hmatrix(pccluster rc, pccluster cc, uint rsons, uint csons);
 
 /** @brief Creates a clone of an existing @ref _hmatrix "hmatrix".
  *
@@ -153,7 +168,7 @@ new_super_hmatrix(pccluster rc, pccluster cc,
  *  and @ref _amatrix "dense matrices" are copied to the clone aswell.
  *
  *  @param src @ref _hmatrix "Hmatrix" to be cloned.
- *  @returns A clone of <tt>src</tt> is returned. */
+ *  @returns Clone of <tt>src</tt>. */
 HEADER_PREFIX phmatrix
 clone_hmatrix(pchmatrix src);
 
@@ -166,7 +181,7 @@ clone_hmatrix(pchmatrix src);
  *  resulting matrix.
  *
  *  @param src @ref _hmatrix "Hmatrix" to be cloned.
- *  @returns A clone of <tt>src</tt> is returned. */
+ *  @returns Clone of <tt>src</tt>. */
 HEADER_PREFIX phmatrix
 clonestructure_hmatrix(pchmatrix src);
 
@@ -181,7 +196,7 @@ clonestructure_hmatrix(pchmatrix src);
 HEADER_PREFIX void
 update_hmatrix(phmatrix hm);
 
-/** @brief Delete an @ref hmatrix object.
+/** @brief Delete a @ref hmatrix object.
  *
  *  Releases the storage corresponding to the object.
  *  If this @ref hmatrix contains pointers to submatrices,
@@ -194,10 +209,10 @@ HEADER_PREFIX void
 del_hmatrix(phmatrix hm);
 
 /* ------------------------------------------------------------
-   Reference counting
-   ------------------------------------------------------------ */
+ Reference counting
+ ------------------------------------------------------------ */
 
-/** @brief Set a pointer to an @ref hmatrix object, increase its
+/** @brief Set a pointer to a @ref hmatrix object, increase its
  *  reference counter, and decrease reference counter of original
  *  pointer target.
  *
@@ -206,8 +221,7 @@ del_hmatrix(phmatrix hm);
 HEADER_PREFIX void
 ref_hmatrix(phmatrix *ptr, phmatrix hm);
 
-
-/** @brief Reduce the reference counter of an @ref hmatrix object.
+/** @brief Reduce the reference counter of a @ref hmatrix object.
  *
  *  If the reference counter reaches zero, the object is deleted.
  *
@@ -219,8 +233,8 @@ HEADER_PREFIX void
 unref_hmatrix(phmatrix hm);
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ Statistics
+ ------------------------------------------------------------ */
 
 /** @brief Get size of a given @ref hmatrix object.
  *
@@ -244,15 +258,51 @@ HEADER_PREFIX size_t
 getfarsize_hmatrix(pchmatrix hm);
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ Access methods
+ ------------------------------------------------------------ */
 
-/** @brief Set an @ref hmatrix to zero by clearing all far- and nearfield
+#ifdef __GNUC__
+INLINE_PREFIX uint
+getrows_hmatrix(pchmatrix) __attribute__ ((const,unused));
+INLINE_PREFIX uint
+getcols_hmatrix(pchmatrix) __attribute__ ((const,unused));
+#endif
+
+/** @brief Get the number of rows of a @ref hmatrix @f$A@f$.
+ *
+ *  @param a Matrix @f$A@f$.
+ *  @return Number of rows of @f$A@f$. */
+INLINE_PREFIX uint getrows_hmatrix(pchmatrix a) {
+  return a->rc->size;
+}
+
+/** @brief Get the number of columns of a @ref hmatrix @f$A@f$.
+ *
+ *  @param a Matrix @f$A@f$.
+ *  @returns Number of columns of @f$A@f$. */
+INLINE_PREFIX uint getcols_hmatrix(pchmatrix a) {
+  return a->cc->size;
+}
+
+/* ------------------------------------------------------------
+ Simple utility functions
+ ------------------------------------------------------------ */
+
+/** @brief Set a @ref hmatrix to zero by clearing all far- and nearfield
  *  matrices.
  *
  *  @param hm Target matrix. */
 HEADER_PREFIX void
 clear_hmatrix(phmatrix hm);
+
+/** @brief Set the upper triangular part of a @ref hmatrix to zero
+ *  by clearing all far- and nearfield matrices.
+ *
+ *  @param hm Target matrix.
+ *  @param strict Is set, if only the strict upper triangular part should be
+ *         cleared. */
+HEADER_PREFIX void
+clear_upper_hmatrix(phmatrix hm, bool strict);
 
 /**
  * @brief Copy a matrix <tt>src</tt> to an existing matrix <tt>dst</tt>.
@@ -266,9 +316,31 @@ clear_hmatrix(phmatrix hm);
 HEADER_PREFIX void
 copy_hmatrix(pchmatrix src, phmatrix trg);
 
+/**
+ * @brief Fill a @ref hmatrix with an identity matrix.
+ *
+ * The diagonals entries will be set to one and all other entries will be set
+ * to zero. Offdiagonal admissible blocks are set to rank-0-matrices.
+ *
+ * @param hm @ref hmatrix to be filled with the identity matrix.
+ */
+HEADER_PREFIX void
+identity_hmatrix(phmatrix hm);
+
+/**
+ * @brief Fill a @ref _hmatrix "hmatrix" with random field values. The maximal
+ * rank for admissible leaves is determined by @p kmax.
+ *
+ * @param hm @ref _hmatrix "hmatrix" to be filled with random values.
+ * @param kmax Maximal rank for admissble leaves. Random values may lead to a
+ * rank lower than @p kmax.
+ */
+HEADER_PREFIX void
+random_hmatrix(phmatrix hm, uint kmax);
+
 /* ------------------------------------------------------------
-   Build H-matrix based on block tree
-   ------------------------------------------------------------ */
+ Build H-matrix based on block tree
+ ------------------------------------------------------------ */
 
 /** @brief Build an @ref hmatrix object from a @ref block tree using
  *  a given local rank.
@@ -283,8 +355,20 @@ HEADER_PREFIX phmatrix
 build_from_block_hmatrix(pcblock b, uint k);
 
 /* ------------------------------------------------------------
-   Matrix-vector multiplication
-   ------------------------------------------------------------ */
+ Build block tree from H-matrix
+ ------------------------------------------------------------ */
+
+/** @brief Build an @ref block tree from an @ref hmatrix.
+ *
+ *  @param G Input @ref hmatrix.
+ *  @returns New @ref block tree corresponding to the structure of <tt>G</tt>.
+ */
+HEADER_PREFIX pblock
+build_from_hmatrix_block(pchmatrix G);
+
+/* ------------------------------------------------------------
+ Matrix-vector multiplication
+ ------------------------------------------------------------ */
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$ or @f$y \gets y + \alpha A^* x@f$.
@@ -299,8 +383,8 @@ build_from_block_hmatrix(pcblock b, uint k);
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-mvm_hmatrix_avector(field alpha, bool atrans, pchmatrix a,
-	    pcavector x, pavector y);
+mvm_hmatrix_avector(field alpha, bool atrans, pchmatrix a, pcavector x,
+    pavector y);
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$.
@@ -315,7 +399,8 @@ mvm_hmatrix_avector(field alpha, bool atrans, pchmatrix a,
  *  @param yp Target vector @f$y@f$ in cluster numbering
  *            with respect to <tt>hm->rc</tt>. */
 HEADER_PREFIX void
-fastaddeval_hmatrix_avector(field alpha, pchmatrix hm, pcavector xp, pavector yp);
+fastaddeval_hmatrix_avector(field alpha, pchmatrix hm, pcavector xp,
+    pavector yp);
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$.
@@ -328,8 +413,7 @@ fastaddeval_hmatrix_avector(field alpha, pchmatrix hm, pcavector xp, pavector yp
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-addeval_hmatrix_avector(field alpha, pchmatrix hm,
-		pcavector x, pavector y);
+addeval_hmatrix_avector(field alpha, pchmatrix hm, pcavector x, pavector y);
 
 /** @brief Adjoint matrix-vector multiplication
  *  @f$y \gets y + \alpha A^* x@f$.
@@ -344,8 +428,8 @@ addeval_hmatrix_avector(field alpha, pchmatrix hm,
  *  @param yp Target vector @f$y@f$ in cluster numbering
  *            with respect to <tt>hm->cc</tt>. */
 HEADER_PREFIX void
-fastaddevaltrans_hmatrix_avector(field alpha, pchmatrix hm,
-			 pcavector xp, pavector yp);
+fastaddevaltrans_hmatrix_avector(field alpha, pchmatrix hm, pcavector xp,
+    pavector yp);
 
 /** @brief Adjoint matrix-vector multiplication
  *  @f$y \gets y + \alpha A^* x@f$.
@@ -358,8 +442,7 @@ fastaddevaltrans_hmatrix_avector(field alpha, pchmatrix hm,
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-addevaltrans_hmatrix_avector(field alpha, pchmatrix hm,
-		     pcavector x, pavector y);
+addevaltrans_hmatrix_avector(field alpha, pchmatrix hm, pcavector x, pavector y);
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$ with symmetric matrix @f$A@f$.
@@ -375,8 +458,8 @@ addevaltrans_hmatrix_avector(field alpha, pchmatrix hm,
  *  @param yp Target vector @f$y@f$ in cluster numbering
  *            with respect to <tt>hm->rc</tt>. */
 HEADER_PREFIX void
-fastaddevalsymm_hmatrix_avector(field alpha, pchmatrix hm,
-				pcavector xp, pavector yp);
+fastaddevalsymm_hmatrix_avector(field alpha, pchmatrix hm, pcavector xp,
+    pavector yp);
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$ with symmetric matrix @f$A@f$.
@@ -390,12 +473,11 @@ fastaddevalsymm_hmatrix_avector(field alpha, pchmatrix hm,
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-addevalsymm_hmatrix_avector(field alpha, pchmatrix hm,
-			    pcavector x, pavector y);
+addevalsymm_hmatrix_avector(field alpha, pchmatrix hm, pcavector x, pavector y);
 
 /* ------------------------------------------------------------
-   Enumeration by block number
-   ------------------------------------------------------------ */
+ Enumeration by block number
+ ------------------------------------------------------------ */
 
 /** @brief Enumerate @ref hmatrix according to block tree.
  *
@@ -414,8 +496,8 @@ HEADER_PREFIX phmatrix *
 enumerate_hmatrix(pcblock b, phmatrix hm);
 
 /* ------------------------------------------------------------
-   Spectral norm
-   ------------------------------------------------------------ */
+ Spectral norm
+ ------------------------------------------------------------ */
 
 /** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
  *
@@ -442,6 +524,19 @@ HEADER_PREFIX real
 norm2diff_amatrix_hmatrix(pchmatrix a, pcamatrix b);
 
 /** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
+ *  of a @ref sparsematrix @f$A@f$ and a @ref hmatrix @f$B@f$.
+ *
+ *  The spectral norm is approximated by applying a few (NORM_STEPS from @ref basic.h) 
+ *  steps of the power iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the 
+ *  square root of the resulting eigenvalue approximation.
+ *
+ *  @param A sparsematrix.
+ *  @param B Hierarchical matrix.
+ *  @returns Approximation of @f$\|A-B\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_sparsematrix_hmatrix(pcsparsematrix A, pchmatrix B);
+
+/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
  *  of two matrices @f$A@f$ and @f$B@f$.
  *
  *  The spectral norm is approximated by applying a few steps of the power
@@ -455,14 +550,89 @@ HEADER_PREFIX real
 norm2diff_hmatrix(pchmatrix a, pchmatrix b);
 
 /* ------------------------------------------------------------
-   File I/O
-   ------------------------------------------------------------ */
+ File I/O
+ ------------------------------------------------------------ */
+
+#ifdef USE_NETCDF
+/** @brief Write a matrix into a NetCDF file.
+ *
+ *  @param G Hierarchical matrix.
+ *  @param name Name of the target file. */
+HEADER_PREFIX void
+write_cdf_hmatrix(pchmatrix G, const char *name);
+
+/** @brief Write a matrix into a NetCDF file.
+ *
+ *  This function takes an already open NetCDF file and adds
+ *  the matrix to it, prefixing all dimensions and variables
+ *  with the given string <tt>prefix</tt>.
+ *  This allows us to store multiple objects in the same file.
+ *
+ *  @param G Hierarchical matrix.
+ *  @param nc_file Handle of the NetCDF file.
+ *  @param prefix String to be put in front of names of dimensions and variables. */
+HEADER_PREFIX void
+write_cdfpart_hmatrix(pchmatrix G, int nc_file, const char *prefix);
+
+/** @brief Read a matrix from a NetCDF file.
+ *
+ *  This function constructs a new @ref hmatrix object using data
+ *  read from a NetCDF file.
+ *
+ *  If row and column cluster trees are provided by setting
+ *  <tt>rc</tt> and <tt>cc</tt>, these clusters will be used.
+ *  If null pointers are given, the function will reconstruct suitable
+ *  cluster trees from the matrix structure.
+ *
+ *  @param name Name of the source file.
+ *  @param rc Row cluster for the matrix, may be null.
+ *  @param cc Column cluster for the matrix, may be null.
+ *  @returns Hierarchical matrix. */
+HEADER_PREFIX phmatrix
+read_cdf_hmatrix(const char *name, pccluster rc, pccluster cc);
+
+/** @brief Read a matrix from a NetCDF file.
+ *
+ *  This function constructs a new @ref hmatrix object using data
+ *  read from an already open NetCDF file.
+ *  The names of all dimensions and variables are prefixed with
+ *  the string <tt>prefix</tt> in order to allow us to store
+ *  multiple objects in the same file.
+ *
+ *  If row and column cluster trees are provided by setting
+ *  <tt>rc</tt> and <tt>cc</tt>, these clusters will be used.
+ *  If null pointers are given, the function will reconstruct suitable
+ *  cluster trees from the matrix structure.
+ *
+ *  @param nc_file Handle of the NetCDF file.
+ *  @param prefix String to be put in front of names of dimensions and variables.
+ *  @param rc Row cluster for the matrix, may be null.
+ *  @param cc Column cluster for the matrix, may be null.
+ *  @returns Hierarchical matrix. */
+HEADER_PREFIX phmatrix
+read_cdfpart_hmatrix(int nc_file, const char *prefix,
+    pccluster rc, pccluster cc);
+
+/** @brief Write @ref hmatrix to NetCDF file, including cluster trees.
+ *
+ *  @param G Matrix.
+ *  @param name File name. */
+HEADER_PREFIX void
+write_cdfcomplete_hmatrix(pchmatrix G, const char *name);
+
+/** @brief Read @ref hmatrix from NetCDF file, including cluster trees.
+ *
+ *  @param name File name.
+ *  @returns @ref hmatrix read from file. */
+HEADER_PREFIX phmatrix
+read_cdfcomplete_hmatrix(const char *name);
+#endif
 
 /** @brief Write a matrix into an ASCII file in the old HLib format.
  *
  *  @param G Hierarchical matrix.
  *  @param filename Name of the target file. */
-void
+HEADER_PREFIX void
 write_hlib_hmatrix(pchmatrix G, const char *filename);
 
 /** @brief Read a matrix from an ASCII file in the old HLib format.
@@ -473,18 +643,62 @@ write_hlib_hmatrix(pchmatrix G, const char *filename);
  *
  *  @param filename Name of the source file.
  *  @returns Hierarchical matrix reconstructed from file. */
-phmatrix
+HEADER_PREFIX phmatrix
 read_hlib_hmatrix(const char *filename);
 
+/** @brief Read a symmetric matrix from an ASCII file in the old
+ *  HLib format.
+ *
+ *  @remark Since HLib does not store cluster trees, this function
+ *  has to reconstruct them from available data. It will always use
+ *  one-dimensional trees with no permutation.
+ *
+ *  @param filename Name of the source file.
+ *  @returns Hierarchical matrix reconstructed from file. */
+HEADER_PREFIX phmatrix
+read_hlibsymm_hmatrix(const char *filename);
+
 /* ------------------------------------------------------------
-   Drawing
-   ------------------------------------------------------------ */
+ Drawing
+ ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
+/** @brief Draw a hierarchical matrix
+ * 
+ * Draw a hierarchical matrix with cairo, optionally the levels can be
+ * limited and the strorage of the blocks can be shown.
+ * 
+ * @param cr Cairo drawing context.
+ * @param hm This hierarchical matrix will be drawn.
+ * @param storage If staorage is true, the storage of the blocks
+ *    in the hierarchical matrix will be shown.
+ * @param levels Number of levels of the blockclustertree, which will
+ *    be drawn.
+ */
 HEADER_PREFIX void
-draw_cairo_hmatrix(cairo_t *cr, pchmatrix hm,
-		  bool storage, uint levels);
+draw_cairo_hmatrix(cairo_t *cr, pchmatrix hm, bool storage, uint levels);
 #endif
+
+
+/* ------------------------------------------------------------
+   Copy entries of a sparse matrix 
+   ------------------------------------------------------------ */
+/** @brief Copy entries of a @ref sparsematrix into a hierarchical matrix
+ * 
+ * Copy the entries of a @ref sparsematrix into a hierarchical matrix of the
+ * same dimensions. The hierarchical matrix has to be allocated before
+ * calling this function.
+ * 
+ * @remark This function is can only be used for a @ref sparsematrix descending of
+ * a discretization with FEM and a hierarchical matrix with admissible blocks,
+ * which only content zero entries (i.e. no storage is allocated for the rank k 
+ * matrices).
+ * 
+ * @param sp source matrix.
+ * @param hm target matrix.
+ */
+HEADER_PREFIX void
+copy_sparsematrix_hmatrix(psparsematrix sp, phmatrix hm);
 
 /** @} */
 

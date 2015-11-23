@@ -44,8 +44,7 @@ compress_hmatrix_h2matrix(pchmatrix G, pctruncmode tm, real eps)
 }
 
 ph2matrix
-compress_h2matrix_h2matrix(pch2matrix G,
-			   bool rbortho, bool cbortho,
+compress_h2matrix_h2matrix(pch2matrix G, bool rbortho, bool cbortho,
 			   pctruncmode tm, real eps)
 {
   pclusteroperator rbw, cbw;
@@ -290,9 +289,9 @@ localweights1(pccluster t, uint tname, uint pardepth,
 }
 
 void
-rowweights_h2matrix(pch2matrix G,
-		    pcclusteroperator rbw, pcclusteroperator cbw,
-		    pctruncmode tm, pclusteroperator rlw)
+rowweights_h2matrix(pch2matrix G, pcclusteroperator rbw,
+		    pcclusteroperator cbw, pctruncmode tm,
+		    pclusteroperator rlw)
 {
   weightsdata wd;
 
@@ -315,9 +314,9 @@ rowweights_h2matrix(pch2matrix G,
 }
 
 void
-colweights_h2matrix(pch2matrix G,
-		    pcclusteroperator rbw, pcclusteroperator cbw,
-		    pctruncmode tm, pclusteroperator clw)
+colweights_h2matrix(pch2matrix G, pcclusteroperator rbw,
+		    pcclusteroperator cbw, pctruncmode tm,
+		    pclusteroperator clw)
 {
   weightsdata wd;
 
@@ -340,8 +339,8 @@ colweights_h2matrix(pch2matrix G,
 }
 
 static void
-localweights2(ph2matrix G,
-	      uint bname, uint rname, uint cname, uint pardepth, void *data)
+localweights2(ph2matrix G, uint bname, uint rname, uint cname,
+	      uint pardepth, void *data)
 {
   pweightsdata wd = (pweightsdata) data;
   pcclusteroperator rbw = wd->rbwn[rname];
@@ -474,9 +473,8 @@ localweights2(ph2matrix G,
 }
 
 void
-localweights_h2matrix(pch2matrix G,
-		      pcclusteroperator rbw, pcclusteroperator cbw,
-		      pctruncmode tm,
+localweights_h2matrix(pch2matrix G, pcclusteroperator rbw,
+		      pcclusteroperator cbw, pctruncmode tm,
 		      pclusteroperator rw, pclusteroperator cw)
 {
   weightsdata wd;
@@ -534,8 +532,9 @@ accumulate(pccluster t, uint tname, void *data)
       uninit_amatrix(w1);
 
       /* Add father's contribution using transfer matrix to lower block */
-      w1 = init_sub_amatrix(&tmp2, w,
-			    lw->krow, lw->son[i]->krow, cb->son[i]->k, 0);
+      w1 =
+	init_sub_amatrix(&tmp2, w, lw->krow, lw->son[i]->krow, cb->son[i]->k,
+			 0);
       clear_amatrix(w1);
       addmul_amatrix(zeta_age, false, &lw->C, true, &cb->son[i]->E, w1);
       uninit_amatrix(w1);
@@ -556,8 +555,8 @@ accumulate(pccluster t, uint tname, void *data)
 }
 
 void
-accumulate_clusteroperator(pcclusterbasis cb,
-			   pctruncmode tm, pclusteroperator lw)
+accumulate_clusteroperator(pcclusterbasis cb, pctruncmode tm,
+			   pclusteroperator lw)
 {
   weightsdata wd;
 
@@ -575,10 +574,9 @@ accumulate_clusteroperator(pcclusterbasis cb,
 }
 
 void
-totalweights_h2matrix(pch2matrix G,
-		      bool rbortho, bool cbortho,
-		      pctruncmode tm,
-		      pclusteroperator rw, pclusteroperator cw)
+totalweights_h2matrix(pch2matrix G, bool rbortho, bool cbortho,
+		      pctruncmode tm, pclusteroperator rw,
+		      pclusteroperator cw)
 {
   pclusteroperator rbw, cbw;
 
@@ -705,8 +703,8 @@ truncate_pre(pccluster t, uint tname, void *data)
       init_amatrix(Wn + tname1, k, cbold->son[i]->k);
 
       clear_amatrix(Wn + tname1);
-      addmul_amatrix(zeta_age,
-		     false, Wn + tname, true, &cbold->son[i]->E, Wn + tname1);
+      addmul_amatrix(zeta_age, false, Wn + tname, true, &cbold->son[i]->E,
+		     Wn + tname1);
 
       tname1 += t->son[i]->desc;
     }
@@ -727,7 +725,8 @@ static void
 truncate_post(pccluster t, uint tname, void *data)
 {
   amatrix   tmp1, tmp2, tmp3;
-  avector   tmp4;
+  realavector tmp4;
+  avector   tmp5;
   struct _truncate_data *td = (struct _truncate_data *) data;
   pcclusterbasis cbold = td->cbold[tname];
   pclusterbasis cbnew = td->cbnew[tname];
@@ -737,7 +736,8 @@ truncate_post(pccluster t, uint tname, void *data)
   pctruncmode tm = td->tm;
   preal     eps = td->eps;
   pamatrix  Vhat, Vhat1, VhatZ, X, X1, Z, Q, Q1;
-  pavector  tau, sigma;
+  pavector  tau;
+  prealavector sigma;
   uint      m, kold, k, kmax;
   uint      tname1;
   uint      i, off;
@@ -773,9 +773,8 @@ truncate_post(pccluster t, uint tname, void *data)
       Vhat1 = init_sub_amatrix(&tmp2, Vhat, cbnew->son[i]->k, off, kold, 0);
 
       clear_amatrix(Vhat1);
-      addmul_amatrix(1.0,
-		     false, &old2new->son[i]->C, false, &cbold->son[i]->E,
-		     Vhat1);
+      addmul_amatrix(1.0, false, &old2new->son[i]->C, false,
+		     &cbold->son[i]->E, Vhat1);
 
       uninit_amatrix(Vhat1);
 
@@ -820,7 +819,7 @@ truncate_post(pccluster t, uint tname, void *data)
 
       /* Compute QR factorization */
       k = UINT_MIN(X->rows, X->cols);
-      tau = init_avector(&tmp4, k);
+      tau = init_avector(&tmp5, k);
       qrdecomp_amatrix(X, tau);
 
       /* R factor is the new weight */
@@ -869,7 +868,7 @@ truncate_post(pccluster t, uint tname, void *data)
 
   kmax = UINT_MIN(m, VhatZ->cols);
   Q = init_amatrix(&tmp3, m, kmax);
-  sigma = init_avector(&tmp4, kmax);
+  sigma = init_realavector(&tmp4, kmax);
   svd_amatrix(VhatZ, sigma, Q, 0);
 
   /* Determine new rank */
@@ -883,7 +882,7 @@ truncate_post(pccluster t, uint tname, void *data)
    */
 
   /* Clean up intermediate matrices */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(VhatZ);
 
   /* Set rank of new cluster basis */
@@ -928,9 +927,8 @@ truncate_post(pccluster t, uint tname, void *data)
 }
 
 void
-truncate_clusterbasis(pcclusterbasis cb,
-		      pcclusteroperator cw, pcclusteroperator clw,
-		      pctruncmode tm, real eps,
+truncate_clusterbasis(pcclusterbasis cb, pcclusteroperator cw,
+		      pcclusteroperator clw, pctruncmode tm, real eps,
 		      pclusterbasis cbnew, pclusteroperator old2new)
 {
   struct _truncate_data td;
@@ -1149,7 +1147,7 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
   pamatrix  Zhat, Zhat1;
   pavector  tau;
   pch2matrixlist hl0;
-  field     norm;
+  real      norm;
   uint      n, k;
   uint      i, off, tname1;
 
@@ -1204,11 +1202,11 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
     if (rbw) {
       for (hl0 = hl; hl0; hl0 = hl0->next)
 	if (hl0->G->u) {
-	  Zhat1 = init_sub_amatrix(&tmp2, Zhat,
-				   rbw[hl0->rname].rows, off, cbold->k, 0);
+	  Zhat1 = init_sub_amatrix(&tmp2, Zhat, rbw[hl0->rname].rows, off,
+				   cbold->k, 0);
 	  clear_amatrix(Zhat1);
-	  addmul_amatrix(1.0, false, rbw + hl0->rname,
-			 false, &hl0->G->u->S, Zhat1);
+	  addmul_amatrix(1.0, false, rbw + hl0->rname, false, &hl0->G->u->S,
+			 Zhat1);
 
 	  /* Scale block if required */
 	  if (tm && tm->blocks) {
@@ -1216,8 +1214,8 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
 	      norm = normfrob_product(false, Zhat1,
 				      (cbw ? cbw + hl0->cname : 0));
 	    else
-	      norm = norm2_product(false, Zhat1,
-				   (cbw ? cbw + hl0->cname : 0));
+	      norm =
+		norm2_product(false, Zhat1, (cbw ? cbw + hl0->cname : 0));
 
 	    if (norm > 0.0)
 	      scale_amatrix(1.0 / norm, Zhat1);
@@ -1230,8 +1228,8 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
     else {
       for (hl0 = hl; hl0; hl0 = hl0->next)
 	if (hl0->G->u) {
-	  Zhat1 = init_sub_amatrix(&tmp2, Zhat,
-				   hl0->G->rb->k, off, cbold->k, 0);
+	  Zhat1 = init_sub_amatrix(&tmp2, Zhat, hl0->G->rb->k, off, cbold->k,
+				   0);
 	  copy_amatrix(false, &hl0->G->u->S, Zhat1);
 
 	  /* Scale block if required */
@@ -1240,8 +1238,8 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
 	      norm = normfrob_product(false, Zhat1,
 				      (cbw ? cbw + hl0->cname : 0));
 	    else
-	      norm = norm2_product(false, Zhat1,
-				   (cbw ? cbw + hl0->cname : 0));
+	      norm =
+		norm2_product(false, Zhat1, (cbw ? cbw + hl0->cname : 0));
 
 	    if (norm > 0.0)
 	      scale_amatrix(1.0 / norm, Zhat1);
@@ -1288,11 +1286,11 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
     if (cbw) {
       for (hl0 = hl; hl0; hl0 = hl0->next)
 	if (hl0->G->u) {
-	  Zhat1 = init_sub_amatrix(&tmp2, Zhat,
-				   cbw[hl0->cname].rows, off, cbold->k, 0);
+	  Zhat1 = init_sub_amatrix(&tmp2, Zhat, cbw[hl0->cname].rows, off,
+				   cbold->k, 0);
 	  clear_amatrix(Zhat1);
-	  addmul_amatrix(1.0, false, cbw + hl0->cname,
-			 true, &hl0->G->u->S, Zhat1);
+	  addmul_amatrix(1.0, false, cbw + hl0->cname, true, &hl0->G->u->S,
+			 Zhat1);
 
 	  /* Scale block if required */
 	  if (tm && tm->blocks) {
@@ -1300,8 +1298,8 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
 	      norm = normfrob_product(false, Zhat1,
 				      (rbw ? rbw + hl0->rname : 0));
 	    else
-	      norm = norm2_product(false, Zhat1,
-				   (rbw ? rbw + hl0->rname : 0));
+	      norm =
+		norm2_product(false, Zhat1, (rbw ? rbw + hl0->rname : 0));
 
 	    if (norm > 0.0)
 	      scale_amatrix(1.0 / norm, Zhat1);
@@ -1314,8 +1312,8 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
     else {
       for (hl0 = hl; hl0; hl0 = hl0->next)
 	if (hl0->G->u) {
-	  Zhat1 = init_sub_amatrix(&tmp2, Zhat,
-				   hl0->G->cb->k, off, cbold->k, 0);
+	  Zhat1 = init_sub_amatrix(&tmp2, Zhat, hl0->G->cb->k, off, cbold->k,
+				   0);
 	  copy_amatrix(true, &hl0->G->u->S, Zhat1);
 
 	  /* Scale block if required */
@@ -1324,8 +1322,8 @@ computebasis_pre(pccluster t, uint tname, uint pardepth,
 	      norm = normfrob_product(false, Zhat1,
 				      (rbw ? rbw + hl0->rname : 0));
 	    else
-	      norm = norm2_product(false, Zhat1,
-				   (rbw ? rbw + hl0->rname : 0));
+	      norm =
+		norm2_product(false, Zhat1, (rbw ? rbw + hl0->rname : 0));
 
 	    if (norm > 0.0)
 	      scale_amatrix(1.0 / norm, Zhat1);
@@ -1376,7 +1374,7 @@ computebasis_post(pccluster t, uint tname, uint pardepth,
 		  pch2matrixlist hl, void *data)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4;
-  avector   tmp5;
+  realavector tmp5;
   struct _computebasis_data *cd = (struct _computebasis_data *) data;
   pamatrix  Z = cd->Z;
   pclusterbasis cbold = cd->cbold[tname];
@@ -1385,7 +1383,7 @@ computebasis_post(pccluster t, uint tname, uint pardepth,
   pctruncmode tm = cd->tm;
   preal     eps = cd->eps;
   pamatrix  Vhat, Vhat1, VhatZ, Q, Q1;
-  pavector  sigma;
+  prealavector sigma;
   uint      tname1;
   uint      m, k, kmax;
   uint      i, off;
@@ -1427,12 +1425,12 @@ computebasis_post(pccluster t, uint tname, uint pardepth,
 
     off = 0;
     for (i = 0; i < cbold->sons; i++) {
-      Vhat1 = init_sub_amatrix(&tmp2, Vhat,
-			       cbnew->son[i]->k, off, cbold->k, 0);
+      Vhat1 =
+	init_sub_amatrix(&tmp2, Vhat, cbnew->son[i]->k, off, cbold->k, 0);
 
       clear_amatrix(Vhat1);
-      addmul_amatrix(1.0, false, &old2new->son[i]->C,
-		     false, &cbold->son[i]->E, Vhat1);
+      addmul_amatrix(1.0, false, &old2new->son[i]->C, false,
+		     &cbold->son[i]->E, Vhat1);
 
       uninit_amatrix(Vhat1);
 
@@ -1458,7 +1456,7 @@ computebasis_post(pccluster t, uint tname, uint pardepth,
   /* Compute singular value decomposition */
   kmax = UINT_MIN(m, Z[tname].rows);
   Q = init_amatrix(&tmp3, m, kmax);
-  sigma = init_avector(&tmp5, kmax);
+  sigma = init_realavector(&tmp5, kmax);
   svd_amatrix(VhatZ, sigma, Q, 0);
 
   /* Determine new rank */
@@ -1500,7 +1498,7 @@ computebasis_post(pccluster t, uint tname, uint pardepth,
   }
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(Q);
   uninit_amatrix(VhatZ);
   uninit_amatrix(Vhat);
@@ -1518,10 +1516,9 @@ computebasis_post(pccluster t, uint tname, uint pardepth,
 }
 
 void
-truncrowbasis_h2matrix(ph2matrix G,
-		       bool rbortho, bool cbortho,
-		       pctruncmode tm, real eps,
-		       pclusterbasis rbnew, pclusteroperator old2new)
+truncrowbasis_h2matrix(ph2matrix G, bool rbortho, bool cbortho,
+		       pctruncmode tm, real eps, pclusterbasis rbnew,
+		       pclusteroperator old2new)
 {
   struct _computebasis_data cd;
   uint      i;
@@ -1539,8 +1536,8 @@ truncrowbasis_h2matrix(ph2matrix G,
   cd.eps[0] = eps;
   init_amatrix(cd.Z, 0, G->rb->k);
 
-  iterate_rowlist_h2matrix(G, 0, 0, 0, max_pardepth,
-			   computebasis_pre, computebasis_post, &cd);
+  iterate_rowlist_h2matrix(G, 0, 0, 0, max_pardepth, computebasis_pre,
+			   computebasis_post, &cd);
 
   uninit_amatrix(cd.Z);
 
@@ -1562,10 +1559,9 @@ truncrowbasis_h2matrix(ph2matrix G,
 }
 
 void
-trunccolbasis_h2matrix(ph2matrix G,
-		       bool rbortho, bool cbortho,
-		       pctruncmode tm, real eps,
-		       pclusterbasis cbnew, pclusteroperator old2new)
+trunccolbasis_h2matrix(ph2matrix G, bool rbortho, bool cbortho,
+		       pctruncmode tm, real eps, pclusterbasis cbnew,
+		       pclusteroperator old2new)
 {
   struct _computebasis_data cd;
   uint      i;
@@ -1583,8 +1579,8 @@ trunccolbasis_h2matrix(ph2matrix G,
   cd.eps[0] = eps;
   init_amatrix(cd.Z, 0, G->cb->k);
 
-  iterate_collist_h2matrix(G, 0, 0, 0, max_pardepth,
-			   computebasis_pre, computebasis_post, &cd);
+  iterate_collist_h2matrix(G, 0, 0, 0, max_pardepth, computebasis_pre,
+			   computebasis_post, &cd);
 
   uninit_amatrix(cd.Z);
 
@@ -1606,9 +1602,9 @@ trunccolbasis_h2matrix(ph2matrix G,
 }
 
 ph2matrix
-build_projected_h2matrix(pch2matrix h2,
-			 pclusterbasis rb, pcclusteroperator ro,
-			 pclusterbasis cb, pcclusteroperator co)
+build_projected_h2matrix(pch2matrix h2, pclusterbasis rb,
+			 pcclusteroperator ro, pclusterbasis cb,
+			 pcclusteroperator co)
 {
   ph2matrix h2new, h2new1;
   pclusterbasis rb1, cb1;
@@ -1650,8 +1646,9 @@ build_projected_h2matrix(pch2matrix h2,
 	  }
 	}
 
-	h2new1 = build_projected_h2matrix(h2->son[i + j * rsons],
-					  rb1, ro1, cb1, co1);
+	h2new1 =
+	  build_projected_h2matrix(h2->son[i + j * rsons], rb1, ro1, cb1,
+				   co1);
 	ref_h2matrix(h2new->son + i + j * rsons, h2new1);
       }
     }
@@ -1685,8 +1682,8 @@ struct _projectiondata {
 };
 
 static void
-project_inplace(ph2matrix G,
-		uint mname, uint rname, uint cname, uint pardepth, void *data)
+project_inplace(ph2matrix G, uint mname, uint rname, uint cname,
+		uint pardepth, void *data)
 {
   pprojectiondata pd = (pprojectiondata) data;
   pclusterbasis rb = pd->rbn[rname];
@@ -1730,9 +1727,9 @@ project_parallel_inplace_h2matrix(ph2matrix G, uint pardepth,
 }
 
 void
-project_inplace_h2matrix(ph2matrix G,
-			 pclusterbasis rb, pcclusteroperator ro,
-			 pclusterbasis cb, pcclusteroperator co)
+project_inplace_h2matrix(ph2matrix G, pclusterbasis rb,
+			 pcclusteroperator ro, pclusterbasis cb,
+			 pcclusteroperator co)
 {
   project_parallel_inplace_h2matrix(G, max_pardepth, rb, ro, cb, co);
 }
@@ -1805,8 +1802,8 @@ orthoweight_clusterbasis(pclusterbasis cb)
 
 /* compute the totalweights of the row clusterbasis */
 void
-totalweight_row_clusteroperator(pclusterbasis rb,
-				pclusteroperator rw, pctruncmode tm)
+totalweight_row_clusteroperator(pclusterbasis rb, pclusteroperator rw,
+				pctruncmode tm)
 {
   uint      sons = rw->sons;
 
@@ -1898,8 +1895,8 @@ totalweight_row_clusteroperator(pclusterbasis rb,
 
 /* compute the totalweights of the extended col clusterbasis */
 void
-totalweight_col_clusteroperator(pclusterbasis cb,
-				pclusteroperator cw, pctruncmode tm)
+totalweight_col_clusteroperator(pclusterbasis cb, pclusteroperator cw,
+				pctruncmode tm)
 {
   uint      sons = cw->sons;
 
@@ -1995,9 +1992,9 @@ truncate_inplace_clusterbasis(pclusterbasis cb, pclusteroperator cw,
 			      pctruncmode tm, real eps)
 {
   amatrix   tmp1, tmp2, tmp3;
-  avector   tmp4;
+  realavector tmp4;
   pamatrix  Vhat, Vhat1, VhatZ, Q, Q1;
-  pavector  sigma;
+  prealavector sigma;
   pclusteroperator cw1;
   real      zeta_level;
   uint      i, off, m, k;
@@ -2050,13 +2047,13 @@ truncate_inplace_clusterbasis(pclusterbasis cb, pclusteroperator cw,
   /* Compute singular value decomposition of VhatZ */
   k = UINT_MIN(VhatZ->rows, VhatZ->cols);
   Q = init_amatrix(&tmp3, VhatZ->rows, VhatZ->cols);
-  sigma = init_avector(&tmp4, k);
+  sigma = init_realavector(&tmp4, k);
   svd_amatrix(VhatZ, sigma, Q, 0);
   uninit_amatrix(VhatZ);
 
   /* Find appropriate rank */
   k = findrank_truncmode(tm, eps, sigma);
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
 
   /* Set rank of new cluster basis */
   resize_clusterbasis(cb, k);
@@ -2246,9 +2243,11 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
   pclusteroperator *cw1;
   amatrix   tmp1, tmp2, tmp3, tmp4;
   avector   tmp5;
+  realavector tmp6;
   ptruncblock *tb1, tb2, tb3;
   pamatrix  Vhat, Vhat1, VhatZ, VhatZ1, W, W1, Q, Q1;
-  pavector  sigma;
+  pavector  tau;
+  prealavector sigma;
   real      zeta_age, zeta_level;
   uint      sons, n, nw, m;
 #ifdef USE_OPENMP
@@ -2317,9 +2316,9 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
       else {
 	roff = 0;
 	for (i = 0; i < sons; i++) {
-	  tb1[i] = new_sub_truncblock(tb2->cb,
-				      tb2->cw, tb2->cw_factor * zeta_age,
-				      t->son[i], roff, tb1[i]);
+	  tb1[i] = new_sub_truncblock(tb2->cb, tb2->cw,
+				      tb2->cw_factor * zeta_age, t->son[i],
+				      roff, tb1[i]);
 
 	  roff += t->son[i]->size;
 	}
@@ -2335,9 +2334,8 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
     cb1 = (pclusterbasis *) allocmem((size_t) sizeof(pclusterbasis) * sons);
     cw1 = 0;
     if (cw)
-      cw1 =
-	(pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
-				      sons);
+      cw1 = (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
+					  sons);
 
 #ifdef USE_OPENMP
     nthreads = sons;
@@ -2345,9 +2343,9 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
 #pragma omp parallel for if(pardepth > 0), num_threads(nthreads)
 #endif
     for (i = 0; i < sons; i++)
-      cb1[i] =
-	unify_parallel_clusterbasis(t->son[i], tb1[i], tm, eps * zeta_level,
-				    pardepth1, (cw ? cw1 + i : 0));
+      cb1[i] = unify_parallel_clusterbasis(t->son[i], tb1[i], tm,
+					   eps * zeta_level, pardepth1,
+					   (cw ? cw1 + i : 0));
 
     /* Set up sons of clusterbasis, determine number of rows of Vhat */
     m = 0;
@@ -2392,8 +2390,9 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
 	   created by new_sub_truncblock */
 	roff = 0;
 	for (i = 0; i < sons; i++) {
-	  Vhat1 = init_sub_amatrix(&tmp2, Vhat,
-				   cb->son[i]->k, roff, tb2->cb->k, coff);
+	  Vhat1 =
+	    init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, roff, tb2->cb->k,
+			     coff);
 	  copy_amatrix(false, &tb2->old2new->son[i]->C, Vhat1);
 	  uninit_amatrix(Vhat1);
 
@@ -2408,15 +2407,15 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
 	   matrices into account when assembling Vhat */
 	roff = 0;
 	for (i = 0; i < sons; i++) {
-	  Vhat1 = init_sub_amatrix(&tmp2, Vhat,
-				   cb->son[i]->k, roff, tb2->cb->k, coff);
+	  Vhat1 =
+	    init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, roff, tb2->cb->k,
+			     coff);
 	  clear_amatrix(Vhat1);
 
 	  assert(cb->son[i]->k == tb2->old2new->son[i]->krow);
 	  assert(tb2->cb->son[i]->k == tb2->old2new->son[i]->kcol);
-	  addmul_amatrix(1.0,
-			 false, &tb2->old2new->son[i]->C,
-			 false, &tb2->cb->son[i]->E, Vhat1);
+	  addmul_amatrix(1.0, false, &tb2->old2new->son[i]->C, false,
+			 &tb2->cb->son[i]->E, Vhat1);
 	  uninit_amatrix(Vhat1);
 
 	  roff += cb->son[i]->k;
@@ -2479,13 +2478,13 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
   /* Compute singular value decomposition of VhatZ */
   k = UINT_MIN(m, nw);
   Q = init_amatrix(&tmp3, m, k);
-  sigma = init_avector(&tmp5, k);
+  sigma = init_realavector(&tmp6, k);
   svd_amatrix(VhatZ, sigma, Q, 0);
   uninit_amatrix(VhatZ);
 
   /* Find appropriate rank */
   k = findrank_truncmode(tm, eps, sigma);
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
 
   /* Set rank of new cluster basis */
   resize_clusterbasis(cb, k);
@@ -2542,8 +2541,8 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
       if (tb2->cw) {
 	W1 = init_sub_amatrix(&tmp2, W, tb2->cw->krow, roff, k, 0);
 	clear_amatrix(W1);
-	addmul_amatrix(tb2->cw_factor,
-		       false, &tb2->cw->C, true, &tb2->old2new->C, W1);
+	addmul_amatrix(tb2->cw_factor, false, &tb2->cw->C, true,
+		       &tb2->old2new->C, W1);
 	uninit_amatrix(W1);
 	roff += tb2->cw->krow;
       }
@@ -2555,13 +2554,13 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
       }
     assert(roff == nw);
 
-    sigma = init_avector(&tmp5, k);
-    qrdecomp_amatrix(W, sigma);
+    tau = init_avector(&tmp5, k);
+    qrdecomp_amatrix(W, tau);
 
     resize_clusteroperator(*cw, UINT_MIN(k, nw), k);
     copy_upper_amatrix(W, false, &(*cw)->C);
 
-    uninit_avector(sigma);
+    uninit_avector(tau);
     uninit_amatrix(W);
   }
 
@@ -2569,8 +2568,8 @@ unify_parallel_clusterbasis(pccluster t, ptruncblock tb,
 }
 
 pclusterbasis
-unify_clusterbasis(pccluster t, ptruncblock tb,
-		   pctruncmode tm, real eps, pclusteroperator * cw)
+unify_clusterbasis(pccluster t, ptruncblock tb, pctruncmode tm,
+		   real eps, pclusteroperator * cw)
 {
   return unify_parallel_clusterbasis(t, tb, tm, eps, max_pardepth, cw);
 }
@@ -2580,9 +2579,8 @@ unify_clusterbasis(pccluster t, ptruncblock tb,
  * ------------------------------------------------------------ */
 
 void
-unify_parallel_h2matrix(ph2matrix G, uint pardepth,
-			pclusteroperator * rw1, pclusteroperator * cw1,
-			pctruncmode tm, real eps,
+unify_parallel_h2matrix(ph2matrix G, uint pardepth, pclusteroperator * rw1,
+			pclusteroperator * cw1, pctruncmode tm, real eps,
 			pclusteroperator * rw, pclusteroperator * cw)
 {
   ptruncblock tb, tb1;
@@ -2601,8 +2599,8 @@ unify_parallel_h2matrix(ph2matrix G, uint pardepth,
 
   /* Construct unified row bases */
   rb1 = (pclusterbasis *) allocmem((size_t) sizeof(pclusterbasis) * rsons);
-  rw2 =
-    (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * rsons);
+  rw2 = (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
+				      rsons);
   ro =
     (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * rsons *
 				  csons);
@@ -2624,8 +2622,8 @@ unify_parallel_h2matrix(ph2matrix G, uint pardepth,
 
   /* Construct unified column bases */
   cb1 = (pclusterbasis *) allocmem((size_t) sizeof(pclusterbasis) * csons);
-  cw2 =
-    (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * csons);
+  cw2 = (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
+				      csons);
   co =
     (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * rsons *
 				  csons);
@@ -2652,15 +2650,15 @@ unify_parallel_h2matrix(ph2matrix G, uint pardepth,
       for (i = 0; i < rsons; i++)
 	project_parallel_inplace_h2matrix(G->son[i + j * rsons],
 					  (pardepth > 0 ? pardepth - 1 : 0),
-					  rb1[i], ro[i + j * rsons],
-					  cb1[j], co[i + j * rsons]);
+					  rb1[i], ro[i + j * rsons], cb1[j],
+					  co[i + j * rsons]);
   }
   else {
     for (j = 0; j < csons; j++)
       for (i = 0; i < rsons; i++)
-	project_inplace_h2matrix(G->son[i + j * rsons],
-				 rb1[i], ro[i + j * rsons],
-				 cb1[j], co[i + j * rsons]);
+	project_inplace_h2matrix(G->son[i + j * rsons], rb1[i],
+				 ro[i + j * rsons], cb1[j],
+				 co[i + j * rsons]);
   }
 
   /* Create row basis for root cluster */
@@ -2736,10 +2734,9 @@ unify_parallel_h2matrix(ph2matrix G, uint pardepth,
 }
 
 void
-unify_h2matrix(ph2matrix G,
-	       pclusteroperator * rw1, pclusteroperator * cw1,
-	       pctruncmode tm, real eps,
-	       pclusteroperator * rw, pclusteroperator * cw)
+unify_h2matrix(ph2matrix G, pclusteroperator * rw1, pclusteroperator * cw1,
+	       pctruncmode tm, real eps, pclusteroperator * rw,
+	       pclusteroperator * cw)
 {
   ptruncblock tb, tb1;
   pclusterbasis rb, cb;
@@ -2757,8 +2754,8 @@ unify_h2matrix(ph2matrix G,
 
   /* Construct unified row bases */
   rb1 = (pclusterbasis *) allocmem((size_t) sizeof(pclusterbasis) * rsons);
-  rw2 =
-    (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * rsons);
+  rw2 = (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
+				      rsons);
   ro =
     (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * rsons *
 				  csons);
@@ -2779,8 +2776,8 @@ unify_h2matrix(ph2matrix G,
 
   /* Construct unified column bases */
   cb1 = (pclusterbasis *) allocmem((size_t) sizeof(pclusterbasis) * csons);
-  cw2 =
-    (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * csons);
+  cw2 = (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
+				      csons);
   co =
     (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) * rsons *
 				  csons);
@@ -2803,9 +2800,8 @@ unify_h2matrix(ph2matrix G,
   /* Change bases */
   for (j = 0; j < csons; j++)
     for (i = 0; i < rsons; i++)
-      project_inplace_h2matrix(G->son[i + j * rsons],
-			       rb1[i], ro[i + j * rsons],
-			       cb1[j], co[i + j * rsons]);
+      project_inplace_h2matrix(G->son[i + j * rsons], rb1[i],
+			       ro[i + j * rsons], cb1[j], co[i + j * rsons]);
 
   /* Create row basis for root cluster */
   rb = 0;
@@ -3246,15 +3242,15 @@ addcol_hcomp(pccluster cc, pchmatrix hm, pctruncmode tm,
 
 static    pclusterbasis
 buildbasis_hcomp(pccluster t, bool colbasis,
-		 phcompactive active, phcomppassive passive,
-		 pctruncmode tm, real eps)
+		 phcompactive active, phcomppassive passive, pctruncmode tm,
+		 real eps)
 {
   pclusterbasis cb, cb1;
   amatrix   tmp1, tmp2, tmp3, tmp4;
-  avector   tmp5;
+  realavector tmp5;
   pamatrix  Ahat, Ahat0, Ahat1;
   pamatrix  Q, Q1;
-  pavector  sigma;
+  prealavector sigma;
   phcompactive active1, ha, ha1;
   phcomppassive passive1, hp;
   real      zeta_age, zeta_level;
@@ -3288,16 +3284,16 @@ buildbasis_hcomp(pccluster t, bool colbasis,
       for (ha = active; ha; ha = ha->next) {
 	ha1 = (phcompactive) allocmem(sizeof(hcompactive));
 	ha1->hm = ha->hm;
-	init_sub_amatrix(&ha1->A, &ha->A,
-			 t->son[i]->size, off, ha->A.cols, 0);
+	init_sub_amatrix(&ha1->A, &ha->A, t->son[i]->size, off, ha->A.cols,
+			 0);
 	ha1->weight = ha->weight * zeta_age;
 	ha1->next = active1;
 	active1 = ha1;
       }
 
       /* Create cluster basis for son */
-      cb1 = buildbasis_hcomp(t->son[i], colbasis, active1, passive1,
-			     tm, eps * zeta_level);
+      cb1 = buildbasis_hcomp(t->son[i], colbasis, active1, passive1, tm,
+			     eps * zeta_level);
       ref_clusterbasis(cb->son + i, cb1);
 
       /* Clean up block lists */
@@ -3317,12 +3313,12 @@ buildbasis_hcomp(pccluster t, bool colbasis,
       m = 0;
       for (i = 0; i < t->sons; i++) {
 	/* Matrix prepared by recursive call */
-	Ahat1 = init_sub_amatrix(&tmp2, &ha->A,
-				 cb->son[i]->k, off, Ahat->cols, 0);
+	Ahat1 =
+	  init_sub_amatrix(&tmp2, &ha->A, cb->son[i]->k, off, Ahat->cols, 0);
 
 	/* Appropriate submatrix in Ahat */
-	Ahat0 = init_sub_amatrix(&tmp3, Ahat,
-				 cb->son[i]->k, m, Ahat->cols, 0);
+	Ahat0 =
+	  init_sub_amatrix(&tmp3, Ahat, cb->son[i]->k, m, Ahat->cols, 0);
 
 	/* Copy submatrix to its place */
 	copy_amatrix(false, Ahat1, Ahat0);
@@ -3372,13 +3368,13 @@ buildbasis_hcomp(pccluster t, bool colbasis,
   /* Compute singular value decomposition */
   k = UINT_MIN(m, n);
   Q = init_amatrix(&tmp2, m, n);
-  sigma = init_avector(&tmp5, k);
+  sigma = init_realavector(&tmp5, k);
   svd_amatrix(Ahat, sigma, Q, 0);
   uninit_amatrix(Ahat);
 
   /* Find appropriate rank */
   k = findrank_truncmode(tm, eps, sigma);
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
 
   /* Set rank of new cluster basis */
   resize_clusterbasis(cb, k);
@@ -3476,8 +3472,8 @@ buildcolbasis_hmatrix(pchmatrix G, pctruncmode tm, real eps)
  * ------------------------------------------------------------ */
 
 ph2matrix
-build_projected_hmatrix_h2matrix(pchmatrix G,
-				 pclusterbasis rb, pclusterbasis cb)
+build_projected_hmatrix_h2matrix(pchmatrix G, pclusterbasis rb,
+				 pclusterbasis cb)
 {
   ph2matrix G2, G21;
   pclusterbasis rb1, cb1;
@@ -3723,15 +3719,15 @@ addcol_comp(pccluster cc, pcamatrix G, pcblock b, pctruncmode tm,
 
 static    pclusterbasis
 buildbasis_comp(pccluster t, bool colbasis,
-		pcompactive active, pcomppassive passive,
-		pctruncmode tm, real eps)
+		pcompactive active, pcomppassive passive, pctruncmode tm,
+		real eps)
 {
   pclusterbasis cb, cb1;
   amatrix   tmp1, tmp2, tmp3, tmp4;
-  avector   tmp5;
+  realavector tmp5;
   pamatrix  Ahat, Ahat0, Ahat1;
   pamatrix  Q, Q1;
-  pavector  sigma;
+  prealavector sigma;
   pcompactive active1, ca, ca1;
   pcomppassive passive1, cp;
   real      zeta_age, zeta_level;
@@ -3766,16 +3762,16 @@ buildbasis_comp(pccluster t, bool colbasis,
 	ca1 = (pcompactive) allocmem(sizeof(compactive));
 	ca1->G = ca->G;
 	ca1->b = ca->b;
-	init_sub_amatrix(&ca1->A, &ca->A,
-			 t->son[i]->size, off, ca->A.cols, 0);
+	init_sub_amatrix(&ca1->A, &ca->A, t->son[i]->size, off, ca->A.cols,
+			 0);
 	ca1->weight = ca->weight * zeta_age;
 	ca1->next = active1;
 	active1 = ca1;
       }
 
       /* Create cluster basis for son */
-      cb1 = buildbasis_comp(t->son[i], colbasis, active1, passive1,
-			    tm, eps * zeta_level);
+      cb1 = buildbasis_comp(t->son[i], colbasis, active1, passive1, tm,
+			    eps * zeta_level);
       ref_clusterbasis(cb->son + i, cb1);
 
       /* Clean up block lists */
@@ -3795,12 +3791,12 @@ buildbasis_comp(pccluster t, bool colbasis,
       m = 0;
       for (i = 0; i < t->sons; i++) {
 	/* Matrix prepared by recursive call */
-	Ahat1 = init_sub_amatrix(&tmp2, &ca->A,
-				 cb->son[i]->k, off, Ahat->cols, 0);
+	Ahat1 =
+	  init_sub_amatrix(&tmp2, &ca->A, cb->son[i]->k, off, Ahat->cols, 0);
 
 	/* Appropriate submatrix in Ahat */
-	Ahat0 = init_sub_amatrix(&tmp3, Ahat,
-				 cb->son[i]->k, m, Ahat->cols, 0);
+	Ahat0 =
+	  init_sub_amatrix(&tmp3, Ahat, cb->son[i]->k, m, Ahat->cols, 0);
 
 	/* Copy submatrix to its place */
 	copy_amatrix(false, Ahat1, Ahat0);
@@ -3850,13 +3846,13 @@ buildbasis_comp(pccluster t, bool colbasis,
   /* Compute singular value decomposition */
   k = UINT_MIN(m, n);
   Q = init_amatrix(&tmp2, m, n);
-  sigma = init_avector(&tmp5, k);
+  sigma = init_realavector(&tmp5, k);
   svd_amatrix(Ahat, sigma, Q, 0);
   uninit_amatrix(Ahat);
 
   /* Find appropriate rank */
   k = findrank_truncmode(tm, eps, sigma);
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
 
   /* Set rank of new cluster basis */
   resize_clusterbasis(cb, k);
@@ -3985,9 +3981,8 @@ build_projected_amatrix_h2matrix(pcamatrix G, pcblock b,
 	  rb1 = rb->son[i];
 	}
 
-	h21 =
-	  build_projected_amatrix_h2matrix(G, b->son[i + j * rsons], rb1,
-					   cb1);
+	h21 = build_projected_amatrix_h2matrix(G, b->son[i + j * rsons], rb1,
+					       cb1);
 	ref_h2matrix(h2->son + i + j * rsons, h21);
       }
     }

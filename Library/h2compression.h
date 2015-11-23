@@ -460,7 +460,9 @@ struct _truncblock {
  *
  *  @param cb Cluster basis of the corresponding submatrix.
  *  @param cw Total weights for <tt>cb</tt>.
- *  @param next Next @ref truncblock in list. */
+ *  @param next Next @ref truncblock in list.
+ *  @return Returns the newly created @ref truncblock object.
+ */
 HEADER_PREFIX ptruncblock
 new_truncblock(pcclusterbasis cb, pcclusteroperator cw, ptruncblock next);
 

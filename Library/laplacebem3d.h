@@ -35,7 +35,7 @@
 
 /**
  * @brief Creates a new @ref _bem3d "bem3d"-object for computation of
- * single layer potential matrix.
+ * single layer potential matrix of the Laplace equation.
  *
  * After calling this function the resulting @ref _bem3d "bem"-object will
  * provide all functionality that is necessary to build up fully populated
@@ -44,18 +44,22 @@
  * or @ref _h2matrix "h2matrix" approximation of this matrix.
  *
  * @param gr Surface mesh
- * @param q Order of gaussian quadrature used within computation of matrix entries.
+ * @param q_regular Order of gaussian quadrature used within computation of matrix
+ *        entries for single integrals and regular double integrals.
+ * @param q_singular Order of gaussian quadrature used within computation of matrix
+ *        entries singular double integrals.
  * @param basis Type of basis functions used for neumann data.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
- * slp matrices @f$ V @f$ for the laplace equation.
+ * slp matrices @f$ V @f$ for the Laplace equation.
  */
-HEADER_PREFIX pbem3d new_slp_laplace_bem3d(pcsurface3d gr, uint q,
-    basisfunctionbem3d basis);
+HEADER_PREFIX pbem3d new_slp_laplace_bem3d(pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d basis);
 
 /**
  * @brief Creates a new @ref _bem3d "bem3d"-object for computation of
- * double layer potential matrix.
+ * double layer potential matrix plus a scalar times the mass matrix
+ * of the Laplace equation.
  *
  * After calling this function the resulting @ref _bem3d "bem"-object will
  * provide all functionality that is necessary to build up fully populated
@@ -65,17 +69,27 @@ HEADER_PREFIX pbem3d new_slp_laplace_bem3d(pcsurface3d gr, uint q,
  * approximation of this matrix.
  *
  * @param gr Surface mesh.
- * @param q Order of gaussian quadrature used within computation of matrix entries.
+ * @param q_regular Order of gaussian quadrature used within computation of matrix
+ *        entries for single integrals and regular double integrals.
+ * @param q_singular Order of gaussian quadrature used within computation of matrix
+ *        entries singular double integrals.
  * @param basis_neumann Type of basis functions used for neumann data.
  * @param basis_dirichlet Type of basis functions used for dirichlet data.
  * @param alpha Double layer operator + @f$\alpha@f$ mass matrix.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
- * dlp matrices @f$ K + \frac{1}{2} M @f$ for the laplace equation.
+ * dlp matrices @f$ K + \frac{1}{2} M @f$ for the Laplace equation.
  */
-HEADER_PREFIX pbem3d new_dlp_laplace_bem3d(pcsurface3d gr, uint q,
-    basisfunctionbem3d basis_neumann, basisfunctionbem3d basis_dirichlet,
-    field alpha);
+HEADER_PREFIX pbem3d new_dlp_laplace_bem3d(pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d basis_neumann,
+    basisfunctionbem3d basis_dirichlet, field alpha);
+
+/**
+ * @brief Delete a @ref _bem3d "bem3d" object for the Laplace equation
+ *
+ * @param bem Object to be deleted.
+ */
+HEADER_PREFIX void del_laplace_bem3d(pbem3d bem);
 
 /* ------------------------------------------------------------
  Examples for Dirichlet- / Neumann-data to test linear system
@@ -100,10 +114,11 @@ HEADER_PREFIX pbem3d new_dlp_laplace_bem3d(pcsurface3d gr, uint q,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_dirichlet_linear_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 
 /**
  * @brief A simple linear harmonic function that will serve as neumann values.
@@ -124,10 +139,11 @@ HEADER_PREFIX field eval_dirichlet_linear_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_neumann_linear_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 
 /**
  * @brief A simple quadratic harmonic function that will serve as dirichlet values.
@@ -148,10 +164,11 @@ HEADER_PREFIX field eval_neumann_linear_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_dirichlet_quadratic_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 
 /**
  * @brief A simple quadratic harmonic function that will serve as neumann values.
@@ -173,10 +190,11 @@ HEADER_PREFIX field eval_dirichlet_quadratic_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_neumann_quadratic_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 
 /**
  * @brief A harmonic function based upon the fundamental solution,
@@ -199,10 +217,11 @@ HEADER_PREFIX field eval_neumann_quadratic_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_dirichlet_fundamental_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 /**
  * @brief A harmonic function based upon the fundamental solution,
  * that will serve as neumann values.
@@ -224,10 +243,11 @@ HEADER_PREFIX field eval_dirichlet_fundamental_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_neumann_fundamental_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 
 /**
  * @brief A harmonic function based upon the fundamental solution,
@@ -250,10 +270,11 @@ HEADER_PREFIX field eval_neumann_fundamental_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_dirichlet_fundamental2_laplacebem3d(const real *x,
-    const real *n);
+    const real *n, void *data);
 /**
  * @brief A harmonic function based upon the fundamental solution,
  * that will serve as neumann values.
@@ -275,39 +296,11 @@ HEADER_PREFIX field eval_dirichlet_fundamental2_laplacebem3d(const real *x,
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field eval_neumann_fundamental2_laplacebem3d(const real *x,
-    const real *n);
-
-/**
- * @brief An interactive convenience function to create @ref _hmatrix "hmatrix"
- * or @ref _h2matrix "h2matrix"
- * approximations of boundary integral operators such as slp or dlp matrices.
- *
- * @param gr Surface mesh.
- * @param op This char specifies the boundary integral operator to be constructed.
- * Valid values are 's' for single layer potential and 'd' for double layer
- * potential plus 0.5 times mass matrix.
- * @param basis_neumann Defines the basis functions used for neumann data.
- * @param basis_dirichlet Defines the basis functions used for dirichlet data.
- * @param q Order of gaussian quadrature used for nearfield entry computation.
- * @param G Pointer to the matrix that will be constructed after calling this
- * routine.
- * @param time Pointer to a real value, that will be filled with the elapsed time
- * for computing the desired matrix.
- * @param filename Name of a file where the parameters that are used to construct
- * the Matrix approximation will be stored in. If <tt>NULL</tt> is passed then
- * this parameter will be neglected.
- *
- * @return Function will return type of the resulting matrix approximation.
- *
- * @attention Yet only 's' for single layer potential and 'd' for double layer
- * potential are admissible values for parameter <tt>op</tt>.
- */
-HEADER_PREFIX uint build_interactive_laplacebem3d(pcsurface3d gr, char op,
-    basisfunctionbem3d basis_neumann, basisfunctionbem3d basis_dirichlet,
-    uint q, void **G, real *time, char* filename);
+    const real *n, void *data);
 
 /** @} */
 

@@ -37,17 +37,18 @@
  *  A typical application would be the computation of entries of
  *  a boundary element matrix by appropriate quadrature rules.
  *
- *  @param ridx Row indices, at least <tt>N->rows</tt> if
- *    <tt>ntrans</tt> is not set and <tt>N->cols</tt> if it is set.
- *  @param cidx Column indices, at least <tt>N->cols</tt> if
- *    <tt>ntrans</tt> is not set and <tt>N->rows</tt> if it is set.
+ *  @param ridx Array of row indices. Should have at least <tt>N->rows</tt>
+ *    elements if <tt>ntrans</tt> is not set and <tt>N->cols</tt> elements if
+ *    it is set.
+ *  @param cidx Array of column indices. Should have  at least <tt>N->cols</tt>
+ *    elements if <tt>ntrans</tt> is not set and <tt>N->rows</tt> elemenrs if
+ *    it is set.
  *  @param data Arbitrary data the callback function might require
  *    to complete its task, e.g., geometry data.
  *  @param ntrans Set if the transposed matrix is to be filled.
  *  @param N Target matrix. */
-typedef void (*matrixentry_t)(const uint *ridx, const uint *cidx,
-			      void *data,
-			      const bool ntrans, pamatrix N);
+typedef void (*matrixentry_t)(const uint *ridx, const uint *cidx, void *data,
+    const bool ntrans, pamatrix N);
 
 /**
  * @brief This routine computes the adaptive cross approximation using full
@@ -111,11 +112,9 @@ HEADER_PREFIX void decomp_fullaca_rkmatrix(pamatrix A, const real accur,
  * @param R The resulting low rank matrix is returned via <tt>R</tt> .
  */
 HEADER_PREFIX void
-decomp_partialaca_rkmatrix(matrixentry_t entry, void *data,
-			   const uint *ridx, const uint rows,
-			   const uint *cidx, const uint cols,
-			   real accur,
-			   uint **rpivot, uint **cpivot, prkmatrix R);
+decomp_partialaca_rkmatrix(matrixentry_t entry, void *data, const uint *ridx,
+    const uint rows, const uint *cidx, const uint cols, real accur,
+    uint **rpivot, uint **cpivot, prkmatrix R);
 
 /**
  * @brief Copies the lower triangular part of a matrix <tt>A</tt> to a matrix <tt>B</tt>
