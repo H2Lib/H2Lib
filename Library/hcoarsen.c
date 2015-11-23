@@ -1,20 +1,20 @@
-
 /* ------------------------------------------------------------
-   This is the file "hcoarsen.c" of the H2Lib package.
-   All rights reserved, Sven Christophersen 2014
-   ------------------------------------------------------------ */
+ This is the file "hcoarsen.c" of the H2Lib package.
+ All rights reserved, Sven Christophersen 2014
+ ------------------------------------------------------------ */
 
 #include "hcoarsen.h"
 
 void
-coarsen_hmatrix(phmatrix G, real eps, bool recursive)
+coarsen_hmatrix(phmatrix G, ptruncmode tm, real eps, bool recursive)
 {
   uint      rsons = G->rsons;
   uint      csons = G->csons;
 
   phmatrix  son;
   prkmatrix R;
-  pamatrix  A, B, T, S;
+  pamatrix  A, B;
+  amatrix   T, S;
   uint      i, j, leafs, ranksum, rankoffset, rowoffset, coloffset, rank;
   size_t    sizeold, sizenew;
 
@@ -26,11 +26,13 @@ coarsen_hmatrix(phmatrix G, real eps, bool recursive)
       for (i = 0; i < rsons; ++i) {
 	son = G->son[i + j * rsons];
 	if (recursive == true) {
-	  coarsen_hmatrix(son, eps, recursive);
+	  coarsen_hmatrix(son, tm, eps, recursive);
 	}
 	leafs += son->rsons * son->csons;
       }
     }
+
+    update_hmatrix(G);
   }
   else {
     /* matrix is a leaf -> northing to do */
@@ -70,8 +72,6 @@ coarsen_hmatrix(phmatrix G, real eps, bool recursive)
     B = &R->B;
     clear_amatrix(A);
     clear_amatrix(B);
-    T = new_amatrix(0, 0);
-    S = new_amatrix(0, 0);
 
     /* copy sons into a big rank-k-matrix */
     rankoffset = 0;
@@ -82,28 +82,28 @@ coarsen_hmatrix(phmatrix G, real eps, bool recursive)
 	son = G->son[i + j * rsons];
 	rank = son->r ? son->r->k : son->f->cols;
 
-	init_sub_amatrix(T, A, son->rc->size, rowoffset, rank, rankoffset);
-	init_sub_amatrix(S, B, son->cc->size, coloffset, rank, rankoffset);
+	init_sub_amatrix(&T, A, son->rc->size, rowoffset, rank, rankoffset);
+	init_sub_amatrix(&S, B, son->cc->size, coloffset, rank, rankoffset);
 
 	if (son->r) {
-	  copy_amatrix(false, &(son->r->A), T);
-	  copy_amatrix(false, &(son->r->B), S);
+	  copy_amatrix(false, &(son->r->A), &T);
+	  copy_amatrix(false, &(son->r->B), &S);
 	}
 	else {
-	  copy_amatrix(false, son->f, T);
-	  identity_amatrix(S);
+	  copy_amatrix(false, son->f, &T);
+	  identity_amatrix(&S);
 	}
 
 	rankoffset += rank;
 	rowoffset += son->rc->size;
-	uninit_amatrix(T);
-	uninit_amatrix(S);
+	uninit_amatrix(&T);
+	uninit_amatrix(&S);
       }
       coloffset += G->son[j * rsons]->cc->size;
     }
 
     /* compression */
-    trunc_rkmatrix(0, eps, R);
+    trunc_rkmatrix(tm, eps, R);
 
     sizenew = getsize_rkmatrix(R);
 
@@ -117,12 +117,15 @@ coarsen_hmatrix(phmatrix G, real eps, bool recursive)
 
       G->rsons = 0;
       G->csons = 0;
+      freemem(G->son);
       G->son = NULL;
       G->f = NULL;
       G->r = R;
+      G->desc = 1;
     }
     else {
       del_rkmatrix(R);
     }
+
   }
 }

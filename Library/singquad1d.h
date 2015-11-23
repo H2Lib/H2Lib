@@ -130,6 +130,7 @@ typedef const singquad1d *pcsingquad1d;
  * @param q Order of quadrature
  * @param x Gauss quadrature points in [-1,1].
  * @param w Gauss weights for above points.
+ * @return Returns the newly created @ref singquad1d object.
  */
 HEADER_PREFIX psingquad1d build_log_singquad1d(uint q, preal x, preal w);
 
@@ -145,6 +146,7 @@ HEADER_PREFIX psingquad1d build_log_singquad1d(uint q, preal x, preal w);
  * @param x Gauss quadrature points in [-1,1].
  * @param w Gauss weights for above points.
  * @param alpha degree of homogeneity, for bem-problem value is -1.0.
+ *  @return Returns the newly created @ref singquad1d object.
  */
 HEADER_PREFIX psingquad1d build_pow_singquad1d(uint q, preal x, preal w,
 		real alpha);

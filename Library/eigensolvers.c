@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
- This is the file "eigensolvers.c" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "eigensolvers.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 #include "eigensolvers.h"
 
@@ -14,55 +14,61 @@
 #include "basic.h"
 #include "factorizations.h"
 
-/** @brief Error tolerance for QR eigenvalue iteration */
+/** Relative accuracy used in the stopping criterion of the QR iteration. */
 #define H2_QR_EPS 1e-14
-/** @brief Error tolerance for SVD iteration */
-#define H2_SVD_EPS 1e-14
-/** @brief Bound for a number that is essentially zero */
+
+/** Bound for determining when a number is essentially zero. */
 #define H2_ALMOST_ZERO 1e-300
 
-/** @brief Tolerance for SVD verification */
-#define H2_SVD_TOL 3e-10
+/** Run-time checks for self-made solvers. */
+/* #define RUNTIME_CHECK_EIGENSOLVERS */
+
+/** Relative tolerance for run-time checks. */
+#ifdef USE_FLOAT
+#define H2_CHECK_TOLERANCE 1.0e-6
+#else
+#define H2_CHECK_TOLERANCE 1.0e-12
+#endif
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 ptridiag
-init_tridiag(ptridiag T, uint dim)
+init_tridiag(ptridiag T, uint size)
 {
-  T->d = allocfield(dim);
-  T->u = (dim > 1 ? allocfield(dim - 1) : NULL);
-  T->l = (dim > 1 ? allocfield(dim - 1) : NULL);
-  T->dim = dim;
+  T->d = allocreal(size);
+  T->u = (size > 1 ? allocreal(size - 1) : NULL);
+  T->l = (size > 1 ? allocreal(size - 1) : NULL);
+  T->size = size;
   T->owner = NULL;
 
   return T;
 }
 
 ptridiag
-init_sub_tridiag(ptridiag T, ptridiag src, uint dim, uint off)
+init_sub_tridiag(ptridiag T, ptridiag src, uint size, uint off)
 {
-  assert(off + dim <= src->dim);
+  assert(off + size <= src->size);
 
   T->d = src->d + off;
-  T->u = (dim > 1 ? src->u + off : NULL);
-  T->l = (dim > 1 ? src->l + off : NULL);
-  T->dim = dim;
+  T->u = (size > 1 ? src->u + off : NULL);
+  T->l = (size > 1 ? src->l + off : NULL);
+  T->size = size;
   T->owner = src;
 
   return T;
 }
 
 ptridiag
-init_vec_tridiag(ptridiag T, pavector src, uint dim)
+init_vec_tridiag(ptridiag T, prealavector src, uint size)
 {
-  assert(3 * dim - 2 <= src->dim);
+  assert(3 * size - 2 <= src->dim);
 
   T->d = src->v;
-  T->u = (dim > 1 ? src->v + dim : NULL);
-  T->l = (dim > 1 ? src->v + 2 * dim - 1 : NULL);
-  T->dim = dim;
+  T->u = (size > 1 ? src->v + size : NULL);
+  T->l = (size > 1 ? src->v + 2 * size - 1 : NULL);
+  T->size = size;
   T->owner = (ptridiag) src;
 
   return T;
@@ -73,7 +79,7 @@ uninit_tridiag(ptridiag T)
 {
   if (T->owner == NULL) {
     freemem(T->d);
-    if (T->dim > 1) {
+    if (T->size > 1) {
       freemem(T->l);
       freemem(T->u);
     }
@@ -85,13 +91,13 @@ uninit_tridiag(ptridiag T)
 }
 
 ptridiag
-new_tridiag(uint dim)
+new_tridiag(uint size)
 {
   ptridiag  T;
 
   T = (ptridiag) allocmem(sizeof(tridiag));
 
-  init_tridiag(T, dim);
+  init_tridiag(T, size);
 
   return T;
 }
@@ -107,29 +113,40 @@ del_tridiag(ptridiag T)
 void
 copy_tridiag(pctridiag T, ptridiag Tcopy)
 {
-  uint      dim = T->dim;
-  pfield    d = T->d;
-  pfield    u = T->u;
-  pfield    l = T->l;
+  uint      size = T->size;
+  preal     d = T->d;
+  preal     u = T->u;
+  preal     l = T->l;
   uint      i;
 
-  assert(Tcopy->dim >= T->dim);
+  assert(Tcopy->size >= T->size);
 
-  for (i = 0; i < dim; i++)
+  for (i = 0; i < size; i++)
     Tcopy->d[i] = d[i];
-  for (i = 0; i < dim - 1; i++) {
+  for (i = 0; i < size - 1; i++) {
     Tcopy->u[i] = u[i];
     Tcopy->l[i] = l[i];
   }
 }
 
+ptridiag
+clone_tridiag(pctridiag T)
+{
+  ptridiag  Tcopy;
+
+  Tcopy = new_tridiag(T->size);
+  copy_tridiag(T, Tcopy);
+
+  return Tcopy;
+}
+
 real
 check_tridiag(pctridiag T, pcamatrix Ts)
 {
-  uint      n = T->dim;
-  pcfield   d = T->d;
-  pcfield   l = T->l;
-  pcfield   u = T->u;
+  uint      n = T->size;
+  pcreal    d = T->d;
+  pcreal    l = T->l;
+  pcreal    u = T->u;
   pcfield   a = Ts->a;
   uint      lda = Ts->ld;
   uint      i, j;
@@ -158,9 +175,9 @@ check_tridiag(pctridiag T, pcamatrix Ts)
 real
 check_lower_tridiag(pctridiag T, pcamatrix Ts)
 {
-  uint      n = T->dim;
-  pcfield   d = T->d;
-  pcfield   l = T->l;
+  uint      n = T->size;
+  pcreal    d = T->d;
+  pcreal    l = T->l;
   pcfield   a = Ts->a;
   uint      lda = Ts->ld;
   uint      i, j;
@@ -187,45 +204,284 @@ check_lower_tridiag(pctridiag T, pcamatrix Ts)
   return REAL_SQRT(norm);
 }
 
+#ifdef USE_BLAS
+void
+diageval_tridiag_amatrix(field alpha, bool atrans, pctridiag a,
+			 bool xtrans, pamatrix x)
+{
+  pcreal    d = a->d;
+  uint      n = a->size;
+  pfield    xa = x->a;
+  uint      ldx = x->ld;
+  field     beta;
+  unsigned  i;
+
+  if (n < 1)			/* Quick exit */
+    return;
+
+  if (xtrans) {
+    assert(x->cols == a->size);
+
+    for (i = 0; i < n; i++) {
+      beta = (atrans ? CONJ(alpha * d[i]) : CONJ(alpha) * d[i]);
+
+      h2_scal(&x->rows, &beta, xa + i * ldx, &u_one);
+    }
+  }
+  else {
+    assert(x->rows == a->size);
+
+    for (i = 0; i < n; i++) {
+      beta = (atrans ? alpha * CONJ(d[i]) : alpha * d[i]);
+
+      h2_scal(&x->cols, &beta, xa + i, &ldx);
+    }
+  }
+}
+#else
+void
+diageval_tridiag_amatrix(field alpha,
+			 bool atrans, pctridiag a, bool xtrans, pamatrix x)
+{
+  pcreal    d = a->d;
+  uint      n = a->size;
+  pfield    xa = x->a;
+  uint      ldx = x->ld;
+  field     beta;
+  unsigned  i, j;
+
+  if (n < 1)			/* Quick exit */
+    return;
+
+  if (xtrans) {
+    assert(x->cols == a->size);
+
+    for (i = 0; i < n; i++) {
+      beta = (atrans ? CONJ(alpha * d[i]) : CONJ(alpha) * d[i]);
+
+      for (j = 0; j < x->rows; j++)
+	xa[j + i * ldx] *= beta;
+    }
+  }
+  else {
+    assert(x->rows == a->size);
+
+    for (i = 0; i < n; i++) {
+      beta = (atrans ? alpha * CONJ(d[i]) : alpha * d[i]);
+
+      for (j = 0; j < x->cols; j++)
+	xa[i + j * ldx] *= beta;
+    }
+  }
+}
+#endif
+
+#ifdef USE_BLAS
+void
+lowereval_tridiag_amatrix(field alpha, bool atrans, pctridiag a,
+			  bool xtrans, pamatrix x)
+{
+  pcreal    d = a->d;
+  pcreal    l = a->l;
+  uint      n = a->size;
+  pfield    xa = x->a;
+  uint      ldx = x->ld;
+  field     beta, gamma;
+  uint      i;
+
+  if (n < 1)			/* Quick exit */
+    return;
+
+  if (atrans) {
+    if (xtrans) {
+      assert(x->cols == a->size);
+
+      for (i = 0; i < n - 1; i++) {
+	beta = CONJ(alpha) * d[i];
+	gamma = CONJ(alpha) * l[i];
+
+	h2_scal(&x->rows, &beta, xa + i * ldx, &u_one);
+	h2_axpy(&x->rows, &gamma, xa + (i + 1) * ldx, &u_one, xa + i * ldx,
+		&u_one);
+      }
+      beta = CONJ(alpha) * d[n - 1];
+
+      h2_scal(&x->rows, &beta, xa + (n - 1) * ldx, &u_one);
+    }
+    else {
+      assert(x->rows == a->size);
+
+      for (i = 0; i < n - 1; i++) {
+	beta = alpha * CONJ(d[i]);
+	gamma = alpha * CONJ(l[i]);
+
+	h2_scal(&x->cols, &beta, xa + i, &ldx);
+	h2_axpy(&x->cols, &gamma, xa + (i + 1), &ldx, xa + i, &ldx);
+      }
+      beta = alpha * CONJ(d[n - 1]);
+
+      h2_scal(&x->cols, &beta, xa + (n - 1), &ldx);
+    }
+  }
+  else {
+    if (xtrans) {
+      assert(x->cols == a->size);
+
+      for (i = n; i-- > 1;) {
+	beta = CONJ(alpha * d[i]);
+	gamma = CONJ(alpha * l[i - 1]);
+
+	h2_scal(&x->rows, &beta, xa + i * ldx, &u_one);
+	h2_axpy(&x->rows, &gamma, xa + (i - 1) * ldx, &u_one, xa + i * ldx,
+		&u_one);
+      }
+      beta = CONJ(alpha * d[0]);
+
+      h2_scal(&x->rows, &beta, xa, &u_one);
+    }
+    else {
+      assert(x->rows == a->size);
+
+      for (i = n; i-- > 1;) {
+	beta = alpha * d[i];
+	gamma = alpha * l[i - 1];
+
+	h2_scal(&x->cols, &beta, xa + i, &ldx);
+	h2_axpy(&x->cols, &gamma, xa + (i - 1), &ldx, xa + i, &ldx);
+      }
+      beta = alpha * d[0];
+
+      h2_scal(&x->cols, &beta, xa, &ldx);
+    }
+  }
+}
+#else
+void
+lowereval_tridiag_amatrix(field alpha,
+			  bool atrans, pctridiag a, bool xtrans, pamatrix x)
+{
+  pcreal    d = a->d;
+  pcreal    l = a->l;
+  uint      n = a->size;
+  pfield    xa = x->a;
+  uint      ldx = x->ld;
+  double    beta, gamma;
+  unsigned  i, j;
+
+  if (n < 1)			/* Quick exit */
+    return;
+
+  if (atrans) {
+    if (xtrans) {
+      assert(x->cols == a->size);
+
+      for (i = 0; i < n - 1; i++) {
+	beta = CONJ(alpha) * d[i];
+	gamma = CONJ(alpha) * l[i];
+
+	for (j = 0; j < x->rows; j++)
+	  xa[j + i * ldx] =
+	    beta * xa[j + i * ldx] + gamma * xa[j + (i + 1) * ldx];
+      }
+      beta = CONJ(alpha) * d[n - 1];
+
+      for (j = 0; j < x->rows; j++)
+	xa[j + (n - 1) * ldx] *= beta;
+    }
+    else {
+      assert(x->rows == a->size);
+
+      for (i = 0; i < n - 1; i++) {
+	beta = alpha * CONJ(d[i]);
+	gamma = alpha * CONJ(l[i]);
+
+	for (j = 0; j < x->cols; j++)
+	  xa[i + j * ldx] =
+	    beta * xa[i + j * ldx] + gamma * xa[(i + 1) + j * ldx];
+      }
+      beta = alpha * CONJ(d[n - 1]);
+
+      for (j = 0; j < x->cols; j++)
+	xa[(n + 1) + j * ldx] *= beta;
+    }
+  }
+  else {
+    if (xtrans) {
+      assert(x->cols == a->size);
+
+      for (i = n; i-- > 1;) {
+	beta = CONJ(alpha * d[i]);
+	gamma = CONJ(alpha * l[i - 1]);
+
+	for (j = 0; j < x->rows; j++)
+	  xa[j + i * ldx] =
+	    beta * xa[j + i * ldx] + gamma * xa[j + (i - 1) * ldx];
+      }
+      beta = CONJ(alpha * d[0]);
+
+      for (j = 0; j < x->rows; j++)
+	xa[j] *= beta;
+    }
+    else {
+      assert(x->rows == a->size);
+
+      for (i = n; i-- > 1;) {
+	beta = alpha * d[i];
+	gamma = alpha * l[i - 1];
+
+	for (j = 0; j < x->cols; j++)
+	  xa[i + j * ldx] =
+	    beta * xa[i + j * ldx] + gamma * xa[(i - 1) + j * ldx];
+      }
+      beta = alpha * d[0];
+
+      for (j = 0; j < x->cols; j++)
+	xa[j * ldx] *= beta;
+    }
+  }
+}
+#endif
+
 /* ------------------------------------------------------------
- Givens rotation
- ------------------------------------------------------------ */
+ * Givens rotation
+ * ------------------------------------------------------------ */
 
 static void
-givens(field a, field b, pfield c, pfield s)
+givens(real a, real b, preal c, preal s)
 {
-  field     t;
+  real      t;
 
-  if(b == 0.0) {
+  if (a == 0.0 && b == 0.0) {
     *c = 1.0;
     *s = 0.0;
   }
-  else if(ABS(a) > ABS(b)) {
+  else if (REAL_ABS(a) > REAL_ABS(b)) {
     t = b / a;
-    *c = 1.0 / REAL_SQRT(1.0 + ABSSQR(t));
+    *c = REAL_RSQRT(1.0 + REAL_SQR(t));
     *s = t * (*c);
   }
   else {
     t = a / b;
-    *s = 1.0 / REAL_SQRT(1.0 + ABSSQR(t));
+    *s = REAL_RSQRT(1.0 + REAL_SQR(t));
     *c = t * (*s);
   }
 }
 
 /* ------------------------------------------------------------
- One QR step for the symmetric tridiagonal matrix
- ------------------------------------------------------------ */
+ * One QR step for the symmetric tridiagonal matrix
+ * ------------------------------------------------------------ */
 
 void
 qrstep_tridiag(ptridiag T, field shift, pamatrix Q)
 {
-  field     a0, a1, b0, b0t, x, y, carry;
-  field     c, s;
-  pfield    a = T->d;
-  pfield    b = T->l;
+  real      a0, a1, b0, b0t, carry;
+  real      c, s;
+  field     x, y;
+  preal     a = T->d;
+  preal     b = T->l;
   pfield    qa;
   uint      ldq;
-  uint      n = T->dim;
+  uint      n = T->size;
   uint      i, j;
 
   assert(Q == NULL || Q->cols == n);
@@ -242,13 +498,13 @@ qrstep_tridiag(ptridiag T, field shift, pamatrix Q)
 
   /* Apply to first two rows */
   a0 = c * a[0] + s * b[0];
-  b0 = -CONJ(s) * a[0] + CONJ(c) * b[0];
-  b0t = c * CONJ(b[0]) + s * a[1];
-  a1 = -CONJ(s) * CONJ(b[0]) + CONJ(c) * a[1];
+  b0 = -s * a[0] + c * b[0];
+  b0t = c * b[0] + s * a[1];
+  a1 = -s * b[0] + c * a[1];
 
   /* Apply to first two columns */
-  a[0] = CONJ(c) * a0 + CONJ(s) * b0t;
-  b[0] = CONJ(c) * b0 + CONJ(s) * a1;
+  a[0] = c * a0 + s * b0t;
+  b[0] = c * b0 + s * a1;
   a[1] = -s * b0 + c * a1;
 
   /* Apply to first two columns of Q */
@@ -256,14 +512,14 @@ qrstep_tridiag(ptridiag T, field shift, pamatrix Q)
     for (j = 0; j < Q->rows; j++) {
       x = qa[j];
       y = qa[j + ldq];
-      qa[j] = CONJ(c) * x + CONJ(s) * y;
+      qa[j] = c * x + s * y;
       qa[j + ldq] = -s * x + c * y;
     }
 
   /* Chase away coefficient at (2,0) */
   for (i = 1; i < n - 1; i++) {
     /* Apply Givens rotation to rows i, i+1 */
-    carry = CONJ(s) * b[i];
+    carry = s * b[i];
     b[i] = c * b[i];
 
     /* Determine Givens rotation to eliminate carry... */
@@ -274,13 +530,13 @@ qrstep_tridiag(ptridiag T, field shift, pamatrix Q)
 
     /* Apply it also to remainder of rows i, i+1, */
     a0 = c * a[i] + s * b[i];
-    b0 = -CONJ(s) * a[i] + CONJ(c) * b[i];
-    b0t = c * CONJ(b[i]) + s * a[i + 1];
-    a1 = -CONJ(s) * CONJ(b[i]) + CONJ(c) * a[i + 1];
+    b0 = -s * a[i] + c * b[i];
+    b0t = c * b[i] + s * a[i + 1];
+    a1 = -s * b[i] + c * a[i + 1];
 
     /* apply it to the columns i, i+1, */
-    a[i] = CONJ(c) * a0 + CONJ(s) * b0t;
-    b[i] = CONJ(c) * b0 + CONJ(s) * a1;
+    a[i] = c * a0 + s * b0t;
+    b[i] = c * b0 + s * a1;
     a[i + 1] = -s * b0 + c * a1;
 
     /* and if necessary to the columns i, i+1 of Q */
@@ -288,41 +544,41 @@ qrstep_tridiag(ptridiag T, field shift, pamatrix Q)
       for (j = 0; j < Q->rows; j++) {
 	x = qa[j + i * ldq];
 	y = qa[j + (i + 1) * ldq];
-	qa[j + i * ldq] = CONJ(c) * x + CONJ(s) * y;
+	qa[j + i * ldq] = c * x + s * y;
 	qa[j + (i + 1) * ldq] = -s * x + c * y;
       }
   }
 }
 
 /* ------------------------------------------------------------
- QR iteration for self-adjoint tridiagonal matrices
- ------------------------------------------------------------ */
+ * QR iteration for self-adjoint tridiagonal matrices
+ * ------------------------------------------------------------ */
 
-struct _evp_sort_data {
+typedef struct {
   ptridiag  T;
   pamatrix  U, Vt;
-};
+} evpsortdata;
 
-static uint
+static bool
 evp_leq(uint i, uint j, void *data)
 {
-  struct _evp_sort_data *esd = (struct _evp_sort_data *) data;
+  evpsortdata *esd = (evpsortdata *) data;
   ptridiag  T = esd->T;
 
-  assert(i < T->dim);
-  assert(j < T->dim);
+  assert(i < T->size);
+  assert(j < T->size);
 
   return (REAL(T->d[i]) <= REAL(T->d[j]));
 }
 
-static uint
+static bool
 evp_geq(uint i, uint j, void *data)
 {
-  struct _evp_sort_data *esd = (struct _evp_sort_data *) data;
+  evpsortdata *esd = (evpsortdata *) data;
   ptridiag  T = esd->T;
 
-  assert(i < T->dim);
-  assert(j < T->dim);
+  assert(i < T->size);
+  assert(j < T->size);
 
   return (REAL(T->d[i]) >= REAL(T->d[j]));
 }
@@ -330,18 +586,19 @@ evp_geq(uint i, uint j, void *data)
 static void
 evp_swap(uint i, uint j, void *data)
 {
-  struct _evp_sort_data *esd = (struct _evp_sort_data *) data;
+  evpsortdata *esd = (evpsortdata *) data;
   ptridiag  T = esd->T;
   pamatrix  U = esd->U;
   pamatrix  Vt = esd->Vt;
   uint      ldu, ldv;
-  field     h;
+  real      h;
+  field     hf;
   uint      k;
 
-  assert(i < T->dim);
-  assert(j < T->dim);
-  assert(U == NULL || U->cols >= T->dim);
-  assert(Vt == NULL || Vt->rows >= T->dim);
+  assert(i < T->size);
+  assert(j < T->size);
+  assert(U == NULL || U->cols >= T->size);
+  assert(Vt == NULL || Vt->rows >= T->size);
 
   h = T->d[i];
   T->d[i] = T->d[j];
@@ -350,18 +607,18 @@ evp_swap(uint i, uint j, void *data)
   if (U) {
     ldu = U->ld;
     for (k = 0; k < U->rows; k++) {
-      h = U->a[k + i * ldu];
+      hf = U->a[k + i * ldu];
       U->a[k + i * ldu] = U->a[k + j * ldu];
-      U->a[k + j * ldu] = h;
+      U->a[k + j * ldu] = hf;
     }
   }
 
   if (Vt) {
     ldv = Vt->ld;
     for (k = 0; k < Vt->cols; k++) {
-      h = Vt->a[i + k * ldv];
+      hf = Vt->a[i + k * ldv];
       Vt->a[i + k * ldv] = Vt->a[j + k * ldv];
-      Vt->a[j + k * ldv] = h;
+      Vt->a[j + k * ldv] = hf;
     }
   }
 }
@@ -371,51 +628,54 @@ sb_muleig_tridiag(ptridiag T, pamatrix Q, uint maxiter)
 {
   tridiag   tmp;
   amatrix   tmp2;
-  struct _evp_sort_data esd;
+  evpsortdata esd;
   ptridiag  Tsub;
   pamatrix  Qsub;
-  pfield    a = T->d;
-  pfield    b = T->l;
-  uint      n = T->dim;
-  field     b0;
-  real      a0, a1, d, m, lambda, lambda1;
-  uint      off, dim, iter;
+  preal     a = T->d;
+  preal     b = T->l;
+  uint      n = T->size;
+  real      d, m, a0, a1, b0, db, lambda, lambda1;
+  uint      off, size, iter;
+
+  if (n < 1)
+    return 0;
 
   /* Find first non-zero subdiagonal coefficient */
   off = 0;
   while (off < n - 1 &&
-	 ABS(b[off]) < H2_QR_EPS * (ABS(a[off]) + ABS(a[off + 1])))
+	 REAL_ABS(b[off]) <
+	 H2_QR_EPS * (REAL_ABS(a[off]) + REAL_ABS(a[off + 1]))) {
+    b[off] = 0.0;
     off++;
+  }
 
   iter = 0;
   while (off < n - 1 && (maxiter == 0 || iter < maxiter)) {
     iter++;
 
     /* Find dimension of unreduced submatrix */
-    dim = 2;
-    while (dim < n - off &&
-	   ABS(b[off + dim - 1]) >=
-	   H2_QR_EPS * (ABS(a[off + dim - 1]) + ABS(a[off + dim])))
-      dim++;
+    size = 2;
+    while (size < n - off
+	   &&
+	   REAL_ABS(b[off + size - 1]) >= H2_QR_EPS
+	   * (REAL_ABS(a[off + size - 1]) + REAL_ABS(a[off + size])))
+      size++;
 
     /* Determine Wilkinson shift */
-    a0 = REAL(a[off + dim - 2]);
-    a1 = REAL(a[off + dim - 1]);
-    b0 = b[off + dim - 2];
+    a0 = a[off + size - 2];
+    a1 = a[off + size - 1];
+    b0 = b[off + size - 2];
     m = (a0 + a1) * 0.5;
     d = (a0 - a1) * 0.5;
-
-    /* Compute eigenvalue with maximal absolute value */
-    lambda1 = (m > 0.0 ?
-	       m + REAL_SQRT(REAL_SQR(d) + ABSSQR(b0)) :
-	       m - REAL_SQRT(REAL_SQR(d) + ABSSQR(b0)));
-
-    /* Choose eigenvalue closest to a1 */
-    lambda = (d * m < 0.0 ? lambda1 : (a0 * a1 - ABSSQR(b0)) / lambda1);
+    db = (REAL_ABS(d) > REAL_ABS(b0) ?
+	  REAL_ABS(d) * REAL_SQRT(1.0 + REAL_SQR(b0 / d)) :
+	  REAL_ABS(b0) * REAL_SQRT(1.0 + REAL_SQR(d / b0)));
+    lambda1 = (m > 0.0 ? m + db : m - db);
+    lambda = (m * d < 0.0 ? lambda1 : (a0 * a1 - ABSSQR(b0)) / lambda1);
 
     /* Set up submatrices */
-    Tsub = init_sub_tridiag(&tmp, T, dim, off);
-    Qsub = (Q ? init_sub_amatrix(&tmp2, Q, Q->rows, 0, dim, off) : NULL);
+    Tsub = init_sub_tridiag(&tmp, T, size, off);
+    Qsub = (Q ? init_sub_amatrix(&tmp2, Q, Q->rows, 0, size, off) : NULL);
 
     /* Perform QR step on submatrices */
     qrstep_tridiag(Tsub, lambda, Qsub);
@@ -427,8 +687,17 @@ sb_muleig_tridiag(ptridiag T, pamatrix Q, uint maxiter)
 
     /* Find non-zero subdiagonal coefficient */
     while (off < n - 1 &&
-	   ABS(b[off]) < H2_QR_EPS * (ABS(a[off]) + ABS(a[off + 1])))
+	   REAL_ABS(b[off]) <
+	   H2_QR_EPS * (REAL_ABS(a[off]) + REAL_ABS(a[off + 1]))) {
+      b[off] = 0.0;
       off++;
+    }
+  }
+
+  if (maxiter > 0 && iter == maxiter) {
+    (void)
+      printf("  ### Eigensolver warning: did not converge after %u steps\n",
+	     iter);
   }
 
   /* Sort eigenvalues */
@@ -441,33 +710,21 @@ sb_muleig_tridiag(ptridiag T, pamatrix Q, uint maxiter)
 }
 
 #ifdef USE_BLAS
-IMPORT_PREFIX void
-dsteqr_(const char *compz,
-	const unsigned *n,
-	double *d,
-	double *e, double *z, const unsigned *ldz, double *work, int *info);
-
-IMPORT_PREFIX void
-dstev_(const char *jobz,
-       const unsigned *n,
-       double *d,
-       double *e, double *z, const unsigned *ldz, double *work, int *info);
-
 uint
 muleig_tridiag(ptridiag T, pamatrix Q)
 {
-  double   *work;
+  preal     work;
   int       info = 0;
 
-  if (T->dim > 1) {
+  if (T->size > 1) {
     if (Q) {
-      work = allocfield(2 * T->dim + 2);
-      dsteqr_("Vectors", &T->dim, T->d, T->l, Q->a, &Q->ld, work, &info);
+      work = allocreal(2 * T->size + 2);
+      h2_steqr(_h2_vectors, &T->size, T->d, T->l, Q->a, &Q->ld, work, &info);
       assert(info >= 0);
       freemem(work);
     }
     else {
-      dstev_("No Vectors", &T->dim, T->d, T->l, NULL, &u_one, NULL, &info);
+      h2_stev(_h2_novectors, &T->size, T->d, T->l, NULL, &u_one, NULL, &info);
       assert(info >= 0);
     }
   }
@@ -479,7 +736,7 @@ muleig_tridiag(ptridiag T, pamatrix Q)
 {
   uint      iter, maxiter;
 
-  maxiter = 32 * T->dim;
+  maxiter = 32 * T->size;
   iter = sb_muleig_tridiag(T, Q, maxiter);
 
   return !(iter < maxiter);
@@ -496,8 +753,8 @@ eig_tridiag(ptridiag T, pamatrix Q)
 }
 
 /* ------------------------------------------------------------
- Hessenberg tridiagonalization
- ------------------------------------------------------------ */
+ * Hessenberg tridiagonalization
+ * ------------------------------------------------------------ */
 
 void
 sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
@@ -506,18 +763,19 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
   uint      lda;
   pfield    qa;
   uint      ldq;
-  pfield    d, l, u;
+  preal     d, l, u;
   uint      n;
   uint      i, j, k;
-  real      norm2, norm, beta;
-  field     first, alpha, gamma;
+  real      norm2, norm;
+  field     first, alpha, beta, gamma;
+  field     nsign, psign;
 
   n = A->rows;
 
   assert(A->cols == n);
   assert(Q->rows == n);
   assert(Q->cols == n);
-  assert(T->dim == n);
+  assert(T->size == n);
 
   aa = A->a;
   lda = A->ld;
@@ -540,6 +798,9 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
     return;
   }
 
+  /* Initialize sign */
+  psign = 1.0;
+
   for (k = 0; k < n - 1; k++) {
     /* Compute norm of k-th column */
     norm2 = ABSSQR(aa[(k + 1) + k * lda]);
@@ -548,7 +809,7 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
     norm = REAL_SQRT(norm2);
 
     if (norm2 <= H2_ALMOST_ZERO) {
-      d[k] = aa[k + k * lda];
+      d[k] = REAL(aa[k + k * lda]);
       l[k] = 0.0;
       u[k] = 0.0;
     }
@@ -565,85 +826,85 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
       for (i = k + 2; i < n; i++)
 	aa[i + k * lda] /= gamma;
       beta *= ABSSQR(gamma);
-      
+
       /* Compute k-th column */
-      d[k] = aa[k + k * lda];
-      l[k] = alpha;
-      u[k] = CONJ(alpha);
-      
+      nsign = SIGN(alpha);
+      d[k] = REAL(aa[k + k * lda]);
+      l[k] = u[k] = ABS(alpha);
+
       /* Update remaining columns */
       for (j = k + 1; j < n; j++) {
 	gamma = aa[(k + 1) + j * lda];
 	for (i = k + 2; i < n; i++)
 	  gamma += CONJ(aa[i + k * lda]) * aa[i + j * lda];
-	
+
 	gamma *= beta;
-	
+
 	aa[(k + 1) + j * lda] -= gamma;
 	for (i = k + 2; i < n; i++)
 	  aa[i + j * lda] -= gamma * aa[i + k * lda];
       }
-      
+
       /* Update remaining rows */
       for (j = k + 1; j < n; j++) {
 	gamma = aa[j + (k + 1) * lda];
 	for (i = k + 2; i < n; i++)
 	  gamma += aa[i + k * lda] * aa[j + i * lda];
-	
+
 	gamma *= beta;
-	
+
 	aa[j + (k + 1) * lda] -= gamma;
 	for (i = k + 2; i < n; i++)
 	  aa[j + i * lda] -= gamma * CONJ(aa[i + k * lda]);
       }
-      
+
       if (Q) {
-	/* Update Q */
+	/* Apply reflection to all rows of Q */
 	for (j = 0; j < n; j++) {
 	  gamma = qa[j + (k + 1) * ldq];
 	  for (i = k + 2; i < n; i++)
 	    gamma += aa[i + k * lda] * qa[j + i * ldq];
-	  
+
 	  gamma *= beta;
-	  
+
 	  qa[j + (k + 1) * ldq] -= gamma;
 	  for (i = k + 2; i < n; i++)
 	    qa[j + i * ldq] -= gamma * CONJ(aa[i + k * lda]);
 	}
+
+	/* Adjust sign of column k+1 */
+	for (j = 0; j < n; j++)
+	  qa[j + (k + 1) * ldq] *= nsign * CONJ(psign);
       }
+
+      /* Update sign */
+      psign *= CONJ(nsign);
     }
   }
-  T->d[k] = aa[k + k * lda];
+  T->d[k] = REAL(aa[k + k * lda]);
 }
 
 #ifdef USE_BLAS
-IMPORT_PREFIX void
-dlarf_(const char *side,
-       const unsigned *m,
-       const unsigned *n,
-       const double *v,
-       const unsigned *incv,
-       const double *tau, double *c, const unsigned *ldc, double *work);
-
 void
-tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
+tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
 {
   pfield    aa;
   uint      lda;
   pfield    qa;
   uint      ldq;
-  pfield    d, l, u;
+  preal     d, l, u;
+  pfield    work;
   uint      n, n1;
-  uint      i, k;
-  real      norm2, norm, beta;
-  field     first, alpha, gamma;
+  uint      k;
+  field     alpha, beta;
+  field     nsign, psign;
 
   n = A->rows;
 
   assert(A->cols == n);
   assert(Q->rows == n);
   assert(Q->cols == n);
-  assert(T->dim == n);
+  assert(T->size == n);
 
   aa = A->a;
   lda = A->ld;
@@ -655,6 +916,8 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
   qa = (Q ? Q->a : 0);
   ldq = (Q ? Q->ld : 0);
 
+  work = allocfield(UINT_MAX(A->rows, A->cols));
+
   if (Q)
     identity_amatrix(Q);
 
@@ -662,84 +925,66 @@ tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
   if (n < 1)
     return;
   else if (n < 2) {
-    d[0] = aa[0];
+    d[0] = REAL(aa[0]);
     return;
   }
 
+  /* Initialize sign */
+  psign = 1.0;
+
   for (k = 0; k < n - 1; k++) {
-    /* Compute norm of k-th column */
-    norm2 = ABSSQR(aa[(k + 1) + k * lda]);
-    for (i = k + 2; i < n; i++)
-      norm2 += ABSSQR(aa[i + k * lda]);
-    norm = REAL_SQRT(norm2);
+    /* Determine Householder vector */
+    n1 = n - k - 1;
+    alpha = aa[(k + 1) + k * lda];
+    h2_larfg(&n1, &alpha, aa + (k + 2) + k * lda, &u_one, &beta);
 
-    if (norm2 <= H2_ALMOST_ZERO) {
-      d[k] = aa[k + k * lda];
-      l[k] = 0.0;
-      u[k] = 0.0;
-    }
-    else {
-      /* Determine Householder reflection vector */
-      first = aa[(k + 1) + k * lda];
-      alpha = -SIGN(first) * norm;
-      gamma = first - alpha;
+    /* Compute k-th column */
+    nsign = SIGN(alpha);
+    d[k] = REAL(aa[k + k * lda]);
+    l[k] = u[k] = ABS(alpha);
 
-      /* Compute 2 / |v|^2 */
-      beta = 1.0 / (norm2 + ABS(first) * norm);
+    /* Update remaining columns */
+    aa[(k + 1) + k * lda] = 1.0;
+    beta = CONJ(beta);
+    h2_larf(_h2_left, &n1, &n1, aa + (k + 1) + k * lda, &u_one, &beta,
+	    aa + (k + 1) + (k + 1) * lda, &lda, work);
 
-      /* Normalize reflection vector */
-      for (i = k + 2; i < n; i++)
-	aa[i + k * lda] /= gamma;
-      beta *= ABSSQR(gamma);
-      
-      /* Compute k-th column */
-      d[k] = aa[k + k * lda];
-      l[k] = alpha;
-      u[k] = CONJ(alpha);
-      
-      /* Update remaining columns */
-      first = aa[(k + 1) + k * lda];
-      aa[(k + 1) + k * lda] = 1.0;
-      n1 = n - k - 1;
-      dlarf_("Left",
-	     &n1, &n1,
-	     aa + (k + 1) + k * lda, &u_one,
-	     &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
-      
-      /* Update remaining rows */
-      dlarf_("Right",
-	     &n1, &n1,
-	     aa + (k + 1) + k * lda, &u_one,
-	     &beta, aa + (k + 1) + (k + 1) * lda, &lda, work->v);
-      
-      if (Q) {
-	/* Update Q */
-	dlarf_("Right",
-	       &n, &n1,
-	       aa + (k + 1) + k * lda, &u_one,
-	       &beta, qa + (k + 1) * ldq, &ldq, work->v);
-      }
-      aa[(k + 1) + k * lda] = first;
+    /* Update remaining rows */
+    beta = CONJ(beta);
+    h2_larf(_h2_right, &n1, &n1, aa + (k + 1) + k * lda, &u_one, &beta,
+	    aa + (k + 1) + (k + 1) * lda, &lda, work);
+
+    if (Q) {
+      /* Update Q */
+      h2_larf(_h2_right, &n, &n1, aa + (k + 1) + k * lda, &u_one, &beta,
+	      qa + (k + 1) * ldq, &ldq, work);
+
+      /* Adjust sign of column k+1 */
+      beta = nsign * CONJ(psign);
+      h2_scal(&n, &beta, qa + (k + 1) * ldq, &u_one);
+
+      /* Update sign */
+      psign *= CONJ(nsign);
     }
   }
-  T->d[k] = aa[k + k * lda];
+  T->d[k] = REAL(aa[k + k * lda]);
+
+  freemem(work);
 }
 #else
 void
-tridiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix Q)
+tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
 {
-  (void) work;
-
   sb_tridiagonalize_amatrix(A, T, Q);
 }
 #endif
 
 /* ------------------------------------------------------------
- Self-adjoint eigenvalue problem
- ------------------------------------------------------------ */
+ * Self-adjoint eigenvalue problem
+ * ------------------------------------------------------------ */
 
 uint
-sb_eig_amatrix(pamatrix A, pavector lambda, pamatrix Q, uint maxiter)
+sb_eig_amatrix(pamatrix A, prealavector lambda, pamatrix Q, uint maxiter)
 {
   tridiag   tmp;
   ptridiag  T;
@@ -762,10 +1007,12 @@ sb_eig_amatrix(pamatrix A, pavector lambda, pamatrix Q, uint maxiter)
   iter = sb_muleig_tridiag(T, Q, maxiter);
 
   /* Copy eigenvalues */
-  if (lambda->dim < n)
-    resize_avector(lambda, n);
-  for (i = 0; i < n; i++)
+  if (lambda->dim < n) {
+    resize_realavector(lambda, n);
+  }
+  for (i = 0; i < n; i++) {
     lambda->v[i] = T->d[i];
+  }
 
   /* Clean up */
   uninit_tridiag(T);
@@ -779,18 +1026,13 @@ sb_eig_amatrix(pamatrix A, pavector lambda, pamatrix Q, uint maxiter)
  * gfortran does the right thing if called with "-frecursive", but this
  * appears not to be the standard in, e.g., OpenSUSE Linux. */
 #if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
-IMPORT_PREFIX void
-dsyev_(const char *jobz,
-       const char *uplo,
-       const unsigned *n,
-       double *a,
-       const unsigned *lda,
-       const double *w, double *work, const unsigned *lwork, int *info);
-
 uint
-eig_amatrix(pamatrix A, pavector lambda, pamatrix Q)
+eig_amatrix(pamatrix A, prealavector lambda, pamatrix Q)
 {
-  double   *work;
+  pfield    work;
+#ifdef USE_COMPLEX
+  preal     rwork;
+#endif
   unsigned  lwork;
   uint      n = A->rows;
   int       info = 0;
@@ -804,23 +1046,31 @@ eig_amatrix(pamatrix A, pavector lambda, pamatrix Q)
 
   lwork = 12 * n;
   work = allocfield(lwork);
+#ifdef USE_COMPLEX
+  rwork = allocreal(3 * n);
+#endif
 
   if (Q) {
-    dsyev_("Vectors", "Lower triangle", &n, A->a, &A->ld, lambda->v,
-	   work, &lwork, &info);
+    h2_heev(_h2_vectors, _h2_lower, &n, A->a, &A->ld, lambda->v,
+	    work, &lwork, rwork, &info);
     copy_amatrix(false, A, Q);
   }
-  else
-    dsyev_("No vectors", "Lower triangle", &n, A->a, &A->ld, lambda->v,
-	   work, &lwork, &info);
+  else {
+    h2_heev(_h2_novectors, _h2_lower, &n, A->a, &A->ld, lambda->v,
+	    work, &lwork, rwork, &info);
+  }
+
+#ifdef USE_COMPLEX
+  freemem(rwork);
+#endif
 
   freemem(work);
 
   return (info != 0);
 }
 #else
-static    uint
-workaround_eig_amatrix(pamatrix A, pavector work, pavector lambda, pamatrix Q)
+uint
+eig_amatrix(pamatrix A, prealavector lambda, pamatrix Q)
 {
   tridiag   tmp;
   ptridiag  T;
@@ -837,44 +1087,28 @@ workaround_eig_amatrix(pamatrix A, pavector work, pavector lambda, pamatrix Q)
   T = init_tridiag(&tmp, n);
 
   /* Tridiagonalize A */
-  tridiagonalize_amatrix(A, work, T, Q);
+  tridiagonalize_amatrix(A, T, Q);
 
   /* Solve tridiagonal eigenproblem */
   info = muleig_tridiag(T, Q);
 
   /* Copy eigenvalues */
-  if (lambda->dim < n)
-    resize_avector(lambda, n);
-  for (i = 0; i < n; i++)
+  if (lambda->dim < n) {
+    resize_realavector(lambda, n);
+  }
+  for (i = 0; i < n; i++) {
     lambda->v[i] = T->d[i];
+  }
 
   /* Clean up */
   uninit_tridiag(T);
 
   return info;
 }
-
-uint
-eig_amatrix(pamatrix A, pavector lambda, pamatrix Q)
-{
-  pavector  work;
-  avector   worktmp;
-  uint      lwork;
-  uint      info;
-
-  assert(A->rows == A->cols);
-
-  lwork = A->rows;
-  work = init_avector(&worktmp, lwork);
-  info = workaround_eig_amatrix(A, work, lambda, Q);
-  uninit_avector(work);
-
-  return (info != 0);
-}
 #endif
 #else
 uint
-eig_amatrix(pamatrix A, pavector lambda, pamatrix Q)
+eig_amatrix(pamatrix A, prealavector lambda, pamatrix Q)
 {
   uint      iter, maxiter;
 
@@ -889,7 +1123,7 @@ eig_amatrix(pamatrix A, pavector lambda, pamatrix Q)
 #endif
 
 uint
-geig_amatrix(pamatrix A, pamatrix M, pavector lambda, pamatrix Q)
+geig_amatrix(pamatrix A, pamatrix M, prealavector lambda, pamatrix Q)
 {
   uint      info;
 
@@ -910,19 +1144,20 @@ geig_amatrix(pamatrix A, pamatrix M, pavector lambda, pamatrix Q)
 }
 
 /* ------------------------------------------------------------
- One SVD step for a sub-bidiagonal matrix
- ------------------------------------------------------------ */
+ * One SVD step for a sub-bidiagonal matrix
+ * ------------------------------------------------------------ */
 
 void
 svdstep_tridiag(ptridiag T, field shift, pamatrix U, pamatrix Vt)
 {
-  field     a0, a1, b0, b0t, x, y, carry;
-  field     c, s;
+  real      a0, a1, b0, b0t, carry;
+  real      c, s, xr, yr;
   pfield    ua, va;
+  field     x, y;
   uint      ldu, ldv;
-  pfield    a = T->d;
-  pfield    b = T->l;
-  uint      n = T->dim;
+  preal     a = T->d;
+  preal     b = T->l;
+  uint      n = T->size;
   uint      i, j;
 
   assert(U == NULL || U->cols == n);
@@ -939,29 +1174,29 @@ svdstep_tridiag(ptridiag T, field shift, pamatrix U, pamatrix Vt)
     return;
 
   /* Determine Givens rotation */
-  givens(ABSSQR(a[0]) - shift, b[0] * CONJ(a[0]), &c, &s);
+  givens(REAL_SQR(a[0]) - shift, b[0] * a[0], &c, &s);
 
   /* Apply to first two rows */
   a0 = c * a[0] + s * b[0];
-  b0 = -CONJ(s) * a[0] + CONJ(c) * b[0];
+  b0 = -s * a[0] + c * b[0];
   b0t = s * a[1];
-  a1 = CONJ(c) * a[1];
+  a1 = c * a[1];
 
   /* Apply to first two columns of U */
   if (U)
     for (j = 0; j < U->rows; j++) {
       x = ua[j];
       y = ua[j + ldu];
-      ua[j] = CONJ(c) * x + CONJ(s) * y;
+      ua[j] = c * x + s * y;
       ua[j + ldu] = -s * x + c * y;
     }
 
   /* Determine Givens rotation to eliminate (0,1) */
-  givens(CONJ(a0), CONJ(b0t), &c, &s);
+  givens(a0, b0t, &c, &s);
 
   /* Apply to first two columns of rows 0 and 1 */
-  a[0] = CONJ(c) * a0 + CONJ(s) * b0t;
-  b[0] = CONJ(c) * b0 + CONJ(s) * a1;
+  a[0] = c * a0 + s * b0t;
+  b[0] = c * b0 + s * a1;
   a[1] = -s * b0 + c * a1;
 
   /* Apply to first two rows of Vt */
@@ -970,13 +1205,13 @@ svdstep_tridiag(ptridiag T, field shift, pamatrix U, pamatrix Vt)
       x = va[j * ldv];
       y = va[1 + j * ldv];
       va[j * ldv] = c * x + s * y;
-      va[1 + j * ldv] = -CONJ(s) * x + CONJ(c) * y;
+      va[1 + j * ldv] = -s * x + c * y;
     }
 
   /* Chase away coefficient at (2,0) */
   for (i = 1; i < n - 1; i++) {
     /* Apply Givens rotation to columns i-1, i of row i+1 */
-    carry = CONJ(s) * b[i];
+    carry = s * b[i];
     b[i] = c * b[i];
 
     /* Determine Givens rotation to eliminate carry... */
@@ -986,35 +1221,35 @@ svdstep_tridiag(ptridiag T, field shift, pamatrix U, pamatrix Vt)
     b[i - 1] = c * b[i - 1] + s * carry;
 
     /* ... rows i,i+1 of column i, ... */
-    x = a[i];
-    y = b[i];
-    a[i] = c * x + s * y;
-    b[i] = -CONJ(s) * x + CONJ(c) * y;
+    xr = a[i];
+    yr = b[i];
+    a[i] = c * xr + s * yr;
+    b[i] = -s * xr + c * yr;
 
     /* ... and rows i,i+1 of column i+1 */
     carry = s * a[i + 1];
-    a[i + 1] = CONJ(c) * a[i + 1];
+    a[i + 1] = c * a[i + 1];
 
     /* Apply to columns i,i+1 of U */
     if (U)
       for (j = 0; j < U->rows; j++) {
 	x = ua[j + i * ldu];
 	y = ua[j + (i + 1) * ldu];
-	ua[j + i * ldu] = CONJ(c) * x + CONJ(s) * y;
+	ua[j + i * ldu] = c * x + s * y;
 	ua[j + (i + 1) * ldu] = -s * x + c * y;
       }
 
     /* Determine Givens rotation to eliminate carry... */
-    givens(CONJ(a[i]), CONJ(carry), &c, &s);
+    givens(a[i], carry, &c, &s);
 
     /* ... and apply it to columns i,i+1 of row i, ... */
-    a[i] = CONJ(c) * a[i] + CONJ(s) * carry;
+    a[i] = c * a[i] + s * carry;
 
     /* ... and columns i,i+1 of row i+1 */
-    x = b[i];
-    y = a[i + 1];
-    b[i] = CONJ(c) * x + CONJ(s) * y;
-    a[i + 1] = -s * x + c * y;
+    xr = b[i];
+    yr = a[i + 1];
+    b[i] = c * xr + s * yr;
+    a[i + 1] = -s * xr + c * yr;
 
     /* Apply to rows i,i+1 of Vt */
     if (Vt)
@@ -1022,25 +1257,26 @@ svdstep_tridiag(ptridiag T, field shift, pamatrix U, pamatrix Vt)
 	x = va[i + j * ldv];
 	y = va[(i + 1) + j * ldv];
 	va[i + j * ldv] = c * x + s * y;
-	va[(i + 1) + j * ldv] = -CONJ(s) * x + CONJ(c) * y;
+	va[(i + 1) + j * ldv] = -s * x + c * y;
       }
   }
 }
 
 /* ------------------------------------------------------------
- Eliminate subdiagonal element for zero diagonal element
- ------------------------------------------------------------ */
+ * Eliminate subdiagonal element for zero diagonal element
+ * ------------------------------------------------------------ */
 
 static void
 elimsubdiag(ptridiag T, pamatrix Vt)
 {
-  pfield    a = T->d;
-  pfield    b = T->l;
-  uint      n = T->dim;
+  preal     a = T->d;
+  preal     b = T->l;
+  uint      n = T->size;
   pfield    va;
   uint      ldv;
-  field     c, s;
-  field     x, y, carry;
+  real      c, s, carry;
+  field     x, y;
+  real      yr;
   uint      i, j;
 
   assert(Vt == NULL || Vt->rows == n);
@@ -1053,10 +1289,10 @@ elimsubdiag(ptridiag T, pamatrix Vt)
     return;
 
   /* Determine Givens rotation to eliminate subdiagonal... */
-  givens(CONJ(a[1]), CONJ(b[0]), &c, &s);
+  givens(a[1], b[0], &c, &s);
 
   /* ... and apply it column-wise to the second row */
-  a[1] = CONJ(c) * a[1] + CONJ(s) * b[0];
+  a[1] = c * a[1] + s * b[0];
   b[0] = 0.0;
 
   /* ... and its adjoint row-wise to Vt */
@@ -1064,56 +1300,55 @@ elimsubdiag(ptridiag T, pamatrix Vt)
     for (j = 0; j < Vt->cols; j++) {
       x = va[j * ldv];
       y = va[1 + j * ldv];
-      va[j * ldv] = CONJ(c) * x - s * y;
-      va[1 + j * ldv] = CONJ(s) * x + c * y;
+      va[j * ldv] = c * x - s * y;
+      va[1 + j * ldv] = s * x + c * y;
     }
   }
 
   /* Chase away coefficient at (2,0) */
   for (i = 1; i < n - 1; i++) {
     /* Apply Givens rotation to row i+1 */
-    y = b[i];
-    b[i] = CONJ(c) * y;
-    carry = -s * y;
+    yr = b[i];
+    b[i] = c * yr;
+    carry = -s * yr;
 
     /* Determine Givens rotation to eliminate (i+1,0)... */
-    givens(CONJ(a[i + 1]), CONJ(carry), &c, &s);
+    givens(a[i + 1], carry, &c, &s);
 
     /* ... and apply it column-wise to the (i+1)th row */
-    a[i + 1] = CONJ(c) * a[i + 1] + CONJ(s) * carry;
+    a[i + 1] = c * a[i + 1] + s * carry;
 
     /* ... and its adjoint row-wise to Vt */
     if (Vt) {
       for (j = 0; j < Vt->cols; j++) {
 	x = va[j * ldv];
 	y = va[(i + 1) + j * ldv];
-	va[j * ldv] = CONJ(c) * x - s * y;
-	va[(i + 1) + j * ldv] = CONJ(s) * x + c * y;
+	va[j * ldv] = c * x - s * y;
+	va[(i + 1) + j * ldv] = s * x + c * y;
       }
     }
   }
 }
 
 /* ------------------------------------------------------------
- Singular value decomposition of a sub-bidiagonal matrix
- ------------------------------------------------------------ */
+ * Singular value decomposition of a sub-bidiagonal matrix
+ * ------------------------------------------------------------ */
 
 uint
 sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
 {
   tridiag   tmp;
   amatrix   tmp2, tmp3;
-  struct _evp_sort_data esd;
+  evpsortdata esd;
   ptridiag  Tsub;
   pamatrix  Usub, Vsub;
-  pfield    a = T->d;
-  pfield    b = T->l;
-  uint      n = T->dim;
+  preal     a = T->d;
+  preal     b = T->l;
+  uint      n = T->size;
   pfield    ua;
   uint      ldu;
-  real      a0, a1, d, m, Tnorm;
-  field     b0, lambda, lambda1;
-  uint      i, j, off, dim, iter;
+  real      a0, b0, a1, lambda, lambda1, d, m, db, Tnorm;
+  uint      i, j, off, size, iter;
 
   ua = (U ? U->a : NULL);
   ldu = (U ? U->ld : 0);
@@ -1121,24 +1356,21 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
   /* Simple case: 1-by-1 matrix */
   if (n < 2) {
     /* Ensure positive sign */
-    if (ABS(a[0]) != a[0]) {
-      assert(a[0] != 0.0);
-
-      lambda = a[0] / ABS(a[0]);
-      a[0] /= lambda;
+    if (a[0] < 0.0) {
+      a[0] = -a[0];
 
       if (U)
 	for (j = 0; j < U->rows; j++)
-	  ua[j] *= lambda;
+	  ua[j] = -ua[j];
     }
 
     return 0;
   }
 
   /* Compute maximum norm of T */
-  Tnorm = ABS(a[0]);
+  Tnorm = REAL_ABS(a[0]);
   for (i = 1; i < n; i++) {
-    d = ABS(b[i - 1]) + ABS(a[i]);
+    d = REAL_ABS(b[i - 1]) + REAL_ABS(a[i]);
     if (d > Tnorm)
       Tnorm = d;
   }
@@ -1146,31 +1378,36 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
   /* Find first non-zero subdiagonal coefficient */
   off = 0;
   while (off < n - 1 &&
-	 ABS(b[off]) <= H2_SVD_EPS * (ABS(a[off]) + ABS(a[off + 1])))
+	 REAL_ABS(b[off]) <=
+	 H2_QR_EPS * (REAL_ABS(a[off]) + REAL_ABS(a[off + 1]))) {
+    b[off] = 0.0;
     off++;
+  }
 
   iter = 0;
   while (off < n - 1 && (maxiter == 0 || iter < maxiter)) {
     iter++;
 
     /* Find dimension of unreduced submatrix */
-    dim = 2;
-    while (dim < n - off &&
-	   ABS(b[off + dim - 1]) >
-	   H2_SVD_EPS * (ABS(a[off + dim - 1]) + ABS(a[off + dim])))
-      dim++;
+    size = 2;
+    while (size < n - off
+	   &&
+	   REAL_ABS(b[off + size - 1]) > H2_QR_EPS
+	   * (REAL_ABS(a[off + size - 1]) + REAL_ABS(a[off + size])))
+      size++;
 
     /* Check for zero diagonal entries */
     i = 0;
-    while (i < dim && ABS(a[off + i]) > H2_SVD_EPS * Tnorm)
+    while (i < size && REAL_ABS(a[off + i]) > H2_QR_EPS * Tnorm)
       i++;
 
-    if (i + 1 < dim) {
+    if (i + 1 < size) {
       /* Eliminate subdiagonal entry */
-      Tsub = init_sub_tridiag(&tmp, T, dim - i, off + i);
-      Vsub = (Vt ?
-	      init_sub_amatrix(&tmp3, Vt, dim - i, off + i, Vt->cols, 0) :
-	      NULL);
+      a[off + i] = 0.0;
+      Tsub = init_sub_tridiag(&tmp, T, size - i, off + i);
+      Vsub =
+	(Vt ? init_sub_amatrix(&tmp3, Vt, size - i, off + i, Vt->cols, 0) :
+	 NULL);
 
       elimsubdiag(Tsub, Vsub);
 
@@ -1180,26 +1417,28 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
     }
     else {
       /* Set up submatrices */
-      Tsub = init_sub_tridiag(&tmp, T, dim, off);
-      Usub = (U ? init_sub_amatrix(&tmp2, U, U->rows, 0, dim, off) : NULL);
-      Vsub = (Vt ? init_sub_amatrix(&tmp3, Vt, dim, off, Vt->cols, 0) : NULL);
+      Tsub = init_sub_tridiag(&tmp, T, size, off);
+      Usub = (U ? init_sub_amatrix(&tmp2, U, U->rows, 0, size, off) : NULL);
+      Vsub =
+	(Vt ? init_sub_amatrix(&tmp3, Vt, size, off, Vt->cols, 0) : NULL);
 
       /* Determine Wilkinson shift for T T^* */
-      a0 = ABSSQR(a[off + dim - 2]);
-      if (off + dim > 2)
-	a0 += ABSSQR(b[off + dim - 3]);
-      b0 = b[off + dim - 2] * CONJ(a[off + dim - 2]);
-      a1 = ABSSQR(b[off + dim - 2]) + ABSSQR(a[off + dim - 1]);
+      a0 = REAL_SQR(a[off + size - 2]);
+      if (off + size > 2)
+	a0 += REAL_SQR(b[off + size - 3]);
+      b0 = b[off + size - 2] * a[off + size - 2];
+      a1 = REAL_SQR(b[off + size - 2]) + REAL_SQR(a[off + size - 1]);
 
-      /* Compute eigenvalue with maximal absolute value */
+      /* Find the eigenvalue with larger absolute value */
       m = (a0 + a1) * 0.5;
       d = (a0 - a1) * 0.5;
-      lambda1 = (m > 0.0 ?
-		 m + REAL_SQRT(REAL_SQR(d) + ABSSQR(b0)) :
-		 m - REAL_SQRT(REAL_SQR(d) + ABSSQR(b0)));
+      db = (REAL_ABS(d) > REAL_ABS(b0) ?
+	    REAL_ABS(d) * REAL_SQRT(1.0 + REAL_SQR(b0 / d)) :
+	    REAL_ABS(b0) * REAL_SQRT(1.0 + REAL_SQR(d / b0)));
+      lambda1 = (m > 0 ? m + db : m - db);
 
-      /* Choose eigenvalue closest to a1 */
-      lambda = (d * m < 0.0 ? lambda1 : (a0 * a1 - ABSSQR(b0)) / lambda1);
+      /* Find the eigenvalue closest to a1 */
+      lambda = (m * d < 0.0 ? lambda1 : (a0 * a1 - REAL_SQR(b0)) / lambda1);
 
       /* Perform SVD step on submatrices */
       svdstep_tridiag(Tsub, lambda, Usub, Vsub);
@@ -1214,27 +1453,26 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
 
     /* Find non-zero subdiagonal coefficient */
     while (off < n - 1 &&
-	   ABS(b[off]) <= H2_SVD_EPS * (ABS(a[off]) + ABS(a[off + 1])))
+	   REAL_ABS(b[off]) <=
+	   H2_QR_EPS * (REAL_ABS(a[off]) + REAL_ABS(a[off + 1]))) {
+      b[off] = 0.0;
       off++;
+    }
   }
 
-  /* DEBUGGING */
-  if (iter >= maxiter) {
-    (void) printf("SVD iteration did not converge after %u steps.\n", iter);
-    abort();
+  if (maxiter > 0 && iter >= maxiter) {
+    (void) printf("  ### SVD warning: did not converge after %u steps\n",
+		  iter);
   }
 
   /* Ensure positive signs */
   for (i = 0; i < n; i++)
-    if (ABS(a[i]) != a[i]) {
-      assert(a[i] != 0.0);
-
-      lambda = a[i] / ABS(a[i]);
-      a[i] /= lambda;
+    if (a[i] < 0.0) {
+      a[i] = -a[i];
 
       if (U)
 	for (j = 0; j < U->rows; j++)
-	  ua[j + i * ldu] *= lambda;
+	  ua[j + i * ldu] = -ua[j + i * ldu];
     }
 
   /* Sort singular values */
@@ -1247,40 +1485,22 @@ sb_mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt, uint maxiter)
 }
 
 #ifdef USE_BLAS
-IMPORT_PREFIX void
-dbdsqr_(const char *uplo,
-	const unsigned *n,
-	const unsigned *ncvt,
-	const unsigned *nru,
-	const unsigned *ncc,
-	double *d,
-	double *e,
-	double *vt,
-	const unsigned *ldvt,
-	double *u,
-	const unsigned *ldu,
-	double *c, const unsigned *ldc, double *work, int *info);
-
 uint
 mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt)
 {
   uint      lwork;
-  double   *work;
+  real     *work;
   int       info;
 
-  if (T->dim < 1)
+  if (T->size < 1)
     return 0;
 
-  lwork = 4 * T->dim;
-  work = (double *) allocmem((size_t) sizeof(double) * lwork);
-  dbdsqr_("Lower bidiagonal",
-	  &T->dim,
-	  (Vt ? &Vt->cols : &u_zero),
-	  (U ? &U->rows : &u_zero),
-	  &u_zero,
-	  T->d, T->l,
-	  (Vt ? Vt->a : 0), (Vt ? &Vt->ld : &u_one),
-	  (U ? U->a : 0), (U ? &U->ld : &u_one), 0, &u_one, work, &info);
+  lwork = 4 * T->size;
+  work = allocreal(lwork);
+  h2_bdsqr(_h2_lower, &T->size, (Vt ? &Vt->cols : &u_zero),
+	   (U ? &U->rows : &u_zero), &u_zero, T->d, T->l, (Vt ? Vt->a : 0),
+	   (Vt ? &Vt->ld : &u_one), (U ? U->a : 0), (U ? &U->ld : &u_one), 0,
+	   &u_one, work, &info);
 
   freemem(work);
 
@@ -1292,10 +1512,10 @@ mulsvd_tridiag(ptridiag T, pamatrix U, pamatrix Vt)
 {
   uint      iter, maxiter;
 
-  if (T->dim < 1)
+  if (T->size < 1)
     return 0;
 
-  maxiter = 32 * T->dim;
+  maxiter = 32 * T->size;
 
   iter = sb_mulsvd_tridiag(T, U, Vt, maxiter);
 
@@ -1316,24 +1536,25 @@ svd_tridiag(ptridiag T, pamatrix U, pamatrix Vt)
 }
 
 /* ------------------------------------------------------------
- Bidiagonalize a matrix
- ------------------------------------------------------------ */
+ * Bidiagonalize a matrix
+ * ------------------------------------------------------------ */
 
 void
 sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 {
-  pfield    a, ua, va, d, l, tau;
-  field     alpha, gamma, diag;
+  pfield    a, ua, va;
+  preal     d, l, tau;
+  field     alpha, gamma, diag, nsign;
   real      norm, norm2, beta;
   uint      rows, cols, lda, ldu, ldv;
-  uint      dim;
+  uint      size;
   uint      i, j, k;
 
   rows = A->rows;
   cols = A->cols;
-  dim = UINT_MIN(rows, cols);
+  size = UINT_MIN(rows, cols);
 
-  assert(T->dim == dim);
+  assert(T->size == size);
   assert(U == NULL || U->rows >= A->rows);
   assert(U == NULL || U->cols >= UINT_MIN(A->rows, A->cols));
   assert(Vt == NULL || Vt->cols >= A->cols);
@@ -1364,8 +1585,10 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[i + k * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 <= H2_ALMOST_ZERO)
+      if (norm2 <= H2_ALMOST_ZERO) {
 	tau[k] = 0.0;
+	a[k + k * lda] = 0.0;
+      }
       else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
@@ -1379,18 +1602,21 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	for (i = k + 1; i < rows; i++)
 	  a[i + k * lda] /= gamma;
 	beta *= ABSSQR(gamma);
+
+	/* Store scaling factor */
 	tau[k] = beta;
-	
+
+	/* Store diagonal element */
 	a[k + k * lda] = alpha;
-	
+
 	/* Update columns k+1,...,cols */
 	for (j = k + 1; j < cols; j++) {
 	  gamma = a[k + j * lda];
 	  for (i = k + 1; i < rows; i++)
 	    gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
-	  
+
 	  gamma *= beta;
-	  
+
 	  a[k + j * lda] -= gamma;
 	  for (i = k + 1; i < rows; i++)
 	    a[i + j * lda] -= gamma * a[i + k * lda];
@@ -1432,8 +1658,10 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	norm2 += ABSSQR(a[k + i * lda]);
       norm = REAL_SQRT(norm2);
 
-      if (norm2 <= H2_ALMOST_ZERO)
+      if (norm2 <= H2_ALMOST_ZERO) {
 	tau[k] = 0.0;
+	a[k + k * lda] = 0.0;
+      }
       else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
@@ -1447,18 +1675,21 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 	for (i = k + 1; i < cols; i++)
 	  a[k + i * lda] /= gamma;
 	beta *= ABSSQR(gamma);
+
+	/* Store scaling factor */
 	tau[k] = beta;
-	
+
+	/* Store diagonal element */
 	a[k + k * lda] = alpha;
-	
+
 	/* Update rows k+1,...,rows */
 	for (j = k + 1; j < rows; j++) {
 	  gamma = a[j + k * lda];
 	  for (i = k + 1; i < cols; i++)
 	    gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
-	  
+
 	  gamma *= beta;
-	  
+
 	  a[j + k * lda] -= gamma;
 	  for (i = k + 1; i < cols; i++)
 	    a[j + i * lda] -= gamma * a[k + i * lda];
@@ -1494,11 +1725,11 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
     cols = rows;
   }
 
-  assert(dim == rows);
-  assert(dim == cols);
+  assert(size == rows);
+  assert(size == cols);
 
   /* Golub-Kahan bidiagonalization */
-  for (k = 0; k < dim; k++) {
+  for (k = 0; k < size; k++) {
     /* Eliminate (k,k+1) to (k,cols) by column reflections */
     norm2 = ABSSQR(a[k + k * lda]);
     for (i = k + 1; i < cols; i++)
@@ -1510,47 +1741,53 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
     else {
       /* Determine Householder reflection vector v */
       diag = a[k + k * lda];
-      alpha = -SIGN(diag) * norm;
+      nsign = -SIGN(diag);
+      alpha = nsign * norm;
       gamma = diag - alpha;
 
       /* Compute 2 / |v|^2 */
       beta = 1.0 / (norm2 + ABS(diag) * norm);
 
+      /* Store diagonal element */
+      d[k] = norm;
+
       /* Normalize reflection vector */
       for (i = k + 1; i < cols; i++)
 	a[k + i * lda] /= gamma;
       beta *= ABSSQR(gamma);
-      
-      d[k] = alpha;
-      
+
       /* Update rows k+1,...,rows */
       for (j = k + 1; j < rows; j++) {
 	gamma = a[j + k * lda];
 	for (i = k + 1; i < cols; i++)
 	  gamma += CONJ(a[k + i * lda]) * a[j + i * lda];
-	
+
 	gamma *= beta;
-	
+
 	a[j + k * lda] -= gamma;
 	for (i = k + 1; i < cols; i++)
 	  a[j + i * lda] -= gamma * a[k + i * lda];
+
+	a[j + k * lda] *= CONJ(nsign);
       }
-      
+
       /* Update columns of Vt */
       if (Vt)
 	for (j = 0; j < Vt->cols; j++) {
 	  gamma = va[k + j * ldv];
 	  for (i = k + 1; i < cols; i++)
 	    gamma += a[k + i * lda] * va[i + j * ldv];
-	  
+
 	  gamma *= beta;
-	  
+
 	  va[k + j * ldv] -= gamma;
 	  for (i = k + 1; i < cols; i++)
 	    va[i + j * ldv] -= gamma * CONJ(a[k + i * lda]);
+
+	  va[k + j * ldv] *= nsign;
 	}
     }
-  
+
     /* Eliminate (k+2,k) to (rows,k) by row reflections */
     if (k + 1 < rows) {
       norm2 = ABSSQR(a[(k + 1) + k * lda]);
@@ -1563,44 +1800,50 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       else {
 	/* Determine Householder reflection vector v */
 	diag = a[(k + 1) + k * lda];
-	alpha = -SIGN(diag) * norm;
+	nsign = -SIGN(diag);
+	alpha = nsign * norm;
 	gamma = diag - alpha;
 
 	/* Compute 2 / |v|^2 */
 	beta = 1.0 / (norm2 + ABS(diag) * norm);
 
+	/* Store subdiagonal element */
+	l[k] = norm;
+
 	/* Normalize reflection vector */
 	for (i = k + 2; i < rows; i++)
 	  a[i + k * lda] /= gamma;
 	beta *= ABSSQR(gamma);
-	
-	l[k] = alpha;
-	
+
 	/* Update columns k+1,...,cols */
 	for (j = k + 1; j < cols; j++) {
 	  gamma = a[(k + 1) + j * lda];
 	  for (i = k + 2; i < rows; i++)
 	    gamma += CONJ(a[i + k * lda]) * a[i + j * lda];
-	  
+
 	  gamma *= beta;
-	  
+
 	  a[(k + 1) + j * lda] -= gamma;
 	  for (i = k + 2; i < rows; i++)
 	    a[i + j * lda] -= gamma * a[i + k * lda];
+
+	  a[(k + 1) + j * lda] *= CONJ(nsign);
 	}
-	
+
 	/* Update rows of U */
 	if (U)
 	  for (j = 0; j < U->rows; j++) {
 	    gamma = ua[j + (k + 1) * ldu];
 	    for (i = k + 2; i < rows; i++)
 	      gamma += a[i + k * lda] * ua[j + i * ldu];
-	    
+
 	    gamma *= beta;
-	    
+
 	    ua[j + (k + 1) * ldu] -= gamma;
 	    for (i = k + 2; i < rows; i++)
 	      ua[j + i * ldu] -= gamma * CONJ(a[i + k * lda]);
+
+	    ua[j + (k + 1) * ldu] *= nsign;
 	  }
       }
     }
@@ -1608,43 +1851,35 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 }
 
 #ifdef USE_BLAS
-IMPORT_PREFIX void
-dlarf_(const char *side,
-       const unsigned *m,
-       const unsigned *n,
-       const double *v,
-       const unsigned *incv,
-       const double *tau, double *c, const unsigned *ldc, double *work);
-
 void
-bidiagonalize_amatrix(pamatrix A, pavector work,
-		      ptridiag T, pamatrix U, pamatrix Vt)
+bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 {
-  pfield    a, ua, va, d, l, tau;
-  field     alpha, gamma, diag;
-  real      norm, norm2, beta;
+  pfield    a, ua, va, work, tau;
+  preal     d, l;
+  field     alpha, beta, nsign;
   uint      rows, cols, lda, ldu, ldv;
   uint      rows1, cols1;
-  uint      dim;
-  uint      i, k;
+  uint      size, lwork;
+  uint      i, j, k;
 
   rows = A->rows;
   cols = A->cols;
-  dim = UINT_MIN(rows, cols);
+  size = UINT_MIN(rows, cols);
 
-  assert(T->dim == dim);
+  assert(T->size == size);
   assert(U == NULL || U->rows >= A->rows);
   assert(U == NULL || U->cols >= UINT_MIN(A->rows, A->cols));
   assert(Vt == NULL || Vt->cols >= A->cols);
   assert(Vt == NULL || Vt->rows >= UINT_MIN(A->rows, A->cols));
-  assert(work->dim >= UINT_MAX(A->rows, A->cols));
+
+  lwork = UINT_MAX(A->rows, A->cols);
+  work = allocfield(lwork);
 
   a = A->a;
   lda = A->ld;
 
   d = T->d;
   l = T->l;
-  tau = d;
 
   ua = (U ? U->a : NULL);
   ldu = (U ? U->ld : 0);
@@ -1658,59 +1893,44 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
     identity_amatrix(Vt);
 
   if (rows > cols) {		/* Make A upper triangular */
-    assert(work->dim >= cols);
+    tau = allocfield(cols);
 
     for (k = 0; k < cols; k++) {
-      norm2 = ABSSQR(a[k + k * lda]);
-      for (i = k + 1; i < rows; i++)
-	norm2 += ABSSQR(a[i + k * lda]);
-      norm = REAL_SQRT(norm2);
+      rows1 = rows - k;
 
-      if (norm2 <= H2_ALMOST_ZERO)
-	tau[k] = 0.0;
-      else {
-	/* Determine Householder reflection vector v */
-	diag = a[k + k * lda];
-	alpha = -SIGN(diag) * norm;
-	gamma = diag - alpha;
+      /* Determine Householder reflection vector v */
+      alpha = a[k + k * lda];
+      h2_larfg(&rows1, &alpha, a + (k + 1) + k * lda, &u_one, &beta);
 
-	/* Compute norm of v */
-	beta = 1.0 / (norm2 + ABS(diag) * norm);
+      /* Store scaling factor */
+      tau[k] = beta;
+      beta = CONJ(beta);
 
-	/* Normalize reflection vector */
-	for (i = k + 1; i < rows; i++)
-	  a[i + k * lda] /= gamma;
-	beta *= ABSSQR(gamma);
-	a[k + k * lda] = 1.0;
-	
-	tau[k] = beta;
-	
-	/* Update columns k+1,...,cols */
-	rows1 = rows - k;
-	cols1 = cols - k - 1;
-	dlarf_("Left",
-	       &rows1, &cols1,
-	       a + k + k * lda, &u_one,
-	       &beta, a + k + (k + 1) * lda, &lda, work->v);
-	
-	/* Set new diagonal entry */
-	a[k + k * lda] = alpha;
-      }
+      /* dlarf/zlarf expects the full Householder vector */
+      a[k + k * lda] = 1.0;
+
+      /* Update columns k+1,...,cols */
+      cols1 = cols - (k + 1);
+      h2_larf(_h2_left, &rows1, &cols1, a + k + k * lda, &u_one, &beta,
+	      a + k + (k + 1) * lda, &lda, work);
+
+      /* Store diagonal element */
+      a[k + k * lda] = alpha;
     }
 
     /* Apply reflections in reversed order to U */
     if (U)
       for (k = cols; k-- > 0;) {
 	beta = tau[k];
+
 	if (beta != 0.0) {
 	  alpha = a[k + k * lda];
 	  a[k + k * lda] = 1.0;
 
 	  rows1 = rows - k;
 	  cols1 = U->cols;
-	  dlarf_("Left",
-		 &rows1, &cols1,
-		 a + k + k * lda, &u_one, &beta, ua + k, &ldu, work->v);
+	  h2_larf(_h2_left, &rows1, &cols1, a + k + k * lda, &u_one, &beta,
+		  ua + k, &ldu, work);
 
 	  a[k + k * lda] = alpha;
 	}
@@ -1721,63 +1941,54 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
       for (i = k + 1; i < cols; i++)
 	a[i + k * lda] = 0.0;
 
+    /* Clean up */
+    freemem(tau);
+
     /* Now A is quadratic */
     rows = cols;
   }
   else if (cols > rows) {	/* Make A lower triangular */
-    assert(work->dim >= rows);
+    tau = allocfield(rows);
 
     for (k = 0; k < rows; k++) {
-      norm2 = ABSSQR(a[k + k * lda]);
+      cols1 = cols - k;
+
+      /* Determine Householder reflection vector v */
+      alpha = CONJ(a[k + k * lda]);
+#ifdef USE_COMPLEX
       for (i = k + 1; i < cols; i++)
-	norm2 += ABSSQR(a[k + i * lda]);
-      norm = REAL_SQRT(norm2);
+	a[k + i * lda] = CONJ(a[k + i * lda]);
+#endif
+      h2_larfg(&cols1, &alpha, a + k + (k + 1) * lda, &lda, &beta);
 
-      if (norm2 <= H2_ALMOST_ZERO)
-	tau[k] = 0.0;
-      else {
-	/* Determine Householder reflection vector v */
-	diag = a[k + k * lda];
-	alpha = -SIGN(diag) * norm;
-	gamma = diag - alpha;
+      /* Store scaling factor */
+      tau[k] = beta;
 
-	/* Compute norm of v */
-	beta = 1.0 / (norm2 + ABS(diag) * norm);
+      /* dlarf/zlarf expects the full Householder vector */
+      a[k + k * lda] = 1.0;
 
-	/* Normalize reflection vector */
-	for (i = k + 1; i < cols; i++)
-	  a[k + i * lda] /= gamma;
-	beta *= ABSSQR(gamma);
-	a[k + k * lda] = 1.0;
-	
-	tau[k] = beta;
-	
-	/* Update rows k+1,...,rows */
-	rows1 = rows - k - 1;
-	cols1 = cols - k;
-	dlarf_("Right",
-	       &rows1, &cols1,
-	       a + k + k * lda, &lda,
-	       &beta, a + (k + 1) + k * lda, &lda, work->v);
-	
-	/* Set new diagonal entry */
-	a[k + k * lda] = alpha;
-      }
+      /* Update rows k+1,...,rows */
+      rows1 = rows - (k + 1);
+      h2_larf(_h2_right, &rows1, &cols1, a + k + k * lda, &lda, &beta,
+	      a + (k + 1) + k * lda, &lda, work);
+
+      /* Store diagonal element */
+      a[k + k * lda] = CONJ(alpha);
     }
 
     /* Apply reflections in reversed order to Vt */
     if (Vt)
       for (k = rows; k-- > 0;) {
-	beta = tau[k];
+	beta = CONJ(tau[k]);
+
 	if (beta != 0.0) {
 	  alpha = a[k + k * lda];
 	  a[k + k * lda] = 1.0;
 
 	  rows1 = Vt->rows;
 	  cols1 = cols - k;
-	  dlarf_("Right",
-		 &rows1, &cols1,
-		 a + k + k * lda, &lda, &beta, va + k * ldv, &ldv, work->v);
+	  h2_larf(_h2_right, &rows1, &cols1, a + k + k * lda, &lda, &beta,
+		  va + k * ldv, &ldv, work);
 
 	  a[k + k * lda] = alpha;
 	}
@@ -1788,125 +1999,114 @@ bidiagonalize_amatrix(pamatrix A, pavector work,
       for (i = k + 1; i < rows; i++)
 	a[k + i * lda] = 0.0;
 
+    /* Clean up */
+    freemem(tau);
+
     /* Now A is quadratic */
     cols = rows;
   }
 
-  assert(dim == rows);
-  assert(dim == cols);
+  assert(size == rows);
+  assert(size == cols);
 
   /* Golub-Kahan bidiagonalization */
-  for (k = 0; k < dim; k++) {
+  for (k = 0; k < size; k++) {
     /* Eliminate (k,k+1) to (k,cols) by column reflections */
-    norm2 = ABSSQR(a[k + k * lda]);
-    for (i = k + 1; i < cols; i++)
-      norm2 += ABSSQR(a[k + i * lda]);
-    norm = REAL_SQRT(norm2);
+    cols1 = size - k;
 
-    if (norm2 <= H2_ALMOST_ZERO)
-      d[k] = 0.0;
-    else {
-      diag = a[k + k * lda];
-      alpha = -SIGN(diag) * norm;
-      gamma = diag - alpha;
+    /* Determine Householder reflection vector v */
+    alpha = CONJ(a[k + k * lda]);
+#ifdef USE_COMPLEX
+    for (i = k + 1; i < size; i++)
+      a[k + i * lda] = CONJ(a[k + i * lda]);
+#endif
+    h2_larfg(&cols1, &alpha, a + k + (k + 1) * lda, &lda, &beta);
 
-      /* Compute 2 / |v|^2 */
-      beta = 1.0 / (norm2 + ABS(diag) * norm);
+    /* Store diagonal element */
+    nsign = SIGN(CONJ(alpha));
+    d[k] = ABS(alpha);
 
-      /* Normalize reflection vector */
-      for (i = k + 1; i < cols; i++)
-	a[k + i * lda] /= gamma;
-      beta *= ABSSQR(gamma);
-      a[k + k * lda] = 1.0;
-      
-      d[k] = alpha;
-      
-      /* Update rows k+1,...,rows */
-      rows1 = rows - k - 1;
-      cols1 = cols - k;
-      dlarf_("Right",
-	     &rows1, &cols1,
-	     a + k + k * lda, &lda,
-	     &beta, a + (k + 1) + k * lda, &lda, work->v);
-      
-      /* Update columns of Vt */
-      if (Vt) {
-	rows1 = cols - k;
-	cols1 = Vt->cols;
-	dlarf_("Left",
-	       &rows1, &cols1,
-	       a + k + k * lda, &lda, &beta, va + k, &ldv, work->v);
-      }
+    /* dlarf/zlarf expects the full Householder vector */
+    a[k + k * lda] = 1.0;
+
+    /* Update rows k+1,...,rows */
+    rows1 = size - (k + 1);
+    h2_larf(_h2_right, &rows1, &cols1, a + k + k * lda, &lda, &beta,
+	    a + (k + 1) + k * lda, &lda, work);
+
+    /* Scale to preserve sign */
+    for (j = k + 1; j < rows; j++)
+      a[j + k * lda] *= nsign;
+
+    /* Update columns of Vt */
+    if (Vt) {
+      beta = CONJ(beta);
+      rows1 = size - k;
+      cols1 = Vt->cols;
+      h2_larf(_h2_left, &rows1, &cols1, a + k + k * lda, &lda, &beta, va + k,
+	      &ldv, work);
+
+      for (j = 0; j < Vt->cols; j++)
+	va[k + j * ldv] *= CONJ(nsign);
     }
 
     /* Eliminate (k+2,k) to (rows,k) by row reflections */
-    if (k + 1 < rows) {
-      norm2 = ABSSQR(a[(k + 1) + k * lda]);
-      for (i = k + 2; i < rows; i++)
-	norm2 += ABSSQR(a[i + k * lda]);
-      norm = REAL_SQRT(norm2);
+    if (k + 1 < size) {
+      rows1 = size - (k + 1);
 
-      if (norm2 <= H2_ALMOST_ZERO)
-	l[k] = 0.0;
-      else {
-	/* Determine Householder reflection vector v */
-	diag = a[(k + 1) + k * lda];
-	alpha = -SIGN(diag) * norm;
-	gamma = diag - alpha;
+      /* Determine Householder reflection vector v */
+      alpha = a[(k + 1) + k * lda];
+      h2_larfg(&rows1, &alpha, a + (k + 2) + k * lda, &u_one, &beta);
 
-	/* Compute 2 / |v|^2 */
-	beta = 1.0 / (norm2 + ABS(diag) * norm);
+      /* Store subdiagonal element */
+      nsign = SIGN(alpha);
+      l[k] = ABS(alpha);
 
-	/* Normalize reflection vector */
-	for (i = k + 2; i < rows; i++)
-	  a[i + k * lda] /= gamma;
-	beta *= ABSSQR(gamma);
-	a[(k + 1) + k * lda] = 1.0;
-	
-	l[k] = alpha;
-	
-	/* Update columns k+1,...,cols */
-	rows1 = rows - k - 1;
-	cols1 = cols - k - 1;
-	dlarf_("Left",
-	       &rows1, &cols1,
-	       a + (k + 1) + k * lda, &u_one,
-	       &beta, a + (k + 1) + (k + 1) * lda, &lda, work->v);
-	
-	/* Update rows of U */
-	if (U) {
-	  rows1 = U->rows;
-	  cols1 = rows - k - 1;
-	  dlarf_("Right",
-		 &rows1, &cols1,
-		 a + (k + 1) + k * lda, &u_one,
-		 &beta, ua + (k + 1) * ldu, &ldu, work->v);
-	}
+      /* dlarf/zlarf expects the full Householder vector */
+      a[(k + 1) + k * lda] = 1.0;
+
+      /* Update columns k+1,...,cols */
+      beta = CONJ(beta);
+      cols1 = size - k - 1;
+      h2_larf(_h2_left, &rows1, &cols1, a + (k + 1) + k * lda, &u_one, &beta,
+	      a + (k + 1) + (k + 1) * lda, &lda, work);
+
+      for (j = k + 1; j < cols; j++)
+	a[(k + 1) + j * lda] *= CONJ(nsign);
+
+      /* Update rows of U */
+      if (U) {
+	beta = CONJ(beta);
+	rows1 = U->rows;
+	cols1 = rows - (k + 1);
+	h2_larf(_h2_right, &rows1, &cols1, a + (k + 1) + k * lda, &u_one,
+		&beta, ua + (k + 1) * ldu, &ldu, work);
+
+	for (j = 0; j < U->rows; j++)
+	  ua[j + (k + 1) * ldu] *= nsign;
       }
     }
   }
+
+  /* Clean up */
+  freemem(work);
 }
 #else
 void
-bidiagonalize_amatrix(pamatrix A, pavector work, ptridiag T, pamatrix U,
-		      pamatrix Vt)
+bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
 {
-  (void) work;
-
   sb_bidiagonalize_amatrix(A, T, U, Vt);
 }
 #endif
 
 void
-bidiagonalize_verified_amatrix(pamatrix A, pavector work, ptridiag T,
-			       pamatrix U, pamatrix Vt)
+bidiagonalize_verified_amatrix(pamatrix A, ptridiag T, pamatrix U,
+			       pamatrix Vt)
 {
   pamatrix  Acopy, Utmp, Vttmp;
   amatrix   tmp1, tmp2, tmp3;
-  pavector  Td, Tl;
-  avector   tmp4, tmp5;
   uint      k;
-  real      error;
+  real      norm, error;
 
   k = UINT_MIN(A->rows, A->cols);
 
@@ -1916,7 +2116,7 @@ bidiagonalize_verified_amatrix(pamatrix A, pavector work, ptridiag T,
   Utmp = init_amatrix(&tmp2, A->rows, k);
   Vttmp = init_amatrix(&tmp3, k, A->cols);
 
-  bidiagonalize_amatrix(A, work, T, Utmp, Vttmp);
+  bidiagonalize_amatrix(A, T, Utmp, Vttmp);
 
   if (U)
     copy_amatrix(false, Utmp, U);
@@ -1924,18 +2124,15 @@ bidiagonalize_verified_amatrix(pamatrix A, pavector work, ptridiag T,
   if (Vt)
     copy_amatrix(false, Vttmp, Vt);
 
-  if (T->dim > 0) {
-    Td = init_pointer_avector(&tmp4, T->d, T->dim);
-    Tl = init_pointer_avector(&tmp5, T->l, T->dim - 1);
-    bidiagmul_amatrix(1.0, false, Utmp, Td, Tl);
+  if (T->size > 0) {
+    norm = normfrob_amatrix(Acopy);
+    lowereval_tridiag_amatrix(1.0, true, T, true, Utmp);
     addmul_amatrix(-1.0, false, Utmp, false, Vttmp, Acopy);
     error = normfrob_amatrix(Acopy);
-    if (error > 1e-12) {
+    if (error > 1e-12 * norm) {
       printf("  bidiag: %.4g\n", error);
       abort();
     }
-    uninit_avector(Tl);
-    uninit_avector(Td);
   }
 
   uninit_amatrix(Vttmp);
@@ -1944,176 +2141,40 @@ bidiagonalize_verified_amatrix(pamatrix A, pavector work, ptridiag T,
 }
 
 /* ------------------------------------------------------------
- Singular value decomposition of an arbitrary matrix
- ------------------------------------------------------------ */
+ * Singular value decomposition of an arbitrary matrix
+ * ------------------------------------------------------------ */
 
 uint
-sb_svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt,
+sb_svd_amatrix(pamatrix A, prealavector sigma, pamatrix U, pamatrix Vt,
 	       uint maxiter)
 {
-  tridiag   tmp;
+#ifdef RUNTIME_CHECK_EIGENSOLVERS
+  tridiag   tmp1;
+  amatrix   tmp2, tmp3, tmp4, tmp5;
   ptridiag  T;
-  uint      dim;
+  pamatrix  Acopy, Utmp, Vttmp, UT;
+  real      norm, error;
+  uint      k;
   uint      iter;
   uint      i;
 
-  dim = UINT_MIN(A->rows, A->cols);
+  k = UINT_MIN(A->rows, A->cols);
 
-  if (dim < 1)			/* Quick exit */
+  if (k < 1)			/* Quick exit */
     return 0;
 
-  /* Set up auxiliary matrix */
-  T = init_tridiag(&tmp, dim);
+  Acopy = init_amatrix(&tmp2, A->rows, A->cols);
+  Utmp = init_amatrix(&tmp3, A->rows, k);
+  Vttmp = init_amatrix(&tmp4, k, A->cols);
+  UT = init_amatrix(&tmp5, A->rows, k);
 
-  /* Bidiagonalize A */
-  sb_bidiagonalize_amatrix(A, T, U, Vt);
-
-  /* Compute SVD of bidiagonal matrix */
-  iter = sb_mulsvd_tridiag(T, U, Vt, maxiter);
-
-  /* DEBUGGING */
-  if (iter >= maxiter) {
-    (void) printf("sb_svd_amatrix: %u iterations were not enough\n", iter);
-    abort();
-  }
-
-  /* Copy singular values */
-  for (i = 0; i < dim; i++)
-    sigma->v[i] = T->d[i];
-
-  /* Clean up */
-  uninit_tridiag(T);
-
-  return iter;
-}
-
-#ifdef USE_BLAS
-#if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
-IMPORT_PREFIX void
-dgesvd_(const char *jobu,
-	const char *jobvt,
-	const unsigned *m,
-	const unsigned *n,
-	double *a,
-	const unsigned *lda,
-	double *s,
-	double *u,
-	const unsigned *ldu,
-	double *vt,
-	const unsigned *ldvt, double *work, const unsigned *lwork, int *info);
-
-uint
-svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt)
-{
-  double   *work;
-  unsigned  lwork;
-  int       info = 0;
-
-  if (A->rows > 0 && A->cols > 0) {
-    lwork = 10 * UINT_MAX(A->rows, A->cols);
-    work = allocfield(lwork);
-
-    dgesvd_((U ? "Skinny left vectors" : "No left vectors"),
-	    (Vt ? "Skinny right vectors" : "No right vectors"),
-	    &A->rows, &A->cols,
-	    A->a, &A->ld,
-	    sigma->v,
-	    (U ? U->a : NULL), (U ? &U->ld : &u_one),
-	    (Vt ? Vt->a : NULL), (Vt ? &Vt->ld : &u_one),
-	    work, &lwork, &info);
-
-    freemem(work);
-  }
-
-  return (info != 0);
-}
-#else
-static    uint
-workaround_svd_amatrix(pamatrix A, pavector work,
-		       pavector sigma, pamatrix U, pamatrix Vt)
-{
-  tridiag   tmp;
-  ptridiag  T;
-  uint      dim;
-  uint      info;
-  uint      i;
-
-  dim = UINT_MIN(A->rows, A->cols);
-
-  /* Set up auxiliary matrix */
-  T = init_tridiag(&tmp, dim);
-
-  /* Bidiagonalize A */
-  bidiagonalize_amatrix(A, work, T, U, Vt);
-
-  /* Compute SVD of bidiagonal matrix */
-  info = mulsvd_tridiag(T, U, Vt);
-
-  /* Copy singular values */
-  for (i = 0; i < dim; i++)
-    sigma->v[i] = T->d[i];
-
-  /* Clean up */
-  uninit_tridiag(T);
-
-  return info;
-}
-
-uint
-svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt)
-{
-  pavector  work;
-  avector   worktmp;
-  uint      lwork;
-  uint      info;
-
-  lwork = UINT_MAX(A->rows, A->cols) + 3 * UINT_MIN(A->rows, A->cols);
-  work = init_avector(&worktmp, lwork);
-  info = workaround_svd_amatrix(A, work, sigma, U, Vt);
-  uninit_avector(work);
-
-  return (info != 0);
-}
-#endif
-#else
-uint
-svd_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt)
-{
-  uint      iter, maxiter;
-
-  if (A->rows < 1)		/* Quick exit */
-    return 0;
-
-  maxiter = 32 * A->rows;
-  iter = sb_svd_amatrix(A, sigma, U, Vt, maxiter);
-
-  return !(iter < maxiter);
-}
-#endif
-
-uint
-svd_verified_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt)
-{
-  pamatrix  Acopy;
-  pamatrix  Utmp, Vttmp, E;
-  amatrix   tmp1, tmp2, tmp3, tmp4;
-  real      errorU, errorVt, errorA;
-  uint      res;
-  uint      k;
-
-  Acopy = init_amatrix(&tmp1, A->rows, A->cols);
   copy_amatrix(false, A, Acopy);
 
-  k = UINT_MIN(A->rows, A->cols);
-  Utmp = init_amatrix(&tmp2, A->rows, k);
-  Vttmp = init_amatrix(&tmp3, k, A->cols);
-  E = init_amatrix(&tmp4, k, k);
+  /* Set up auxiliary matrix */
+  T = init_tridiag(&tmp1, k);
 
-  res = svd_amatrix(A, sigma, Utmp, Vttmp);
-  if (res != 0) {
-    (void) printf("SVD failed\n");
-    abort();
-  }
+  /* Bidiagonalize A */
+  sb_bidiagonalize_amatrix(A, T, Utmp, Vttmp);
 
   if (U)
     copy_amatrix(false, Utmp, U);
@@ -2121,25 +2182,204 @@ svd_verified_amatrix(pamatrix A, pavector sigma, pamatrix U, pamatrix Vt)
   if (Vt)
     copy_amatrix(false, Vttmp, Vt);
 
-  errorU = check_ortho_amatrix(false, Utmp);
-  errorVt = check_ortho_amatrix(true, Vttmp);
+  /* Check bidiagonalization */
+  norm = normfrob_amatrix(Acopy);
 
-  diagmul_amatrix(1.0, false, Utmp, sigma);
-  addmul_amatrix(-1.0, false, Utmp, false, Vttmp, Acopy);
-  errorA = normfrob_amatrix(Acopy) / normfrob_amatrix(A);
+  copy_amatrix(false, Utmp, UT);
+  lowereval_tridiag_amatrix(1.0, true, T, true, UT);
 
-  if (errorU > H2_SVD_TOL || errorVt > H2_SVD_TOL || errorA > H2_SVD_TOL) {
-    (void) printf("SVD WARNING: errorU %.4g, errorVt %.4g, errorA %.4g\n",
-		  errorU, errorVt, errorA);
-    /*
-       abort();
-     */
-  }
+  addmul_amatrix(-1.0, false, UT, false, Vttmp, Acopy);
 
-  uninit_amatrix(E);
+  error = normfrob_amatrix(Acopy);
+
+  if (error > H2_CHECK_TOLERANCE * norm)
+    (void) printf("  ### Poor bidiagonalization accuracy, %g\n",
+		  error / norm);
+
+  /* Compute SVD of bidiagonal matrix */
+  iter = sb_mulsvd_tridiag(T, U, Vt, maxiter);
+
+  if (maxiter > 0 && iter >= maxiter)
+    (void) printf("  ## SVD iteration did not converge after %u steps\n",
+		  iter);
+
+  /* Copy singular values */
+  for (i = 0; i < k; i++)
+    sigma->v[i] = T->d[i];
+
+  /* Clean up */
+  uninit_tridiag(T);
+  uninit_amatrix(UT);
   uninit_amatrix(Vttmp);
   uninit_amatrix(Utmp);
   uninit_amatrix(Acopy);
+#else
+  tridiag   tmp;
+  ptridiag  T;
+  uint      k;
+  uint      iter;
+  uint      i;
 
-  return res;
+  k = UINT_MIN(A->rows, A->cols);
+
+  if (k < 1)			/* Quick exit */
+    return 0;
+
+  /* Set up auxiliary matrix */
+  T = init_tridiag(&tmp, k);
+
+  /* Bidiagonalize A */
+  sb_bidiagonalize_amatrix(A, T, U, Vt);
+
+  /* Compute SVD of bidiagonal matrix */
+  iter = sb_mulsvd_tridiag(T, U, Vt, maxiter);
+
+  /* Copy singular values */
+  for (i = 0; i < k; i++)
+    sigma->v[i] = T->d[i];
+
+  /* Clean up */
+  uninit_tridiag(T);
+#endif
+
+  return iter;
 }
+
+#ifdef USE_BLAS
+#if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
+uint
+svd_amatrix(pamatrix A, prealavector sigma, pamatrix U, pamatrix Vt)
+{
+  pfield    work;
+  unsigned  lwork;
+#ifdef USE_COMPLEX
+  preal     rwork;
+#endif
+  int       info = 0;
+
+  assert(sigma->dim >= UINT_MIN(A->rows, A->cols));
+
+  if (A->rows > 0 && A->cols > 0) {
+    lwork = 10 * UINT_MAX(A->rows, A->cols);
+    work = allocfield(lwork);
+#ifdef USE_COMPLEX
+    rwork = allocreal(5 * UINT_MIN(A->rows, A->cols));
+
+    h2_gesvd((U ? _h2_skinnyvectors : _h2_novectors),
+	     (Vt ? _h2_skinnyvectors : _h2_novectors),
+	     &A->rows, &A->cols,
+	     A->a, &A->ld,
+	     sigma->v,
+	     (U ? U->a : NULL), (U ? &U->ld : &u_one),
+	     (Vt ? Vt->a : NULL), (Vt ? &Vt->ld : &u_one),
+	     work, &lwork, rwork, &info);
+
+    freemem(rwork);
+#else
+    h2_gesvd((U ? _h2_skinnyvectors : _h2_novectors),
+	     (Vt ? _h2_skinnyvectors : _h2_novectors),
+	     &A->rows, &A->cols,
+	     A->a, &A->ld,
+	     sigma->v,
+	     (U ? U->a : NULL), (U ? &U->ld : &u_one),
+	     (Vt ? Vt->a : NULL), (Vt ? &Vt->ld : &u_one),
+	     work, &lwork, &info);
+#endif
+
+    freemem(work);
+  }
+
+  return (info != 0);
+}
+#else
+uint
+svd_amatrix(pamatrix A, prealavector sigma, pamatrix U, pamatrix Vt)
+{
+  tridiag   tmp;
+  ptridiag  T;
+  uint      size;
+  uint      info;
+  uint      i;
+
+  size = UINT_MIN(A->rows, A->cols);
+
+  /* Set up auxiliary matrix */
+  T = init_tridiag(&tmp, size);
+
+  /* Bidiagonalize A */
+  bidiagonalize_amatrix(A, T, U, Vt);
+
+  /* Compute SVD of bidiagonal matrix */
+  info = mulsvd_tridiag(T, U, Vt);
+
+  /* Copy singular values */
+  for (i = 0; i < size; i++)
+    sigma->v[i] = T->d[i];
+
+  /* Clean up */
+  uninit_tridiag(T);
+
+  return info;
+}
+#endif
+#else
+uint
+svd_amatrix(pamatrix A, prealavector sigma, pamatrix U, pamatrix Vt)
+{
+#ifdef RUNTIME_CHECK_EIGENSOLVERS
+  uint      iter, maxiter;
+  pamatrix  Acopy, Utmp, Vttmp;
+  amatrix   tmp1, tmp2, tmp3;
+  real      norm, error;
+  uint      k;
+
+  k = UINT_MIN(A->rows, A->cols);
+
+  if (k < 1)			/* Quick exit */
+    return 0;
+
+  Acopy = init_amatrix(&tmp1, A->rows, A->cols);
+  copy_amatrix(false, A, Acopy);
+
+  Utmp = init_amatrix(&tmp2, A->rows, k);
+  Vttmp = init_amatrix(&tmp3, k, A->cols);
+
+  maxiter = 32 * k;
+
+  iter = sb_svd_amatrix(A, sigma, Utmp, Vttmp, maxiter);
+
+  if (U)
+    copy_amatrix(false, Utmp, U);
+  if (Vt)
+    copy_amatrix(false, Vttmp, Vt);
+
+  norm = normfrob_amatrix(Acopy);
+
+  diageval_realavector_amatrix(1.0, true, sigma, true, Utmp);
+  addmul_amatrix(-1.0, false, Utmp, false, Vttmp, Acopy);
+
+  error = normfrob_amatrix(Acopy);
+
+  if (error > H2_CHECK_TOLERANCE * norm)
+    (void) printf("  ### Poor SVD accuracy, %g\n", error / norm);
+
+  uninit_amatrix(Vttmp);
+  uninit_amatrix(Utmp);
+  uninit_amatrix(Acopy);
+#else
+  uint      iter, maxiter;
+  uint      k;
+
+  k = UINT_MIN(A->rows, A->cols);
+
+  if (k < 1)			/* Quick exit */
+    return 0;
+
+  maxiter = 32 * k;
+
+  iter = sb_svd_amatrix(A, sigma, U, Vt, maxiter);
+#endif
+
+  return !(iter < maxiter);
+}
+#endif

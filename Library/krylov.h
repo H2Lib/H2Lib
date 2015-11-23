@@ -38,6 +38,26 @@
 typedef void (*addeval_t)(field alpha, void *matrix,
 			  pcavector x, pavector y);
 
+/** @brief Matrix callback.
+ *
+ *  Used to evaluate the system matrix @f$A@f$ or its adjoint,
+ *  i.e., to perform @f$y \gets y + \alpha A x@f$.
+ *
+ *  Compared to @ref addeval_t, callbacks of this type allow us
+ *  to evaluate both the matrix and its adjoint.
+ *
+ *  Functions like @ref mvm_amatrix_avector,
+ *  @ref mvm_hmatrix_avector, @ref mvm_h2matrix_avector, or
+ *  @ref addeval_sparsematrix_avector can be cast to <tt>mvm_t</tt>.
+ *
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param trans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param matrix Matrix data describing @f$A@f$.
+ *  @param x Source vector @f$x@f$.
+ *  @param y Target vector @f$y@f$. */
+typedef void (*mvm_t)(field alpha, bool trans, void *matrix,
+		      pcavector x, pavector y);
+
 /** @brief Preconditioner callback.
  *
  *  Used to apply a precondtioner to a vector, i.e., to perform
@@ -51,6 +71,10 @@ typedef void (*addeval_t)(field alpha, void *matrix,
  *  @param pdata Preconditioner data describing @f$N@f$.
  *  @param r Source vector, will be overwritten by result. */
 typedef void (*prcd_t)(void *pdata, pavector r);
+
+/* ------------------------------------------------------------
+ * Conjugate gradients method (cg)
+ * ------------------------------------------------------------ */
 
 /** @brief Initialize a standard conjugate gradient method to
  *  solve @f$A x = b@f$.
@@ -110,6 +134,10 @@ evalfunctional_cg(addeval_t addeval,
 		  pcavector x,
 		  pcavector r);
 
+/* ------------------------------------------------------------
+ * Preconditioned conjugate gradients method (pcg)
+ * ------------------------------------------------------------ */
+
 /** @brief Initialize a preconditioned conjugate gradient method
  *  to solve @f$N^{1/2} A N^{1/2} \widehat{x} = N^{1/2} b@f$
  *  with @f$x = N^{1/2} \widehat{x}@f$.
@@ -166,110 +194,9 @@ step_pcg(addeval_t addeval,
 	 pavector p,		/* Search direction */
 	 pavector a);
 
-/** @brief Initialize a biconjugate gradient method
- *
- *  @param addeval Callback function name
- *  @param addevaltrans Callback function name
- *  @param matrix untyped pointer to matrix data
- *  @param b Right-hand side.
- *  @param x Approximate solution.
- *  @param r Residual b-Ax
- *  @param rt Adjoint residual
- *  @param p Search direction
- *  @param pt Adjoint search direction
- *  @param a auxiliary vector
- *  @param at auxiliary vector
- */
-HEADER_PREFIX void
-init_bicg(addeval_t addeval,
-	  addeval_t addevaltrans,
-	  void *matrix,
-	  pcavector b,		/* Right-hand side */
-	  pavector x,		/* Approximate solution */
-	  pavector r,		/* Residual b-Ax */
-	  pavector rt,		/* Adjoint residual */
-	  pavector p,		/* Search direction */
-	  pavector pt,		/* Adjoint search direction */
-	  pavector a,
-	  pavector at);
-
-/** @brief One step a biconjugate gradient method
- *
- *  @param addeval Callback function name
- *  @param addevaltrans Callback function name
- *  @param matrix untyped pointer to matrix data
- *  @param b Right-hand side.
- *  @param x Approximate solution.
- *  @param r Residual b-Ax
- *  @param rt Adjoint residual
- *  @param p Search direction
- *  @param pt Adjoint search direction
- *  @param a auxiliary vector
- *  @param at auxiliary vector
- */
-HEADER_PREFIX void
-step_bicg(addeval_t addeval,
-	  addeval_t addevaltrans,
-	  void *matrix,
-	  pcavector b,		/* Right-hand side */
-	  pavector x,		/* Approximate solution */
-	  pavector r,		/* Residual b-Ax */
-	  pavector rt,		/* Adjoint residual */
-	  pavector p,		/* Search direction */
-	  pavector pt,		/* Adjoint search direction */
-	  pavector a,
-	  pavector at);
-
-/** @brief Initialize a stabilized biconjugate gradient method
- *
- *  @param addeval Callback function name
- *  @param matrix untyped pointer to matrix data
- *  @param b Right-hand side.
- *  @param x Approximate solution.
- *  @param r Residual b-Ax
- *  @param rt Adjoint residual
- *  @param p Search direction
- *  @param a auxiliary vector
- *  @param as auxiliary vector
- */
-HEADER_PREFIX void
-init_bicgstab(addeval_t addeval,
-	      void *matrix,
-	      pcavector b,	/* Right-hand side */
-	      pavector x,	/* Approximate solution */
-	      pavector r,	/* Residual b-Ax */
-	      pavector rt,	/* Adjoint residual */
-	      pavector p,	/* Search direction */
-	      pavector a,
-	      pavector as);
-
-
-/** @brief One step a stabilized biconjugate gradient method
- *
- *  @param addeval Callback function name
- *  @param matrix untyped pointer to matrix data
- *  @param b Right-hand side.
- *  @param x Approximate solution.
- *  @param r Residual b-Ax
- *  @param rt Adjoint residual
- *  @param p Search direction
- *  @param a auxiliary vector
- *  @param as auxiliary vector
- */ 
-HEADER_PREFIX void
-step_bicgstab(addeval_t addeval,
-	      void *matrix,
-	      pcavector b,	/* Right-hand side */
-	      pavector x,	/* Approximate solution */
-	      pavector r,	/* Residual b-Ax */
-	      pavector rt,	/* Adjoint residual */
-	      pavector p,	/* Search direction */
-	      pavector a,
-	      pavector as);
-
 /* ------------------------------------------------------------
-   Generalized minimal residual method (GMRES)
-   ------------------------------------------------------------ */
+ * Generalized minimal residual method (GMRES)
+ * ------------------------------------------------------------ */
 
 /** @brief Initialize GMRES.
  *
@@ -295,7 +222,7 @@ step_bicgstab(addeval_t addeval,
  *         transformed matrix @f$Q_{k+1}^* A Q_k@f$.
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
-void
+HEADER_PREFIX void
 init_gmres(addeval_t addeval,
 	   void *matrix,
 	   pcavector b, pavector x,
@@ -331,7 +258,7 @@ init_gmres(addeval_t addeval,
  *         transformed matrix @f$Q_{k+1}^* A Q_k@f$.
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
-void
+HEADER_PREFIX void
 step_gmres(addeval_t addeval,
 	   void *matrix,
 	   pcavector b, pavector x,
@@ -361,16 +288,25 @@ step_gmres(addeval_t addeval,
  *         transformed matrix @f$Q_{k+1}^* A Q_k@f$.
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
-void
+HEADER_PREFIX void
 finish_gmres(addeval_t addeval,
 	     void *matrix,
 	     pcavector b, pavector x,
 	     pavector rhat, pavector q,
 	     uint *kk, pamatrix qr, pavector tau);
 
+/** @brief Returns norm of current residual vector.
+ *
+ *  @param rhat Transformed residual. The absolute value of
+ *         <tt>rhat[k]</tt> is the Euclidean norm of the residual.
+ *  @param k Current dimension of the Krylov space.
+ *  @returns Norm of the residual. */
+HEADER_PREFIX real
+residualnorm_gmres(pcavector rhat, uint k);
+
 /* ------------------------------------------------------------
-   Preconditioned generalized minimal residual method (GMRES)
-   ------------------------------------------------------------ */
+ * Preconditioned generalized minimal residual method (GMRES)
+ * ------------------------------------------------------------ */
 
 /** @brief Initialize preconditioned GMRES.
  *
@@ -399,7 +335,7 @@ finish_gmres(addeval_t addeval,
  *         transformed matrix @f$Q_{k+1}^* A Q_k@f$.
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
-void
+HEADER_PREFIX void
 init_pgmres(addeval_t addeval,
 	    void *matrix,
 	    prcd_t prcd,
@@ -440,7 +376,7 @@ init_pgmres(addeval_t addeval,
  *         transformed matrix @f$Q_{k+1}^* A Q_k@f$.
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
-void
+HEADER_PREFIX void
 step_pgmres(addeval_t addeval,
 	    void *matrix,
 	    prcd_t prcd,
@@ -475,7 +411,7 @@ step_pgmres(addeval_t addeval,
  *         transformed matrix @f$Q_{k+1}^* A Q_k@f$.
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
-void
+HEADER_PREFIX void
 finish_pgmres(addeval_t addeval,
 	      void *matrix,
 	      prcd_t prcd,
@@ -483,6 +419,16 @@ finish_pgmres(addeval_t addeval,
 	      pcavector b, pavector x,
 	      pavector rhat, pavector q,
 	      uint *kk, pamatrix qr, pavector tau);
+
+/** @brief Returns norm of current preconditioned residual vector.
+ *
+ *  @param rhat Transformed residual. The absolute value of
+ *         <tt>rhat[k]</tt> is the Euclidean norm of the
+ *         preconditioned residual.
+ *  @param k Current dimension of the Krylov space.
+ *  @returns Norm of the residual. */
+HEADER_PREFIX real
+residualnorm_pgmres(pcavector rhat, uint k);
 
 /** @} */
 

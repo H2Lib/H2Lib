@@ -1,12 +1,18 @@
 /* ------------------------------------------------------------
- This is the file "harith.c" of the H2Lib package.
- All rights reserved, Steffen Boerm 2014
- ------------------------------------------------------------ */
+ * This is the file "harith.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2014
+ * ------------------------------------------------------------ */
 
 #include "harith.h"
 #include "basic.h"
 #include "eigensolvers.h"
 #include "factorizations.h"
+
+/* Quick exit if a rank zero matrix is added? (handled in options.inc) */
+/* #define HARITH_RKMATRIX_QUICK_EXIT */
+
+/* Quick exit if a dense zero matrix is added? (handled in options.inc) */
+/* #define HARITH_AMATRIX_QUICK_EXIT */
 
 /* ------------------------------------------------------------
  * Truncation of an rkmatrix
@@ -19,12 +25,11 @@ static void
 trunc_ab_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
 {
   amatrix   tmp1, tmp2, tmp3;
-  avector   tmp4, tmp5;
+  realavector tmp4;
   pamatrix  a, b, c, u, vt;
-  pavector  sigma, ac;
+  prealavector sigma;
   uint      rows, cols;
   uint      k1, knew;
-  uint      i;
 
   assert(r->A.cols == r->k);
   assert(r->B.cols == r->k);
@@ -43,7 +48,7 @@ trunc_ab_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   /* Compute singular value decomposition */
   u = init_amatrix(&tmp2, rows, k1);
   vt = init_amatrix(&tmp3, k1, cols);
-  sigma = init_avector(&tmp4, k1);
+  sigma = init_realavector(&tmp4, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -57,14 +62,10 @@ trunc_ab_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   copy_sub_amatrix(true, vt, &r->B);
 
   /* Scale singular vectors */
-  for (i = 0; i < knew; i++) {
-    ac = init_column_avector(&tmp5, &r->A, i);
-    scale_avector(sigma->v[i], ac);
-    uninit_avector(ac);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, &r->A);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -78,12 +79,13 @@ static void
 trunc_qb_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4;
-  avector   tmp5, tmp6;
+  avector   tmp5;
+  realavector tmp6;
   pamatrix  a, b, c, a1, u, vt;
-  pavector  tau, sigma, bc;
+  pavector  tau;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, kr, k1, knew;
-  uint      i;
 
   assert(r->A.cols == r->k);
   assert(r->B.cols == r->k);
@@ -112,7 +114,7 @@ trunc_qb_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   k1 = UINT_MIN(cols, kr);
   u = init_amatrix(&tmp2, cols, k1);
   vt = init_amatrix(&tmp3, k1, kr);
-  sigma = init_avector(&tmp6, k1);
+  sigma = init_realavector(&tmp6, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -126,17 +128,13 @@ trunc_qb_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   clear_amatrix(&r->A);
   copy_sub_amatrix(true, vt, &r->A);
   qreval_amatrix(false, a, tau, &r->A);
+  uninit_avector(tau);
 
   /* Scale singular vectors */
-  uninit_avector(tau);
-  for (i = 0; i < knew; i++) {
-    bc = init_column_avector(&tmp5, &r->B, i);
-    scale_avector(sigma->v[i], bc);
-    uninit_avector(bc);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, &r->B);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -151,12 +149,13 @@ static void
 trunc_aq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4;
-  avector   tmp5, tmp6;
+  avector   tmp5;
+  realavector tmp6;
   pamatrix  a, b, c, b1, u, vt;
-  pavector  tau, sigma, ac;
+  pavector  tau;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, kc, k1, knew;
-  uint      i;
 
   assert(r->A.cols == r->k);
   assert(r->B.cols == r->k);
@@ -185,7 +184,7 @@ trunc_aq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   k1 = UINT_MIN(rows, kc);
   u = init_amatrix(&tmp2, rows, k1);
   vt = init_amatrix(&tmp3, k1, kc);
-  sigma = init_avector(&tmp6, k1);
+  sigma = init_realavector(&tmp6, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -199,17 +198,13 @@ trunc_aq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   clear_amatrix(&r->B);
   copy_sub_amatrix(true, vt, &r->B);
   qreval_amatrix(false, b, tau, &r->B);
+  uninit_avector(tau);
 
   /* Scale singular vectors */
-  uninit_avector(tau);
-  for (i = 0; i < knew; i++) {
-    ac = init_column_avector(&tmp5, &r->A, i);
-    scale_avector(sigma->v[i], ac);
-    uninit_avector(ac);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, &r->A);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -224,12 +219,13 @@ static void
 trunc_qq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4, tmp5;
-  avector   tmp6, tmp7, tmp8, tmp9;
+  avector   tmp6, tmp7;
+  realavector tmp8;
   pamatrix  a, b, c, a1, b1, u, vt;
-  pavector  atau, btau, sigma, ac;
+  pavector  atau, btau;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, ak, bk, k1, knew;
-  uint      i;
 
   assert(r->A.cols == r->k);
   assert(r->B.cols == r->k);
@@ -267,7 +263,7 @@ trunc_qq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   k1 = UINT_MIN(ak, bk);
   u = init_amatrix(&tmp4, ak, k1);
   vt = init_amatrix(&tmp5, k1, bk);
-  sigma = init_avector(&tmp8, k1);
+  sigma = init_realavector(&tmp8, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -277,11 +273,7 @@ trunc_qq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   setrank_rkmatrix(r, knew);
 
   /* Scale singular vectors */
-  for (i = 0; i < knew; i++) {
-    ac = init_column_avector(&tmp9, u, i);
-    scale_avector(sigma->v[i], ac);
-    uninit_avector(ac);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, u);
 
   /* Copy singular vectors */
   clear_amatrix(&r->A);
@@ -294,7 +286,7 @@ trunc_qq_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
   qreval_amatrix(false, b, btau, &r->B);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -311,6 +303,11 @@ trunc_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
 
   assert(r->A.cols == r->k);
   assert(r->B.cols == r->k);
+
+#ifdef HARITH_RKMATRIX_QUICK_EXIT
+  if (r->k == 0)
+    return;
+#endif
 
   rows = r->A.rows;
   cols = r->B.rows;
@@ -336,8 +333,159 @@ trunc_rkmatrix(pctruncmode tm, real eps, prkmatrix r)
 }
 
 /* ------------------------------------------------------------
- Truncated addition of an rkmatrix to another rkmatrix.
- ------------------------------------------------------------ */
+ * Truncated addition of an amatrix to an rkmatrix.
+ * ------------------------------------------------------------ */
+
+void
+add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
+		     real eps, prkmatrix b)
+{
+  amatrix   tmp1, tmp2, tmp3;
+  realavector tmp4;
+  pamatrix  z, u, vt;
+  prealavector sigma;
+  uint      rows, cols, k, knew;
+
+#ifdef HARITH_AMATRIX_QUICK_EXIT
+  if (normfrob_amatrix(a) == 0.0)
+    return;
+#endif
+
+  if (atrans) {
+    assert(a->rows == b->B.rows);
+    assert(a->cols == b->A.rows);
+  }
+  else {
+    assert(a->rows == b->A.rows);
+    assert(a->cols == b->B.rows);
+  }
+
+  rows = b->A.rows;
+  cols = b->B.rows;
+
+  z = init_amatrix(&tmp1, rows, cols);
+
+  /* Compute sum */
+  if (atrans)
+    copy_amatrix(true, a, z);
+  else
+    copy_amatrix(false, a, z);
+  addmul_amatrix(alpha, false, &b->A, true, &b->B, z);
+
+  /* Find singular value decomposition of Z */
+  k = UINT_MIN(rows, cols);
+  u = init_amatrix(&tmp2, rows, k);
+  vt = init_amatrix(&tmp3, k, cols);
+  sigma = init_realavector(&tmp4, k);
+  svd_amatrix(z, sigma, u, vt);
+
+  /* Determine rank */
+  knew = findrank_truncmode(tm, eps, sigma);
+
+  /* Set new rank */
+  setrank_rkmatrix(b, knew);
+
+  /* Scale singular vectors */
+  diageval_realavector_amatrix(1.0, true, sigma, true, u);
+
+  /* Copy singular vectors */
+  clear_amatrix(&b->A);
+  copy_amatrix(false, u, &b->A);
+  clear_amatrix(&b->B);
+  copy_amatrix(true, vt, &b->B);
+
+  /* Clean up */
+  uninit_realavector(sigma);
+  uninit_amatrix(vt);
+  uninit_amatrix(u);
+  uninit_amatrix(z);
+}
+
+/* ------------------------------------------------------------
+ * Add an rkmatrix to an amatrix
+ * ------------------------------------------------------------ */
+
+void
+add_rkmatrix_amatrix(field alpha, bool atrans, pcrkmatrix a, pamatrix b)
+{
+#ifdef HARITH_RKMATRIX_QUICK_EXIT
+  if (a->k == 0)
+    return;
+#endif
+
+  if (atrans) {
+    assert(a->B.rows == b->rows);
+    assert(a->A.rows == b->cols);
+
+    if (a->k > 0)
+      addmul_amatrix(alpha, false, &a->B, true, &a->A, b);
+  }
+  else {
+    assert(a->A.rows == b->rows);
+    assert(a->B.rows == b->cols);
+
+    if (a->k > 0)
+      addmul_amatrix(alpha, false, &a->A, true, &a->B, b);
+  }
+}
+
+/* ------------------------------------------------------------
+ * Add an hmatrix to an amatrix
+ * ------------------------------------------------------------ */
+
+void
+add_hmatrix_amatrix(field alpha, bool atrans, pchmatrix a, pamatrix b)
+{
+  amatrix   tmp;
+  pamatrix  b1;
+  uint      rsons, csons;
+  uint      i, j;
+  uint      roff, coff;
+
+  if (atrans) {
+    assert(a->rc->size == b->cols);
+    assert(a->cc->size == b->rows);
+  }
+  else {
+    assert(a->rc->size == b->rows);
+    assert(a->cc->size == b->cols);
+  }
+
+  if (a->f)
+    add_amatrix(alpha, atrans, a->f, b);
+  else if (a->r)
+    add_rkmatrix_amatrix(alpha, atrans, a->r, b);
+  else {
+    rsons = a->rsons;
+    csons = a->csons;
+
+    coff = 0;
+    for (j = 0; j < csons; j++) {
+      roff = 0;
+      for (i = 0; i < rsons; i++) {
+	b1 = (atrans ?
+	      init_sub_amatrix(&tmp, b, a->son[i + j * rsons]->cc->size, coff,
+			       a->son[i + j * rsons]->rc->size, roff) :
+	      init_sub_amatrix(&tmp, b, a->son[i + j * rsons]->rc->size, roff,
+			       a->son[i + j * rsons]->cc->size, coff));
+
+	add_hmatrix_amatrix(alpha, atrans, a->son[i + j * rsons], b1);
+
+	uninit_amatrix(b1);
+
+	roff += a->son[i]->rc->size;
+      }
+      assert(roff == a->rc->size);
+
+      coff += a->son[j * rsons]->cc->size;
+    }
+    assert(coff == a->cc->size);
+  }
+}
+
+/* ------------------------------------------------------------
+ * Truncated addition of an rkmatrix to another rkmatrix.
+ * ------------------------------------------------------------ */
 
 /* First version: Set up A and B and apply SVD directly to A B^*.
  * This approach is only advisable if the rank is high compared to
@@ -347,12 +495,11 @@ add_ab_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
 		real eps, prkmatrix trg)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4, tmp5;
-  avector   tmp6, tmp7;
+  realavector tmp6;
   pamatrix  a, b, c, a1, b1, u, vt;
-  pavector  sigma, ac;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, k1, knew;
-  uint      i;
 
   rows = trg->A.rows;
   cols = trg->B.rows;
@@ -367,8 +514,9 @@ add_ab_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
 
   a1 = init_sub_amatrix(&tmp3, a, rows, 0, src->k, 0);
   copy_amatrix(false, &src->A, a1);
-  if (alpha != 1.0)
+  if (alpha != 1.0) {
     scale_amatrix(alpha, a1);
+  }
   uninit_amatrix(a1);
 
   b1 = init_sub_amatrix(&tmp3, b, cols, 0, src->k, 0);
@@ -392,7 +540,7 @@ add_ab_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   /* Compute singular value decomposition */
   u = init_amatrix(&tmp4, rows, k1);
   vt = init_amatrix(&tmp5, k1, cols);
-  sigma = init_avector(&tmp6, k1);
+  sigma = init_realavector(&tmp6, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -406,14 +554,10 @@ add_ab_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   copy_sub_amatrix(true, vt, &trg->B);
 
   /* Scale singular vectors */
-  for (i = 0; i < knew; i++) {
-    ac = init_column_avector(&tmp7, &trg->A, i);
-    scale_avector(sigma->v[i], ac);
-    uninit_avector(ac);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, &trg->A);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -430,12 +574,13 @@ add_qb_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
 		real eps, prkmatrix trg)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4, tmp5;
-  avector   tmp6, tmp7;
+  avector   tmp6;
+  realavector tmp7;
   pamatrix  a, b, c, a1, b1, u, vt;
-  pavector  tau, sigma, bc;
+  pavector  tau;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, kr, k1, knew;
-  uint      i;
 
   rows = trg->A.rows;
   cols = trg->B.rows;
@@ -481,7 +626,7 @@ add_qb_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   k1 = UINT_MIN(cols, kr);
   u = init_amatrix(&tmp3, cols, k1);
   vt = init_amatrix(&tmp4, k1, kr);
-  sigma = init_avector(&tmp7, k1);
+  sigma = init_realavector(&tmp7, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -495,17 +640,13 @@ add_qb_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   clear_amatrix(&trg->A);
   copy_sub_amatrix(true, vt, &trg->A);
   qreval_amatrix(false, a, tau, &trg->A);
+  uninit_avector(tau);
 
   /* Scale singular vectors */
-  uninit_avector(tau);
-  for (i = 0; i < knew; i++) {
-    bc = init_column_avector(&tmp6, &trg->B, i);
-    scale_avector(sigma->v[i], bc);
-    uninit_avector(bc);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, &trg->B);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -522,12 +663,13 @@ add_aq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
 		real eps, prkmatrix trg)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4, tmp5;
-  avector   tmp6, tmp7;
+  avector   tmp6;
+  realavector tmp7;
   pamatrix  a, b, c, a1, b1, u, vt;
-  pavector  tau, sigma, ac;
+  pavector  tau;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, kc, k1, knew;
-  uint      i;
 
   rows = trg->A.rows;
   cols = trg->B.rows;
@@ -573,7 +715,7 @@ add_aq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   k1 = UINT_MIN(rows, kc);
   u = init_amatrix(&tmp3, rows, k1);
   vt = init_amatrix(&tmp4, k1, kc);
-  sigma = init_avector(&tmp7, k1);
+  sigma = init_realavector(&tmp7, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -587,17 +729,13 @@ add_aq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   clear_amatrix(&trg->B);
   copy_sub_amatrix(true, vt, &trg->B);
   qreval_amatrix(false, b, tau, &trg->B);
+  uninit_avector(tau);
 
   /* Scale singular vectors */
-  uninit_avector(tau);
-  for (i = 0; i < knew; i++) {
-    ac = init_column_avector(&tmp6, &trg->A, i);
-    scale_avector(sigma->v[i], ac);
-    uninit_avector(ac);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, &trg->A);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -614,12 +752,13 @@ add_qq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
 		real eps, prkmatrix trg)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4, tmp5;
-  avector   tmp6, tmp7, tmp8, tmp9;
+  avector   tmp6, tmp7;
+  realavector tmp8;
   pamatrix  a, b, c, a1, b1, u, vt;
-  pavector  atau, btau, sigma, ac;
+  pavector  atau, btau;
+  prealavector sigma;
   uint      rows, cols;
   uint      k, ak, bk, k1, knew;
-  uint      i;
 
   rows = trg->A.rows;
   cols = trg->B.rows;
@@ -669,11 +808,11 @@ add_qq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   uninit_amatrix(b1);
   uninit_amatrix(a1);
 
-  /* Find singular value decomposition of Z */
+  /* Find singular value decomposition of C */
   k1 = UINT_MIN(ak, bk);
   u = init_amatrix(&tmp4, ak, k1);
   vt = init_amatrix(&tmp5, k1, bk);
-  sigma = init_avector(&tmp8, k1);
+  sigma = init_realavector(&tmp8, k1);
   svd_amatrix(c, sigma, u, vt);
 
   /* Determine rank */
@@ -683,11 +822,7 @@ add_qq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   setrank_rkmatrix(trg, knew);
 
   /* Scale singular vectors */
-  for (i = 0; i < knew; i++) {
-    ac = init_column_avector(&tmp9, u, i);
-    scale_avector(sigma->v[i], ac);
-    uninit_avector(ac);
-  }
+  diageval_realavector_amatrix(1.0, true, sigma, true, u);
 
   /* Copy singular vectors */
   clear_amatrix(&trg->A);
@@ -700,7 +835,7 @@ add_qq_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm,
   qreval_amatrix(false, b, btau, &trg->B);
 
   /* Clean up */
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
   uninit_amatrix(vt);
   uninit_amatrix(u);
   uninit_amatrix(c);
@@ -718,32 +853,165 @@ add_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm, real eps,
 {
   uint      rows, cols, k;
 
+#ifdef HARITH_RKMATRIX_QUICK_EXIT
+  if (src->k == 0)
+    return;
+#endif
+
   rows = trg->A.rows;
   cols = trg->B.rows;
   k = src->k + trg->k;
 
   /* Choose most efficient truncation algorithm */
   if (k < rows) {
-    if (k < cols)
+    if (k < cols) {
       /* rows and cols large, use QR decomposition for A and B */
       add_qq_rkmatrix(alpha, src, tm, eps, trg);
-    else
+    }
+    else {
       /* rows large, cols small, use QR decomposition for A only */
       add_qb_rkmatrix(alpha, src, tm, eps, trg);
+    }
   }
   else {
-    if (k < cols)
+    if (k < cols) {
       /* rows small, cols large, use QR decomposition for B only */
       add_aq_rkmatrix(alpha, src, tm, eps, trg);
-    else
+    }
+    else {
       /* rows and cols small, no QR decomposition required */
       add_ab_rkmatrix(alpha, src, tm, eps, trg);
+    }
   }
 }
 
 /* ------------------------------------------------------------
- Add rkmatrix to an hmatrix.
- ------------------------------------------------------------ */
+ * Add an amatrix to an hmatrix.
+ * ------------------------------------------------------------ */
+
+void
+add_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
+		    real eps, phmatrix b)
+{
+  amatrix   tmp;
+  phmatrix  b1;
+  pamatrix  a1;
+  uint      rsons, csons;
+  uint      roff, coff;
+  uint      i, j;
+
+#ifdef HARITH_AMATRIX_QUICK_EXIT
+  if (normfrob_amatrix(a) == 0.0)
+    return;
+#endif
+
+  if (b->r)
+    add_amatrix_rkmatrix(alpha, atrans, a, tm, eps, b->r);
+  else if (b->f)
+    add_amatrix(alpha, atrans, a, b->f);
+  else {
+    rsons = b->rsons;
+    csons = b->csons;
+
+    coff = 0;
+    for (j = 0; j < csons; j++) {
+      roff = 0;
+      for (i = 0; i < rsons; i++) {
+	b1 = b->son[i + j * rsons];
+	a1 = init_sub_amatrix(&tmp, (pamatrix) a, b1->rc->size, roff,
+			      b1->cc->size, coff);
+
+	add_amatrix_hmatrix(alpha, atrans, a1, tm, eps, b1);
+
+	uninit_amatrix(a1);
+
+	roff += b1->rc->size;
+      }
+      assert(roff == b->rc->size);
+
+      coff += b->son[j * rsons]->cc->size;
+    }
+    assert(coff == b->cc->size);
+  }
+}
+
+void
+add_lower_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a,
+			  pctruncmode tm, real eps, phmatrix b)
+{
+  amatrix   tmp;
+  pamatrix  a1;
+  phmatrix  b1;
+  uint      sons;
+  uint      roff, coff;
+  uint      i, j;
+
+  assert(b->rc == b->cc);
+
+#ifdef HARITH_AMATRIX_QUICK_EXIT
+  if (normfrob_amatrix(a) == 0.0)
+    return;
+#endif
+
+  if (b->f)
+    add_amatrix(alpha, atrans, a, b->f);
+  else {
+    assert(b->son);
+    assert(b->rsons == b->csons);
+
+    sons = b->rsons;
+
+    coff = 0;
+    for (j = 0; j < sons; j++) {
+      /* Strictly upper triangular part */
+      roff = 0;
+      for (i = 0; i < j; i++) {
+	b1 = b->son[i + j * sons];
+
+	roff += b1->rc->size;
+      }
+
+      /* Diagonal */
+      b1 = b->son[i + j * sons];
+      a1 = (atrans ?
+	    init_sub_amatrix(&tmp, (pamatrix) a, b1->cc->size, coff,
+			     b1->rc->size, roff) :
+	    init_sub_amatrix(&tmp, (pamatrix) a, b1->rc->size, roff,
+			     b1->cc->size, coff));
+
+      add_lower_amatrix_hmatrix(alpha, atrans, a1, tm, eps, b1);
+
+      uninit_amatrix(a1);
+
+      roff += b1->rc->size;
+      i++;
+
+      /* Strictly lower triangular part */
+      for (; i < sons; i++) {
+	b1 = b->son[i + j * sons];
+	a1 = (atrans ?
+	      init_sub_amatrix(&tmp, (pamatrix) a, b1->cc->size, coff,
+			       b1->rc->size, roff) :
+	      init_sub_amatrix(&tmp, (pamatrix) a, b1->rc->size, roff,
+			       b1->cc->size, coff));
+
+	add_amatrix_hmatrix(alpha, atrans, a1, tm, eps, b1);
+
+	uninit_amatrix(a1);
+
+	roff += b1->rc->size;
+      }
+      assert(roff == b->rc->size);
+
+      coff += b->son[j * sons]->cc->size;
+    }
+    assert(coff == b->cc->size);
+  }
+}
+
+/* ------------------------------------------------------------
+ * Add an rkmatrix to an hmatrix.
+ * ------------------------------------------------------------ */
 
 void
 add_rkmatrix_hmatrix(field alpha, pcrkmatrix r, pctruncmode tm, real eps,
@@ -755,6 +1023,11 @@ add_rkmatrix_hmatrix(field alpha, pcrkmatrix r, pctruncmode tm, real eps,
   uint      rsons, csons;
   uint      roff, coff;
   uint      i, j;
+
+#ifdef HARITH_RKMATRIX_QUICK_EXIT
+  if (r->k == 0)
+    return;
+#endif
 
   if (a->r)
     add_rkmatrix(alpha, r, tm, eps, a->r);
@@ -787,31 +1060,140 @@ add_rkmatrix_hmatrix(field alpha, pcrkmatrix r, pctruncmode tm, real eps,
 }
 
 void
+add_lower_rkmatrix_hmatrix(field alpha, pcrkmatrix a, pctruncmode tm,
+			   real eps, phmatrix b)
+{
+  rkmatrix  tmp;
+  pcrkmatrix a1;
+  phmatrix  b1;
+  uint      sons;
+  uint      roff, coff;
+  uint      i, j;
+
+  assert(b->rc == b->cc);
+
+#ifdef HARITH_RKMATRIX_QUICK_EXIT
+  if (a->k == 0)
+    return;
+#endif
+
+  if (b->f)
+    add_rkmatrix_amatrix(alpha, false, a, b->f);
+  else {
+    assert(b->son);
+    assert(b->rsons == b->csons);
+
+    sons = b->rsons;
+
+    coff = 0;
+    for (j = 0; j < sons; j++) {
+      /* Strictly upper triangular part */
+      roff = 0;
+      for (i = 0; i < j; i++) {
+	b1 = b->son[i + j * sons];
+
+	roff += b1->rc->size;
+      }
+
+      /* Diagonal */
+      b1 = b->son[i + j * sons];
+      a1 = init_sub_rkmatrix(&tmp, a, b1->rc->size, roff, b1->cc->size, coff);
+
+      add_lower_rkmatrix_hmatrix(alpha, a1, tm, eps, b1);
+
+      uninit_rkmatrix((prkmatrix) a1);
+
+      roff += b1->rc->size;
+      i++;
+
+      /* Strictly lower triangular part */
+      for (; i < sons; i++) {
+	b1 = b->son[i + j * sons];
+	a1 =
+	  init_sub_rkmatrix(&tmp, a, b1->rc->size, roff, b1->cc->size, coff);
+
+	add_rkmatrix_hmatrix(alpha, a1, tm, eps, b1);
+
+	uninit_rkmatrix((prkmatrix) a1);
+
+	roff += b1->rc->size;
+      }
+      assert(roff == b->rc->size);
+
+      coff += b->son[j * sons]->cc->size;
+    }
+    assert(coff == b->cc->size);
+  }
+}
+
+void
 add_hmatrix(field alpha, pchmatrix a, pctruncmode tm, real eps, phmatrix b)
 {
+  phmatrix  bs;
+  prkmatrix rk;
   uint      rsons, csons;
   uint      i, j;
 
   assert(a->rc == b->rc);
   assert(a->cc == b->cc);
 
-  if (a->r)
+  if (a->r) {
     add_rkmatrix_hmatrix(alpha, a->r, tm, eps, b);
+  }
   else if (a->f) {
-    assert(b->f);		/* Should be generalized */
-    add_amatrix(alpha, false, a->f, b->f);
+    add_amatrix_hmatrix(alpha, false, a->f, tm, eps, b);
   }
   else {
-    assert(a->rsons == b->rsons);	/* Should be generalized */
-    assert(a->csons == b->csons);
+    if (b->son != NULL) {
+      assert(a->rsons == b->rsons);	/* Should be generalized */
+      assert(a->csons == b->csons);
 
-    rsons = a->rsons;
-    csons = a->csons;
+      rsons = a->rsons;
+      csons = a->csons;
 
-    for (j = 0; j < csons; j++)
-      for (i = 0; i < rsons; i++)
-	add_hmatrix(alpha, a->son[i + j * rsons], tm, eps,
-		    b->son[i + j * rsons]);
+      for (j = 0; j < csons; j++) {
+	for (i = 0; i < rsons; i++) {
+	  add_hmatrix(alpha, a->son[i + j * rsons], tm, eps,
+		      b->son[i + j * rsons]);
+	}
+      }
+    }
+    else if (b->r != NULL) {
+      bs = split_rkmatrix(b->r, b->rc, b->cc, a->rsons != b->rsons,
+			  a->csons != b->csons, false);
+
+      rsons = a->rsons;
+      csons = a->csons;
+
+      for (j = 0; j < csons; j++) {
+	for (i = 0; i < rsons; i++) {
+	  add_hmatrix(alpha, a->son[i + j * rsons], tm, eps,
+		      bs->son[i + j * rsons]);
+	}
+      }
+
+      rk = merge_hmatrix_rkmatrix(bs, tm, eps);
+      add_rkmatrix(1.0, rk, tm, eps, b->r);
+
+      del_rkmatrix(rk);
+      del_hmatrix(bs);
+    }
+    else if (b->f != NULL) {
+      bs = split_sub_amatrix(b->f, b->rc, b->cc, a->rsons != b->rsons,
+			     a->csons != b->csons);
+
+      rsons = a->rsons;
+      csons = a->csons;
+
+      for (j = 0; j < csons; j++) {
+	for (i = 0; i < rsons; i++) {
+	  add_hmatrix(alpha, a->son[i + j * rsons], tm, eps,
+		      bs->son[i + j * rsons]);
+	}
+      }
+
+      del_hmatrix(bs);
+    }
   }
 }
 
@@ -820,267 +1202,21 @@ add_hmatrix(field alpha, pchmatrix a, pctruncmode tm, real eps, phmatrix b)
  * ------------------------------------------------------------ */
 
 phmatrix
-split_hmatrix(phmatrix hm, bool rsplit, bool csplit, bool copy)
+split_sub_amatrix(pcamatrix f, pccluster rc, pccluster cc, bool rsplit,
+		  bool csplit)
 {
   phmatrix  s, s1;
-  pamatrix  f1;
-  prkmatrix r1;
-  amatrix   tmp1;
-  rkmatrix  tmp2;
-  pccluster rc, cc;
   uint      rsons, csons;
   uint      roff, coff;
   uint      i, j;
 
-  assert(hm->son == 0);
-
-  rc = hm->rc;
-  cc = hm->cc;
-
   s = 0;
-  if (hm->f) {
-    if (rsplit) {
-      assert(rc->sons > 0);
-      rsons = rc->sons;
 
-      if (csplit) {
-	/* Split full matrix in row and column direction */
-	assert(cc->sons > 0);
-	csons = cc->sons;
-
-	s = new_super_hmatrix(rc, cc, rsons, csons);
-
-	coff = 0;
-	for (j = 0; j < csons; j++) {
-	  roff = 0;
-	  for (i = 0; i < rsons; i++) {
-	    s1 = new_full_hmatrix(rc->son[i], cc->son[j]);
-
-	    if (copy) {
-	      f1 = init_sub_amatrix(&tmp1, hm->f, rc->son[i]->size, roff,
-				    cc->son[j]->size, coff);
-	      copy_amatrix(false, f1, s1->f);
-	      uninit_amatrix(f1);
-	    }
-	    else
-	      clear_amatrix(s1->f);
-
-	    ref_hmatrix(s->son + i + j * rsons, s1);
-
-	    roff += rc->son[i]->size;
-	  }
-	  assert(roff == rc->size);
-
-	  coff += cc->son[j]->size;
-	}
-	assert(coff == cc->size);
-      }
-      else {
-	/* Split full matrix in row direction */
-	s = new_super_hmatrix(rc, cc, rsons, 1);
-
-	roff = 0;
-	for (i = 0; i < rsons; i++) {
-	  s1 = new_full_hmatrix(rc->son[i], cc);
-
-	  if (copy) {
-	    f1 = init_sub_amatrix(&tmp1, hm->f, rc->son[i]->size, roff,
-				  cc->size, 0);
-	    copy_amatrix(false, f1, s1->f);
-	    uninit_amatrix(f1);
-	  }
-	  else
-	    clear_amatrix(s1->f);
-
-	  ref_hmatrix(s->son + i, s1);
-
-	  roff += rc->son[i]->size;
-	}
-	assert(roff == rc->size);
-      }
-    }
-    else {
-      if (csplit) {
-	/* Split full matrix in column direction */
-	assert(cc->sons > 0);
-	csons = cc->sons;
-
-	s = new_super_hmatrix(rc, cc, 1, csons);
-
-	coff = 0;
-	for (j = 0; j < csons; j++) {
-	  s1 = new_full_hmatrix(rc, cc->son[j]);
-
-	  if (copy) {
-	    f1 = init_sub_amatrix(&tmp1, hm->f, rc->size, 0, cc->son[j]->size,
-				  coff);
-	    copy_amatrix(false, f1, s1->f);
-	    uninit_amatrix(f1);
-	  }
-	  else
-	    clear_amatrix(s1->f);
-
-	  ref_hmatrix(s->son + j, s1);
-
-	  coff += cc->son[j]->size;
-	}
-	assert(coff == cc->size);
-      }
-      else {
-	/* Do not split full matrix at all */
-	s = new_super_hmatrix(rc, cc, 1, 1);
-
-	s1 = new_full_hmatrix(rc, cc);
-
-	if (copy)
-	  copy_amatrix(false, hm->f, s1->f);
-	else
-	  clear_amatrix(s1->f);
-
-	ref_hmatrix(s->son, s1);
-      }
-    }
-  }
-  else {
-    assert(hm->r);
-
-    if (rsplit) {
-      assert(rc->sons > 0);
-      rsons = rc->sons;
-
-      if (csplit) {
-	/* Split rk matrix in row and column direction */
-	assert(cc->sons > 0);
-	csons = cc->sons;
-
-	s = new_super_hmatrix(rc, cc, rsons, csons);
-
-	coff = 0;
-	for (j = 0; j < csons; j++) {
-	  roff = 0;
-	  for (i = 0; i < rsons; i++) {
-	    s1 = 0;
-	    if (copy) {
-	      s1 = new_rk_hmatrix(rc->son[i], cc->son[j], hm->r->k);
-
-	      r1 =
-		(prkmatrix) init_sub_rkmatrix(&tmp2, hm->r, rc->son[i]->size,
-					      roff, cc->son[j]->size, coff);
-	      copy_rkmatrix(false, r1, s1->r);
-	      uninit_rkmatrix(r1);
-	    }
-	    else
-	      s1 = new_rk_hmatrix(rc->son[i], cc->son[j], 0);
-
-	    ref_hmatrix(s->son + i + j * rsons, s1);
-
-	    roff += rc->son[i]->size;
-	  }
-	  assert(roff == rc->size);
-
-	  coff += cc->son[j]->size;
-	}
-	assert(coff == cc->size);
-      }
-      else {
-	/* Split rk matrix in row direction */
-	s = new_super_hmatrix(rc, cc, rsons, 1);
-
-	roff = 0;
-	for (i = 0; i < rsons; i++) {
-	  s1 = 0;
-	  if (copy) {
-	    s1 = new_rk_hmatrix(rc->son[i], cc, hm->r->k);
-
-	    r1 = (prkmatrix) init_sub_rkmatrix(&tmp2, hm->r, rc->son[i]->size,
-					       roff, cc->size, 0);
-	    copy_rkmatrix(false, r1, s1->r);
-	    uninit_rkmatrix(r1);
-	  }
-	  else
-	    s1 = new_rk_hmatrix(rc->son[i], cc, 0);
-
-	  ref_hmatrix(s->son + i, s1);
-
-	  roff += rc->son[i]->size;
-	}
-	assert(roff == rc->size);
-      }
-    }
-    else {
-      if (csplit) {
-	/* Split rk matrix in column direction */
-	assert(cc->sons > 0);
-	csons = cc->sons;
-
-	s = new_super_hmatrix(rc, cc, 1, csons);
-
-	coff = 0;
-	for (j = 0; j < csons; j++) {
-	  s1 = 0;
-	  if (copy) {
-	    s1 = new_rk_hmatrix(rc, cc->son[j], hm->r->k);
-
-	    r1 = (prkmatrix) init_sub_rkmatrix(&tmp2, hm->r, rc->size, 0,
-					       cc->son[j]->size, coff);
-	    copy_rkmatrix(false, r1, s1->r);
-	    uninit_rkmatrix(r1);
-	  }
-	  else
-	    s1 = new_rk_hmatrix(rc, cc->son[j], 0);
-
-	  ref_hmatrix(s->son + j, s1);
-
-	  coff += cc->son[j]->size;
-	}
-	assert(coff == cc->size);
-      }
-      else {
-	/* Do not split rk matrix at all */
-	s = new_super_hmatrix(rc, cc, 1, 1);
-
-	if (copy) {
-	  s1 = new_rk_hmatrix(rc, cc, hm->r->k);
-
-	  copy_rkmatrix(false, hm->r, s1->r);
-	}
-	else
-	  s1 = new_rk_hmatrix(rc, cc, 0);
-
-	ref_hmatrix(s->son, s1);
-      }
-    }
-  }
-
-  update_hmatrix(s);
-
-  return s;
-}
-
-phmatrix
-split_sub_hmatrix(phmatrix hm, bool rsplit, bool csplit)
-{
-  phmatrix  s, s1;
-  pamatrix  f;
-  pccluster rc, cc;
-  uint      rsons, csons;
-  uint      roff, coff;
-  uint      i, j;
-
-  assert(hm->f != 0);
-
-  rc = hm->rc;
-  cc = hm->cc;
-  f = hm->f;
-
-  s = 0;
-  if (rsplit) {
-    assert(rc->sons > 0);
+  if (rsplit && rc->sons > 0) {
     rsons = rc->sons;
 
-    if (csplit) {
+    if (csplit && cc->sons > 0) {
       /* Split full matrix in row and column direction */
-      assert(cc->sons > 0);
       csons = cc->sons;
 
       s = new_super_hmatrix(rc, cc, rsons, csons);
@@ -1090,9 +1226,8 @@ split_sub_hmatrix(phmatrix hm, bool rsplit, bool csplit)
 	roff = 0;
 	for (i = 0; i < rsons; i++) {
 	  s1 = new_hmatrix(rc->son[i], cc->son[j]);
-
-	  s1->f = new_sub_amatrix(f, rc->son[i]->size, roff, cc->son[j]->size,
-				  coff);
+	  s1->f = new_sub_amatrix((pamatrix) f, rc->son[i]->size, roff,
+				  cc->son[j]->size, coff);
 	  s1->desc = 1;
 
 	  ref_hmatrix(s->son + i + j * rsons, s1);
@@ -1112,8 +1247,8 @@ split_sub_hmatrix(phmatrix hm, bool rsplit, bool csplit)
       roff = 0;
       for (i = 0; i < rsons; i++) {
 	s1 = new_hmatrix(rc->son[i], cc);
-
-	s1->f = new_sub_amatrix(f, rc->son[i]->size, roff, cc->size, 0);
+	s1->f =
+	  new_sub_amatrix((pamatrix) f, rc->son[i]->size, roff, cc->size, 0);
 	s1->desc = 1;
 
 	ref_hmatrix(s->son + i, s1);
@@ -1124,9 +1259,8 @@ split_sub_hmatrix(phmatrix hm, bool rsplit, bool csplit)
     }
   }
   else {
-    if (csplit) {
+    if (csplit && cc->sons > 0) {
       /* Split full matrix in column direction */
-      assert(cc->sons > 0);
       csons = cc->sons;
 
       s = new_super_hmatrix(rc, cc, 1, csons);
@@ -1134,8 +1268,8 @@ split_sub_hmatrix(phmatrix hm, bool rsplit, bool csplit)
       coff = 0;
       for (j = 0; j < csons; j++) {
 	s1 = new_hmatrix(rc, cc->son[j]);
-
-	s1->f = new_sub_amatrix(f, rc->size, 0, cc->son[j]->size, coff);
+	s1->f = new_sub_amatrix((pamatrix) f, rc->size, 0, cc->son[j]->size,
+				coff);
 	s1->desc = 1;
 
 	ref_hmatrix(s->son + j, s1);
@@ -1149,8 +1283,227 @@ split_sub_hmatrix(phmatrix hm, bool rsplit, bool csplit)
       s = new_super_hmatrix(rc, cc, 1, 1);
 
       s1 = new_hmatrix(rc, cc);
+      s1->f = new_sub_amatrix((pamatrix) f, rc->size, 0, cc->size, 0);
+      s1->desc = 1;
 
-      s1->f = new_sub_amatrix(f, rc->size, 0, cc->size, 0);
+      ref_hmatrix(s->son, s1);
+    }
+  }
+
+  update_hmatrix(s);
+
+  return s;
+}
+
+phmatrix
+split_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc, bool rsplit,
+	       bool csplit, bool copy)
+{
+  phmatrix  s, s1;
+  prkmatrix r1;
+  rkmatrix  tmp;
+  uint      rsons, csons;
+  uint      roff, coff;
+  uint      i, j;
+
+  s = 0;
+
+  if (rsplit && rc->sons > 0) {
+    rsons = rc->sons;
+
+    if (csplit && cc->sons > 0) {
+      /* Split rk matrix in row and column direction */
+      csons = cc->sons;
+
+      s = new_super_hmatrix(rc, cc, rsons, csons);
+
+      coff = 0;
+      for (j = 0; j < csons; j++) {
+	roff = 0;
+	for (i = 0; i < rsons; i++) {
+	  s1 = 0;
+	  if (copy) {
+	    s1 = new_rk_hmatrix(rc->son[i], cc->son[j], r->k);
+
+	    r1 =
+	      (prkmatrix) init_sub_rkmatrix(&tmp, r, rc->son[i]->size, roff,
+					    cc->son[j]->size, coff);
+	    copy_rkmatrix(false, r1, s1->r);
+	    uninit_rkmatrix(r1);
+	  }
+	  else
+	    s1 = new_rk_hmatrix(rc->son[i], cc->son[j], 0);
+
+	  ref_hmatrix(s->son + i + j * rsons, s1);
+
+	  roff += rc->son[i]->size;
+	}
+	assert(roff == rc->size);
+
+	coff += cc->son[j]->size;
+      }
+      assert(coff == cc->size);
+    }
+    else {
+      /* Split rk matrix in row direction */
+      s = new_super_hmatrix(rc, cc, rsons, 1);
+
+      roff = 0;
+      for (i = 0; i < rsons; i++) {
+	s1 = 0;
+	if (copy) {
+	  s1 = new_rk_hmatrix(rc->son[i], cc, r->k);
+
+	  r1 = (prkmatrix) init_sub_rkmatrix(&tmp, r, rc->son[i]->size, roff,
+					     cc->size, 0);
+	  copy_rkmatrix(false, r1, s1->r);
+	  uninit_rkmatrix(r1);
+	}
+	else
+	  s1 = new_rk_hmatrix(rc->son[i], cc, 0);
+
+	ref_hmatrix(s->son + i, s1);
+
+	roff += rc->son[i]->size;
+      }
+      assert(roff == rc->size);
+    }
+  }
+  else {
+    if (csplit && cc->sons > 0) {
+      /* Split rk matrix in column direction */
+      csons = cc->sons;
+
+      s = new_super_hmatrix(rc, cc, 1, csons);
+
+      coff = 0;
+      for (j = 0; j < csons; j++) {
+	s1 = 0;
+	if (copy) {
+	  s1 = new_rk_hmatrix(rc, cc->son[j], r->k);
+
+	  r1 = (prkmatrix) init_sub_rkmatrix(&tmp, r, rc->size, 0,
+					     cc->son[j]->size, coff);
+	  copy_rkmatrix(false, r1, s1->r);
+	  uninit_rkmatrix(r1);
+	}
+	else
+	  s1 = new_rk_hmatrix(rc, cc->son[j], 0);
+
+	ref_hmatrix(s->son + j, s1);
+
+	coff += cc->son[j]->size;
+      }
+      assert(coff == cc->size);
+    }
+    else {
+      /* Do not split rk matrix at all */
+      s = new_super_hmatrix(rc, cc, 1, 1);
+
+      if (copy) {
+	s1 = new_rk_hmatrix(rc, cc, r->k);
+
+	copy_rkmatrix(false, r, s1->r);
+      }
+      else
+	s1 = new_rk_hmatrix(rc, cc, 0);
+
+      ref_hmatrix(s->son, s1);
+    }
+  }
+
+  update_hmatrix(s);
+
+  return s;
+}
+
+phmatrix
+split_sub_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc,
+		   bool rsplit, bool csplit)
+{
+  phmatrix  s, s1;
+  uint      rsons, csons;
+  uint      roff, coff;
+  uint      i, j;
+
+  s = 0;
+
+  if (rsplit && rc->sons > 0) {
+    rsons = rc->sons;
+
+    if (csplit && cc->sons > 0) {
+      /* Split rk matrix in row and column direction */
+      csons = cc->sons;
+
+      s = new_super_hmatrix(rc, cc, rsons, csons);
+
+      coff = 0;
+      for (j = 0; j < csons; j++) {
+	roff = 0;
+	for (i = 0; i < rsons; i++) {
+	  s1 = new_hmatrix(rc->son[i], cc->son[j]);
+
+	  s1->r = (prkmatrix) new_sub_rkmatrix(r, rc->son[i]->size, roff,
+					       cc->son[j]->size, coff);
+	  s1->desc = 1;
+
+	  ref_hmatrix(s->son + i + j * rsons, s1);
+
+	  roff += rc->son[i]->size;
+	}
+	assert(roff == rc->size);
+
+	coff += cc->son[j]->size;
+      }
+      assert(coff == cc->size);
+    }
+    else {
+      /* Split rk matrix in row direction */
+      s = new_super_hmatrix(rc, cc, rsons, 1);
+
+      roff = 0;
+      for (i = 0; i < rsons; i++) {
+	s1 = new_hmatrix(rc->son[i], cc);
+
+	s1->r = (prkmatrix) new_sub_rkmatrix(r, rc->son[i]->size, roff,
+					     cc->size, 0);
+	s1->desc = 1;
+
+	ref_hmatrix(s->son + i, s1);
+
+	roff += rc->son[i]->size;
+      }
+      assert(roff == rc->size);
+    }
+  }
+  else {
+    if (csplit && cc->sons > 0) {
+      /* Split rk matrix in column direction */
+      csons = cc->sons;
+
+      s = new_super_hmatrix(rc, cc, 1, csons);
+
+      coff = 0;
+      for (j = 0; j < csons; j++) {
+	s1 = new_hmatrix(rc, cc->son[j]);
+
+	s1->r = (prkmatrix) new_sub_rkmatrix(r, rc->size, 0, cc->son[j]->size,
+					     coff);
+	s1->desc = 1;
+
+	ref_hmatrix(s->son + j, s1);
+
+	coff += cc->son[j]->size;
+      }
+      assert(coff == cc->size);
+    }
+    else {
+      /* Do not split rk matrix at all */
+      s = new_super_hmatrix(rc, cc, 1, 1);
+
+      s1 = new_hmatrix(rc, cc);
+
+      s1->r = (prkmatrix) new_sub_rkmatrix(r, rc->size, 0, cc->size, 0);
       s1->desc = 1;
 
       ref_hmatrix(s->son, s1);
@@ -1171,13 +1524,14 @@ merge_aq_rkmatrix(bool colmerge, pcrkmatrix src, pctruncmode tm,
 		  real eps, prkmatrix trg)
 {
   amatrix   tmp1, tmp2, tmp3, tmp4, tmp5, tmp6;
-  avector   tmp7, tmp8, tmp9;
+  avector   tmp7, tmp8;
+  realavector tmp9;
   pamatrix  a, a1, a2, a1r, a2r, b, b1, b2, b1r, b2r;
   pamatrix  c, c1, u, u1, vt, v1, vt1;
-  pavector  tau1, tau2, sigma, ac;
+  pavector  tau1, tau2;
+  prealavector sigma;
   uint      rows, cols, rows1, rows2, cols1, cols2;
   uint      k, k1, k2, kk, kmax, knew;
-  uint      i;
 
   if (colmerge) {
     assert(src->B.rows == trg->B.rows);
@@ -1247,7 +1601,7 @@ merge_aq_rkmatrix(bool colmerge, pcrkmatrix src, pctruncmode tm,
     kmax = UINT_MIN(kk, cols);
     u = init_amatrix(&tmp1, cols, kmax);
     vt = init_amatrix(&tmp2, kmax, kk);
-    sigma = init_avector(&tmp9, kmax);
+    sigma = init_realavector(&tmp9, kmax);
     svd_amatrix(c, sigma, u, vt);
 
     /* Determine rank */
@@ -1295,14 +1649,10 @@ merge_aq_rkmatrix(bool colmerge, pcrkmatrix src, pctruncmode tm,
     uninit_amatrix(a1);
 
     /* Scale singular vectors */
-    for (i = 0; i < knew; i++) {
-      ac = init_column_avector(&tmp7, &trg->B, i);
-      scale_avector(sigma->v[i], ac);
-      uninit_avector(ac);
-    }
+    diageval_realavector_amatrix(1.0, true, sigma, true, &trg->B);
 
     /* Final clean-up */
-    uninit_avector(sigma);
+    uninit_realavector(sigma);
     uninit_amatrix(c);
   }
   else {
@@ -1373,7 +1723,7 @@ merge_aq_rkmatrix(bool colmerge, pcrkmatrix src, pctruncmode tm,
     kmax = UINT_MIN(kk, rows);
     u = init_amatrix(&tmp1, rows, kmax);
     vt = init_amatrix(&tmp2, kmax, kk);
-    sigma = init_avector(&tmp9, kmax);
+    sigma = init_realavector(&tmp9, kmax);
     svd_amatrix(c, sigma, u, vt);
 
     /* Determine rank */
@@ -1421,14 +1771,10 @@ merge_aq_rkmatrix(bool colmerge, pcrkmatrix src, pctruncmode tm,
     uninit_amatrix(b1);
 
     /* Scale singular vectors */
-    for (i = 0; i < knew; i++) {
-      ac = init_column_avector(&tmp7, &trg->A, i);
-      scale_avector(sigma->v[i], ac);
-      uninit_avector(ac);
-    }
+    diageval_realavector_amatrix(1.0, true, sigma, true, &trg->A);
 
     /* Final clean-up */
-    uninit_avector(sigma);
+    uninit_realavector(sigma);
     uninit_amatrix(c);
   }
 }
@@ -1511,8 +1857,8 @@ merge_hmatrix_rkmatrix(pchmatrix s, pctruncmode tm, real eps)
 }
 
 /* ------------------------------------------------------------
- Multiply an rkmatrix by an amatrix.
- ------------------------------------------------------------ */
+ * Multiply an rkmatrix by an amatrix.
+ * ------------------------------------------------------------ */
 
 void
 addmul_rkmatrix_amatrix_amatrix(field alpha, bool xtrans, pcrkmatrix x,
@@ -1601,8 +1947,8 @@ addmul_rkmatrix_amatrix_amatrix(field alpha, bool xtrans, pcrkmatrix x,
 }
 
 /* ------------------------------------------------------------
- Multiply an hmatrix by an amatrix.
- ------------------------------------------------------------ */
+ * Multiply an hmatrix by an amatrix.
+ * ------------------------------------------------------------ */
 
 /* First version: Multiply by A. */
 static void
@@ -1624,10 +1970,12 @@ addmul_n_hmatrix_amatrix_amatrix(field alpha, pchmatrix a,
 				    cp);
   }
   else if (a->f) {
-    if (ctrans)
+    if (ctrans) {
       addmul_amatrix(CONJ(alpha), !btrans, bp, true, a->f, cp);
-    else
+    }
+    else {
       addmul_amatrix(alpha, false, a->f, btrans, bp, cp);
+    }
   }
   else {
     rsons = a->rsons;
@@ -1736,6 +2084,7 @@ addmul_hmatrix_amatrix_amatrix(field alpha, bool atrans, pchmatrix a,
 			       bool btrans, pcamatrix bp, bool ctrans,
 			       pamatrix cp)
 {
+
   if (atrans) {
     if (btrans) {
       assert(bp->cols == a->rc->size);
@@ -1785,8 +2134,8 @@ addmul_hmatrix_amatrix_amatrix(field alpha, bool atrans, pchmatrix a,
 }
 
 /* ------------------------------------------------------------
- Multiply two hmatrices.
- ------------------------------------------------------------ */
+ * Multiply two hmatrices.
+ * ------------------------------------------------------------ */
 
 static void
 addmul_nn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
@@ -1815,7 +2164,8 @@ addmul_nn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
   if (x->f) {
     xf = x->f;
     if (z->f)			/* Z = Z + X Y   <=>   Z^* = Z^* + Y^* X^* */
-      addmul_hmatrix_amatrix_amatrix(alpha, true, y, true, xf, true, z->f);
+      addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, true, xf, true,
+				     z->f);
     else {
       if (xf->rows > xf->cols) {
 	/* Compute rkmatrix X Y = X (Y^* I^*)^* */
@@ -1824,7 +2174,7 @@ addmul_nn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	id = init_amatrix(&tmp2, xf->cols, xf->cols);
 	identity_amatrix(id);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, true, y, true, id, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, true, id, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -1839,7 +2189,7 @@ addmul_nn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	xy = init_rkmatrix(&tmp1, rc->size, cc->size, xf->rows);
 	identity_amatrix(&xy->A);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, true, y, true, xf, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, true, xf, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -1855,8 +2205,8 @@ addmul_nn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
     xy = init_rkmatrix(&tmp1, rc->size, cc->size, x->r->k);
     copy_amatrix(false, &x->r->A, &xy->A);
     clear_amatrix(&xy->B);
-    addmul_hmatrix_amatrix_amatrix(alpha, true, y, false, &x->r->B, false,
-				   &xy->B);
+    addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, false, &x->r->B,
+				   false, &xy->B);
 
     /* Add rkmatrix to Z */
     add_rkmatrix_hmatrix(1.0, xy, tm, eps, z);
@@ -2028,8 +2378,8 @@ addmul_nn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	}
       }
       else if (z->r) {
-	ztmp = split_hmatrix(z, (x->rc != x->son[0]->rc),
-			     (y->cc != y->son[0]->cc), false);
+	ztmp = split_rkmatrix(z->r, z->rc, z->cc, (x->rc != x->son[0]->rc),
+			      (y->cc != y->son[0]->cc), false);
 
 	for (k = 0; k < csons; k++)
 	  for (i = 0; i < rsons; i++)
@@ -2083,7 +2433,8 @@ addmul_nt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
   if (x->f) {
     xf = x->f;
     if (z->f)			/* Z = Z + X Y^*   <=>   Z^* = Z^* + Y X^* */
-      addmul_hmatrix_amatrix_amatrix(alpha, false, y, true, xf, true, z->f);
+      addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, true, xf, true,
+				     z->f);
     else {
       if (xf->rows > xf->cols) {
 	/* Compute rkmatrix X Y^* = X (Y I^*)^* */
@@ -2092,7 +2443,7 @@ addmul_nt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	id = init_amatrix(&tmp2, xf->cols, xf->cols);
 	identity_amatrix(id);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, false, y, true, id, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, true, id, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -2107,7 +2458,7 @@ addmul_nt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	xy = init_rkmatrix(&tmp1, rc->size, cc->size, xf->rows);
 	identity_amatrix(&xy->A);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, false, y, true, xf, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, true, xf, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -2123,8 +2474,8 @@ addmul_nt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
     xy = init_rkmatrix(&tmp1, rc->size, cc->size, x->r->k);
     copy_amatrix(false, &x->r->A, &xy->A);
     clear_amatrix(&xy->B);
-    addmul_hmatrix_amatrix_amatrix(alpha, false, y, false, &x->r->B, false,
-				   &xy->B);
+    addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, false, &x->r->B,
+				   false, &xy->B);
 
     /* Add rkmatrix to Z */
     add_rkmatrix_hmatrix(1.0, xy, tm, eps, z);
@@ -2296,8 +2647,8 @@ addmul_nt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	}
       }
       else if (z->r) {
-	ztmp = split_hmatrix(z, (x->rc != x->son[0]->rc),
-			     (y->rc != y->son[0]->rc), false);
+	ztmp = split_rkmatrix(z->r, z->rc, z->cc, (x->rc != x->son[0]->rc),
+			      (y->rc != y->son[0]->rc), false);
 
 	for (k = 0; k < csons; k++)
 	  for (i = 0; i < rsons; i++)
@@ -2351,7 +2702,8 @@ addmul_tn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
   if (x->f) {
     xf = x->f;
     if (z->f)			/* Z = Z + X^* Y   <=>   Z^* = Z^* + Y^* X */
-      addmul_hmatrix_amatrix_amatrix(alpha, true, y, false, xf, true, z->f);
+      addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, false, xf, true,
+				     z->f);
     else {
       if (xf->rows < xf->cols) {
 	/* Compute rkmatrix X^* Y = X^* (Y^* I^*)^* */
@@ -2360,7 +2712,7 @@ addmul_tn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	id = init_amatrix(&tmp2, xf->rows, xf->rows);
 	identity_amatrix(id);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, true, y, true, id, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, true, id, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -2375,7 +2727,7 @@ addmul_tn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	xy = init_rkmatrix(&tmp1, rc->size, cc->size, xf->cols);
 	identity_amatrix(&xy->A);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, true, y, false, xf, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, false, xf, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -2391,8 +2743,8 @@ addmul_tn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
     xy = init_rkmatrix(&tmp1, rc->size, cc->size, x->r->k);
     copy_amatrix(false, &x->r->B, &xy->A);
     clear_amatrix(&xy->B);
-    addmul_hmatrix_amatrix_amatrix(alpha, true, y, false, &x->r->A, false,
-				   &xy->B);
+    addmul_hmatrix_amatrix_amatrix(CONJ(alpha), true, y, false, &x->r->A,
+				   false, &xy->B);
 
     /* Add rkmatrix to Z */
     add_rkmatrix_hmatrix(1.0, xy, tm, eps, z);
@@ -2564,8 +2916,8 @@ addmul_tn_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	}
       }
       else if (z->r) {
-	ztmp = split_hmatrix(z, (x->cc != x->son[0]->cc),
-			     (y->cc != y->son[0]->cc), false);
+	ztmp = split_rkmatrix(z->r, z->rc, z->cc, (x->cc != x->son[0]->cc),
+			      (y->cc != y->son[0]->cc), false);
 
 	for (k = 0; k < csons; k++)
 	  for (i = 0; i < rsons; i++)
@@ -2619,7 +2971,8 @@ addmul_tt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
   if (x->f) {
     xf = x->f;
     if (z->f)			/* Z = Z + X^* Y^*   <=>   Z^* = Z^* + Y X */
-      addmul_hmatrix_amatrix_amatrix(alpha, false, y, false, xf, true, z->f);
+      addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, false, xf, true,
+				     z->f);
     else {
       if (xf->rows < xf->cols) {
 	/* Compute rkmatrix X^* Y^* = X^* (Y I^*)^* */
@@ -2628,7 +2981,7 @@ addmul_tt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	id = init_amatrix(&tmp2, xf->rows, xf->rows);
 	identity_amatrix(id);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, false, y, true, id, false,
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, true, id, false,
 				       &xy->B);
 
 	/* Add rkmatrix to Z */
@@ -2643,8 +2996,8 @@ addmul_tt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	xy = init_rkmatrix(&tmp1, rc->size, cc->size, xf->cols);
 	identity_amatrix(&xy->A);
 	clear_amatrix(&xy->B);
-	addmul_hmatrix_amatrix_amatrix(alpha, false, y, false, xf, false,
-				       &xy->B);
+	addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, false, xf,
+				       false, &xy->B);
 
 	/* Add rkmatrix to Z */
 	add_rkmatrix_hmatrix(1.0, xy, tm, eps, z);
@@ -2659,8 +3012,8 @@ addmul_tt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
     xy = init_rkmatrix(&tmp1, rc->size, cc->size, x->r->k);
     copy_amatrix(false, &x->r->B, &xy->A);
     clear_amatrix(&xy->B);
-    addmul_hmatrix_amatrix_amatrix(alpha, false, y, false, &x->r->A, false,
-				   &xy->B);
+    addmul_hmatrix_amatrix_amatrix(CONJ(alpha), false, y, false, &x->r->A,
+				   false, &xy->B);
 
     /* Add rkmatrix to Z */
     add_rkmatrix_hmatrix(1.0, xy, tm, eps, z);
@@ -2831,8 +3184,8 @@ addmul_tt_hmatrix(field alpha, pchmatrix x, pchmatrix y,
 	}
       }
       else if (z->r) {
-	ztmp = split_hmatrix(z, (x->cc != x->son[0]->cc),
-			     (y->rc != y->son[0]->rc), false);
+	ztmp = split_rkmatrix(z->r, z->rc, z->cc, (x->cc != x->son[0]->cc),
+			      (y->rc != y->son[0]->rc), false);
 
 	for (k = 0; k < csons; k++)
 	  for (i = 0; i < rsons; i++)
@@ -2877,6 +3230,267 @@ addmul_hmatrix(field alpha, bool xtrans, pchmatrix x, bool ytrans,
   }
 }
 
+void
+addmul_lower_hmatrix(field alpha, bool xtrans, pchmatrix x, bool ytrans,
+		     pchmatrix y, pctruncmode tm, real eps, phmatrix z)
+{
+  amatrix   tmp1;
+  rkmatrix  tmp2;
+  pamatrix  xf, yf, mf;
+  prkmatrix xr, yr, mr;
+  phmatrix  ztmp;
+  uint      sons, msons;
+  uint      i, j, k;
+
+  assert(z->rc == z->cc);
+
+  if (x->f) {
+    xf = x->f;
+    if (xtrans) {
+      if (xf->cols <= xf->rows) {
+	/* Compute M = X^* Y = (Y^* X)^* */
+	mf = init_amatrix(&tmp1, xf->cols,
+			  (ytrans ? y->rc->size : y->cc->size));
+	clear_amatrix(mf);
+	addmul_hmatrix_amatrix_amatrix(1.0, !ytrans, y, !xtrans, xf, true,
+				       mf);
+	add_lower_amatrix_hmatrix(alpha, false, mf, tm, eps, z);
+	uninit_amatrix(mf);
+      }
+      else {
+	/* Compute M = X^* Y = X^* (Y^*)^* */
+	mr = init_rkmatrix(&tmp2, xf->cols,
+			   (ytrans ? y->rc->size : y->cc->size), xf->rows);
+	copy_amatrix(true, xf, &mr->A);
+	clear_amatrix(&mr->B);
+	add_hmatrix_amatrix(1.0, !ytrans, y, &mr->B);
+	add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+	uninit_rkmatrix(mr);
+      }
+    }
+    else {
+      if (xf->rows <= xf->cols) {
+	/* Compute M = X Y = (Y^* X^*)^* */
+	mf = init_amatrix(&tmp1, xf->rows,
+			  (ytrans ? y->rc->size : y->cc->size));
+	clear_amatrix(mf);
+	addmul_hmatrix_amatrix_amatrix(1.0, !ytrans, y, !xtrans, xf, true,
+				       mf);
+	add_lower_amatrix_hmatrix(alpha, false, mf, tm, eps, z);
+	uninit_amatrix(mf);
+      }
+      else {
+	/* Compute M = X Y = X (Y^*)^* */
+	mr = init_rkmatrix(&tmp2, xf->rows,
+			   (ytrans ? y->rc->size : y->cc->size), xf->cols);
+	copy_amatrix(false, xf, &mr->A);
+	clear_amatrix(&mr->B);
+	add_hmatrix_amatrix(1.0, !ytrans, y, &mr->B);
+	add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+	uninit_rkmatrix(mr);
+      }
+    }
+  }
+  else if (y->f) {
+    yf = y->f;
+    if (ytrans) {
+      if (yf->rows <= yf->cols) {
+	/* Compute M = X Y^* */
+	mf = init_amatrix(&tmp1, (xtrans ? x->cc->size : x->rc->size),
+			  yf->rows);
+	clear_amatrix(mf);
+	addmul_hmatrix_amatrix_amatrix(1.0, xtrans, x, ytrans, yf, false, mf);
+	add_lower_amatrix_hmatrix(alpha, false, mf, tm, eps, z);
+	uninit_amatrix(mf);
+      }
+      else {
+	/* Compute M = X Y^* */
+	mr = init_rkmatrix(&tmp2, (xtrans ? x->cc->size : x->rc->size),
+			   yf->rows, yf->cols);
+	clear_amatrix(&mr->A);
+	add_hmatrix_amatrix(1.0, xtrans, x, &mr->A);
+	copy_amatrix(false, yf, &mr->B);
+	add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+	uninit_rkmatrix(mr);
+      }
+    }
+    else {
+      if (yf->cols <= yf->rows) {
+	/* Compute M = X Y */
+	mf = init_amatrix(&tmp1, (xtrans ? x->cc->size : x->rc->size),
+			  yf->cols);
+	clear_amatrix(mf);
+	addmul_hmatrix_amatrix_amatrix(1.0, xtrans, x, ytrans, yf, false, mf);
+	add_lower_amatrix_hmatrix(alpha, false, mf, tm, eps, z);
+	uninit_amatrix(mf);
+      }
+      else {
+	/* Compute M = X Y = X (Y^*)^* */
+	mr = init_rkmatrix(&tmp2, (xtrans ? x->cc->size : x->rc->size),
+			   yf->cols, yf->rows);
+	clear_amatrix(&mr->A);
+	add_hmatrix_amatrix(1.0, xtrans, x, &mr->A);
+	copy_amatrix(true, yf, &mr->B);
+	add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+	uninit_rkmatrix(mr);
+      }
+    }
+  }
+  else if (x->r) {
+    xr = x->r;
+    if (xtrans) {
+      /* Compute M = B A^* Y = B (Y^* A)^*, where X = A B^* */
+      mr = init_rkmatrix(&tmp2, x->cc->size,
+			 (ytrans ? y->rc->size : y->cc->size), xr->k);
+      copy_amatrix(false, &xr->B, &mr->A);
+      clear_amatrix(&mr->B);
+      addmul_hmatrix_amatrix_amatrix(1.0, !ytrans, y, false, &xr->A, false,
+				     &mr->B);
+      add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+      uninit_rkmatrix(mr);
+    }
+    else {
+      /* Compute M = A B^* Y = A (Y^* B)^*, where X = A B^* */
+      mr = init_rkmatrix(&tmp2, x->rc->size,
+			 (ytrans ? y->rc->size : y->cc->size), xr->k);
+      copy_amatrix(false, &xr->A, &mr->A);
+      clear_amatrix(&mr->B);
+      addmul_hmatrix_amatrix_amatrix(1.0, !ytrans, y, false, &xr->B, false,
+				     &mr->B);
+      add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+      uninit_rkmatrix(mr);
+    }
+  }
+  else if (y->r) {
+    yr = y->r;
+    if (ytrans) {
+      /* Compute M = X B A^* = (X B) A^*, where Y = A B^* */
+      mr = init_rkmatrix(&tmp2, (xtrans ? x->cc->size : x->rc->size),
+			 y->rc->size, yr->k);
+      clear_amatrix(&mr->A);
+      addmul_hmatrix_amatrix_amatrix(1.0, xtrans, x, false, &yr->B, false,
+				     &mr->A);
+      copy_amatrix(false, &yr->A, &mr->B);
+      add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+      uninit_rkmatrix(mr);
+    }
+    else {
+      /* Compute M = X A B^* = (X A) B^*, where Y = A B^* */
+      mr = init_rkmatrix(&tmp2, (xtrans ? x->cc->size : x->rc->size),
+			 y->cc->size, yr->k);
+      clear_amatrix(&mr->A);
+      addmul_hmatrix_amatrix_amatrix(1.0, xtrans, x, false, &yr->A, false,
+				     &mr->A);
+      copy_amatrix(false, &yr->B, &mr->B);
+      add_lower_rkmatrix_hmatrix(alpha, mr, tm, eps, z);
+      uninit_rkmatrix(mr);
+    }
+  }
+  else {
+    assert(x->son);
+    assert(y->son);
+
+    ztmp = z;
+    if (ztmp->son == 0) {
+      assert(z->f);
+      ztmp = split_sub_amatrix(z->f, z->rc, z->cc,
+			       (xtrans ? x->son[0]->cc !=
+				x->cc : x->son[0]->rc != x->rc),
+			       (ytrans ? y->son[0]->rc !=
+				y->rc : y->son[0]->cc != y->cc));
+    }
+
+    assert(ztmp->rsons == ztmp->csons);
+    sons = ztmp->rsons;
+
+    if (xtrans) {
+      assert(x->csons == ztmp->rsons);
+      if (ytrans) {
+	assert(x->rsons == y->csons);
+	assert(y->rsons == ztmp->csons);
+
+	msons = x->rsons;
+
+	for (i = 0; i < sons; i++) {
+	  for (j = 0; j < i; j++)
+	    for (k = 0; k < msons; k++)
+	      addmul_hmatrix(alpha, xtrans, x->son[k + i * x->rsons], ytrans,
+			     y->son[j + k * y->rsons], tm, eps,
+			     ztmp->son[i + j * sons]);
+
+	  for (k = 0; k < msons; k++)
+	    addmul_lower_hmatrix(alpha, xtrans, x->son[k + i * x->rsons],
+				 ytrans, y->son[j + k * y->rsons], tm, eps,
+				 ztmp->son[i + j * sons]);
+	}
+      }
+      else {
+	assert(x->rsons == y->rsons);
+	assert(y->csons == ztmp->csons);
+
+	msons = x->rsons;
+
+	for (i = 0; i < sons; i++) {
+	  for (j = 0; j < i; j++)
+	    for (k = 0; k < msons; k++)
+	      addmul_hmatrix(alpha, xtrans, x->son[k + i * x->rsons], ytrans,
+			     y->son[j + k * y->rsons], tm, eps,
+			     ztmp->son[i + j * sons]);
+
+	  for (k = 0; k < msons; k++)
+	    addmul_lower_hmatrix(alpha, xtrans, x->son[k + i * x->rsons],
+				 ytrans, y->son[k + j * y->rsons], tm, eps,
+				 ztmp->son[i + j * sons]);
+	}
+      }
+    }
+    else {
+      assert(x->rsons == ztmp->rsons);
+      if (ytrans) {
+	assert(x->csons == y->csons);
+	assert(y->rsons == ztmp->csons);
+
+	msons = x->csons;
+
+	for (i = 0; i < sons; i++) {
+	  for (j = 0; j < i; j++)
+	    for (k = 0; k < msons; k++)
+	      addmul_hmatrix(alpha, xtrans, x->son[i + k * x->rsons], ytrans,
+			     y->son[j + k * y->rsons], tm, eps,
+			     ztmp->son[i + j * sons]);
+
+	  for (k = 0; k < msons; k++)
+	    addmul_lower_hmatrix(alpha, xtrans, x->son[i + k * x->rsons],
+				 ytrans, y->son[j + k * y->rsons], tm, eps,
+				 ztmp->son[i + j * sons]);
+	}
+      }
+      else {
+	assert(x->csons == y->rsons);
+	assert(y->csons == ztmp->csons);
+
+	msons = x->csons;
+
+	for (i = 0; i < sons; i++) {
+	  for (j = 0; j < i; j++)
+	    for (k = 0; k < msons; k++)
+	      addmul_hmatrix(alpha, xtrans, x->son[i + k * x->rsons], ytrans,
+			     y->son[k + j * y->rsons], tm, eps,
+			     ztmp->son[i + j * sons]);
+
+	  for (k = 0; k < msons; k++)
+	    addmul_lower_hmatrix(alpha, xtrans, x->son[i + k * x->rsons],
+				 ytrans, y->son[k + j * y->rsons], tm, eps,
+				 ztmp->son[i + j * sons]);
+	}
+      }
+    }
+
+    if (ztmp != z)
+      del_hmatrix(ztmp);
+  }
+}
+
 /* ------------------------------------------------------------
  * Inversion of an H-matrix
  * ------------------------------------------------------------ */
@@ -2906,16 +3520,20 @@ invert_hmatrix(phmatrix a, phmatrix work, pctruncmode tm, real eps)
       invert_hmatrix(a->son[k + k * sons], work->son[k + k * sons], tm, eps);
 
       /* Compute W_{ik} = A_{ik} A_{kk}^{-1} */
-      for (i = k + 1; i < sons; i++)
+      for (i = k + 1; i < sons; i++) {
+	clear_hmatrix(work->son[i + k * sons]);
 	addmul_hmatrix(1.0, false, a->son[i + k * sons], false,
 		       a->son[k + k * sons], tm, eps,
 		       work->son[i + k * sons]);
+      }
 
       /* Compute W_{kj} = A_{kk}^{-1} A_{kj} */
-      for (j = k + 1; j < sons; j++)
+      for (j = k + 1; j < sons; j++) {
+	clear_hmatrix(work->son[k + j * sons]);
 	addmul_hmatrix(1.0, false, a->son[k + k * sons], false,
 		       a->son[k + j * sons], tm, eps,
 		       work->son[k + j * sons]);
+      }
 
       /* Update Schur complement A_{ij} = A_{ij} - W_{ik} A_{kj} */
       for (j = k + 1; j < sons; j++)
@@ -3277,10 +3895,7 @@ triangularsolve_hmatrix_avector(bool alower, bool aunit, bool atrans,
   for (i = 0; i < n; i++)
     xp->v[i] = x->v[idx[i]];
 
-  if (alower)
-    lowersolve_hmatrix_avector(aunit, atrans, a, xp);
-  else
-    uppersolve_hmatrix_avector(aunit, atrans, a, xp);
+  triangularinvmul_hmatrix_avector(alower, aunit, atrans, a, xp);
 
   for (i = 0; i < n; i++)
     x->v[idx[i]] = xp->v[i];
@@ -3349,8 +3964,9 @@ lowersolve_nt_hmatrix_amatrix(bool aunit, pchmatrix a, pamatrix xp)
   assert(a->rc == a->cc);
   assert(a->cc->size == xp->cols);
 
-  if (a->f)
+  if (a->f) {
     triangularsolve_amatrix(true, aunit, false, a->f, true, xp);
+  }
   else {
     assert(a->son != 0);
     assert(a->rsons == a->csons);
@@ -3486,8 +4102,8 @@ lowersolve_tt_hmatrix_amatrix(bool aunit, pchmatrix a, pamatrix xp)
 }
 
 static void
-tlowersolve_hmatrix_amatrix(bool aunit, bool atrans, pchmatrix a,
-			    bool xtrans, pamatrix xp)
+lowersolve_hmatrix_amatrix(bool aunit, bool atrans, pchmatrix a,
+			   bool xtrans, pamatrix xp)
 {
   if (atrans) {
     if (xtrans)
@@ -3724,7 +4340,7 @@ triangularinvmul_hmatrix_amatrix(bool alower, bool aunit, bool atrans,
 				 pchmatrix a, bool xtrans, pamatrix xp)
 {
   if (alower)
-    tlowersolve_hmatrix_amatrix(aunit, atrans, a, xtrans, xp);
+    lowersolve_hmatrix_amatrix(aunit, atrans, a, xtrans, xp);
   else
     uppersolve_hmatrix_amatrix(aunit, atrans, a, xtrans, xp);
 }
@@ -3746,7 +4362,7 @@ lowersolve_nn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowersolve_nn_hmatrix_amatrix(aunit, a, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -3803,7 +4419,7 @@ lowersolve_nt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowersolve_nn_hmatrix_amatrix(aunit, a, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -3860,7 +4476,7 @@ lowersolve_tn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowersolve_tn_hmatrix_amatrix(aunit, a, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -3917,7 +4533,7 @@ lowersolve_tt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowersolve_tn_hmatrix_amatrix(aunit, a, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -3992,7 +4608,7 @@ uppersolve_nn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppersolve_nn_hmatrix_amatrix(aunit, a, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -4049,7 +4665,7 @@ uppersolve_nt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppersolve_nn_hmatrix_amatrix(aunit, a, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -4106,7 +4722,7 @@ uppersolve_tn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppersolve_tn_hmatrix_amatrix(aunit, a, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -4163,7 +4779,7 @@ uppersolve_tt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppersolve_tn_hmatrix_amatrix(aunit, a, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -4609,10 +5225,7 @@ triangulareval_hmatrix_avector(bool alower, bool aunit, bool atrans,
   for (i = 0; i < n; i++)
     xp->v[i] = x->v[idx[i]];
 
-  if (alower)
-    lowereval_hmatrix_avector(aunit, atrans, a, xp);
-  else
-    uppereval_hmatrix_avector(aunit, atrans, a, xp);
+  triangularmul_hmatrix_avector(alower, aunit, atrans, a, xp);
 
   for (i = 0; i < n; i++)
     x->v[idx[i]] = xp->v[i];
@@ -4898,7 +5511,7 @@ lowereval_nn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowereval_n_hmatrix_amatrix(aunit, a, false, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -4955,7 +5568,7 @@ lowereval_nt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowereval_n_hmatrix_amatrix(aunit, a, false, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -5012,7 +5625,7 @@ lowereval_tn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowereval_t_hmatrix_amatrix(aunit, a, false, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -5069,7 +5682,7 @@ lowereval_tt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     lowereval_t_hmatrix_amatrix(aunit, a, false, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -5144,7 +5757,7 @@ uppereval_nn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppereval_n_hmatrix_amatrix(aunit, a, false, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -5201,7 +5814,7 @@ uppereval_nt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppereval_n_hmatrix_amatrix(aunit, a, false, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -5258,7 +5871,7 @@ uppereval_tn_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppereval_t_hmatrix_amatrix(aunit, a, false, &xp->r->A);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->rc != xp->rc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->rc != xp->rc),
 			       (xp->son[0]->rc != xp->rc));
 
       assert(xp->rsons == atmp->rsons);
@@ -5315,7 +5928,7 @@ uppereval_tt_hmatrix(bool aunit, pchmatrix a, pctruncmode tm,
     uppereval_t_hmatrix_amatrix(aunit, a, false, &xp->r->B);
   else {
     if (a->f) {
-      atmp = split_sub_hmatrix((phmatrix) a, (xp->son[0]->cc != xp->cc),
+      atmp = split_sub_amatrix(a->f, a->rc, a->cc, (xp->son[0]->cc != xp->cc),
 			       (xp->son[0]->cc != xp->cc));
 
       assert(xp->csons == atmp->rsons);
@@ -5482,10 +6095,14 @@ choldecomp_hmatrix(phmatrix a, pctruncmode tm, real eps)
 	lowersolve_hmatrix(false, false, a->son[k + k * sons], tm, eps, true,
 			   a->son[i + k * sons]);
 
-      for (j = k + 1; j < sons; j++)
-	for (i = j; i < sons; i++)
+      for (j = k + 1; j < sons; j++) {
+	addmul_lower_hmatrix(-1.0, false, a->son[j + k * sons], true,
+			     a->son[j + k * sons], tm, eps,
+			     a->son[j + j * sons]);
+	for (i = j + 1; i < sons; i++)
 	  addmul_hmatrix(-1.0, false, a->son[i + k * sons], true,
 			 a->son[j + k * sons], tm, eps, a->son[i + j * sons]);
+      }
     }
   }
 }

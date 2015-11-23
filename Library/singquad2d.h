@@ -21,6 +21,7 @@
 /* SIMPLE */
 /* PARTICLES */
 /* BEM */
+#include "surface3d.h"
 
 /** \defgroup singquad2d singquad2d
  *  @brief This module is responsible for standard and singular quadrature scheme
@@ -32,90 +33,111 @@
  * computation of matrix entries within BEM.
  */
 struct _singquad2d {
-	/** @brief X-component of quadrature points for singular integrals on same domain.*/
-	real *x_id;
-	/** @brief Y-component of quadrature points for singular integrals on same domain.*/
-	real *y_id;
-	/** @brief Quadrature weights for singular integrals on same domain.*/
-	real *w_id;
-	/** @brief Constant offset for singular integrals on same domain.*/
-	real base_id;
-	/** @brief Number of quadrature points for singular integrals on same domain.*/
-	uint n_id;
-	/**
-	 * @brief X-component of quadrature points for singular integrals on domains
-	 * sharing a common edge.
-	 */
-	real *x_edge;
-	/**
-	 * @brief Y-component of quadrature points for singular integrals on domains
-	 * sharing a common edge.
-	 */
-	real *y_edge;
-	/**
-	 * @brief Quadrature weights for singular integrals on domains
-	 * sharing a common edge.
-	 */
-	real *w_edge;
-	/**
-	 * @brief Constant offset for singular integrals on domains
-	 * sharing a common edge.
-	 */
-	real base_edge;
-	/**
-	 * @brief Number of quadrature points for singular integrals on domains
-	 * sharing a common edge.
-	 */
-	uint n_edge;
-	/**
-	 * @brief X-component of quadrature points for singular integrals on domains
-	 * sharing a common vertex.
-	 */
-	real *x_vert;
-	/**
-	 * @brief Y-component of quadrature points for singular integrals on domains
-	 * sharing a common vertex.
-	 */
-	real *y_vert;
-	/**
-	 * @brief Quadrature weights for singular integrals on domains
-	 * sharing a common vertex.
-	 */
-	real *w_vert;
-	/**
-	 * @brief Constant offset for singular integrals on domains
-	 * sharing a common vertex.
-	 */
-	real base_vert;
-	/**
-	 * @brief Number of quadrature points for singular integrals on domains
-	 * sharing a common vertex.
-	 */
-	uint n_vert;
-	/** @brief X-component of quadrature points for singular integrals on distant domains.*/
-	real *x_dist;
-	/** @brief Y-component of quadrature points for singular integrals on distant domains.*/
-	real *y_dist;
-	/** @brief Quadrature weights for singular integrals on distant domains.*/
-	real *w_dist;
-	/** @brief Constant offset for singular integrals on distant domains.*/
-	real base_dist;
-	/** @brief Number of quadrature points for singular integrals on distant domains.*/
-	uint n_dist;
-	/** @brief X-component of quadrature points for a single triangle.*/
-	real *x_single;
-	/** @brief Y-component of quadrature points for a single triangle.*/
-	real *y_single;
-	/** @brief Quadrature weights for a single triangle.*/
-	real *w_single;
-	/** @brief Constant offset for a single triangle.*/
-	real base_single;
-	/** @brief Number of quadrature points for a single triangle.*/
-	uint n_single;
-	/** @brief Order of basic quadrature rule.*/
-	uint q;
-	/** @brief maximal number of quadrature points.*/
-	uint nmax;
+  /** @brief X-component of quadrature points for singular integrals on same domain.*/
+  real *x_id;
+  /** @brief Y-component of quadrature points for singular integrals on same domain.*/
+  real *y_id;
+  /** @brief Quadrature weights for singular integrals on same domain.*/
+  real *w_id;
+  /** @brief Constant offset for singular integrals on same domain.*/
+  real base_id;
+  /** @brief Number of quadrature points for singular integrals on same domain.*/
+  uint n_id;
+  /**
+   * @brief X-component of quadrature points for singular integrals on domains
+   * sharing a common edge.
+   */
+  real *x_edge;
+  /**
+   * @brief Y-component of quadrature points for singular integrals on domains
+   * sharing a common edge.
+   */
+  real *y_edge;
+  /**
+   * @brief Quadrature weights for singular integrals on domains
+   * sharing a common edge.
+   */
+  real *w_edge;
+  /**
+   * @brief Constant offset for singular integrals on domains
+   * sharing a common edge.
+   */
+  real base_edge;
+  /**
+   * @brief Number of quadrature points for singular integrals on domains
+   * sharing a common edge.
+   */
+  uint n_edge;
+  /**
+   * @brief X-component of quadrature points for singular integrals on domains
+   * sharing a common vertex.
+   */
+  real *x_vert;
+  /**
+   * @brief Y-component of quadrature points for singular integrals on domains
+   * sharing a common vertex.
+   */
+  real *y_vert;
+  /**
+   * @brief Quadrature weights for singular integrals on domains
+   * sharing a common vertex.
+   */
+  real *w_vert;
+  /**
+   * @brief Constant offset for singular integrals on domains
+   * sharing a common vertex.
+   */
+  real base_vert;
+  /**
+   * @brief Number of quadrature points for singular integrals on domains
+   * sharing a common vertex.
+   */
+  uint n_vert;
+  /** @brief X-component of quadrature points for singular integrals on distant domains.*/
+  real *x_dist;
+  /** @brief Y-component of quadrature points for singular integrals on distant domains.*/
+  real *y_dist;
+  /** @brief Quadrature weights for singular integrals on distant domains.*/
+  real *w_dist;
+  /** @brief Constant offset for singular integrals on distant domains.*/
+  real base_dist;
+  /** @brief Number of quadrature points for singular integrals on distant domains.*/
+  uint n_dist;
+  /** @brief X-component of quadrature points for a single triangle.*/
+  real *x_single;
+  /** @brief Y-component of quadrature points for a single triangle.*/
+  real *y_single;
+  /** @brief Quadrature weights for a single triangle.*/
+  real *w_single;
+  /** @brief Constant offset for a single triangle.*/
+  real base_single;
+  /** @brief Number of quadrature points for a single triangle.*/
+  uint n_single;
+
+#ifdef USE_TRIQUADPOINTS
+  /**
+   * @brief 3D transformed quadrature points for every triangle - x-components.
+   */
+  real *tri_x;
+
+  /**
+   * @brief 3D transformed quadrature points for every triangle - y-components.
+   */
+  real *tri_y;
+
+  /**
+   * @brief 3D transformed quadrature points for every triangle - z-components.
+   */
+  real *tri_z;
+#endif
+
+  /** @brief Order of basic quadrature rule for single and regular double
+   integrals.*/
+  uint q;
+  /** @brief Order of basic quadrature rule for singular double integrals.*/
+  uint q2;
+  /** @brief maximal number of quadrature points.*/
+  uint nmax;
 };
 
 /**
@@ -144,6 +166,7 @@ typedef const singquad2d *pcsingquad2d;
  * necessary quadrature rules for singular integrals arising in BEM applications
  * in 3 dimensional space.
  *
+ * @param gr Currently used geometry.
  * @param q Order of gaussian quadrature rule used for construction of single
  * triangle quadrature rule and in case of distant domains.
  * @param q2 Order of gaussian quadrature rule used for construction of singular
@@ -151,7 +174,7 @@ typedef const singquad2d *pcsingquad2d;
  * @return returns a new @ref _singquad2d" "singquad2d" object.
  */
 HEADER_PREFIX psingquad2d
-build_singquad2d(uint q, uint q2);
+build_singquad2d(pcsurface3d gr, uint q, uint q2);
 
 /**
  * @brief Destructor for @ref _singquad2d "singquad2d" objects.
@@ -223,6 +246,19 @@ weight_basisfunc_l_singquad2d(real *x, real *y, real*w, uint nq);
 /* ------------------------------------------------------------
  Select quadrature rule
  ------------------------------------------------------------ */
+
+/**
+ * @brief Determine the number of common vertices of a pair of triangles.
+ *
+ * @param geo_t Array of all triangles in the geometry.
+ * @param t Index for the first triangle.
+ * @param s Index for the second triangle.
+ * @return Number of common vertices for @p t and @p s.
+ */
+HEADER_PREFIX uint
+fast_select_quadrature(uint (*geo_t)[3], uint t, uint s);
+
+
 /**
  * @brief This function is designed to select the correct quadrature rule for
  * a current pair of triangles
@@ -243,7 +279,7 @@ weight_basisfunc_l_singquad2d(real *x, real *y, real*w, uint nq);
  */
 HEADER_PREFIX uint
 select_quadrature_singquad2d(pcsingquad2d sq, const uint *tv, const uint *sv,
-		uint *tp, uint *sp, real **x, real **y, real **w, uint *n, real *base);
+    uint *tp, uint *sp, real **x, real **y, real **w, uint *n, field *base);
 
 /** @} */
 

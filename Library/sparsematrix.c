@@ -211,7 +211,7 @@ print_sparsematrix(pcsparsematrix a)
     (void) printf("  %u:", i);
 
     for (j = row[i]; j < row[i + 1]; j++)
-      (void) printf(" (%u %g)", col[j], coeff[j]);
+      (void) printf(" (%u " FIELD_CS(, g) ")", col[j], FIELD_ARG(coeff[j]));
 
     (void) printf("\n");
   }
@@ -239,9 +239,9 @@ print_eps_sparsematrix(pcsparsematrix a, const char *filename, uint offset)
 
   maxval = 0.0;
   if (nz > 0) {
-    maxval = fabs(coeff[0]);
+    maxval = ABS(coeff[0]);
     for (i = 1; i < nz; i++) {
-      val = fabs(coeff[i]);
+      val = ABS(coeff[i]);
       if (maxval < val)
 	maxval = val;
     }
@@ -270,7 +270,7 @@ print_eps_sparsematrix(pcsparsematrix a, const char *filename, uint offset)
 
       (void) fprintf(out,
 		     "%u %u %f bx\n",
-		     j, rows - 1 - i, fabs(coeff[r]) / maxval);
+		     j, rows - 1 - i, ABS(coeff[r]) / maxval);
     }
 
   (void) fprintf(out, "showpage\n");

@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "amatrix.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ This is the file "amatrix.h" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2009
+ ------------------------------------------------------------ */
 
 /** @file amatrix.h
  *  @author Steffen B&ouml;rm
@@ -34,7 +33,9 @@ typedef const amatrix *pcamatrix;
 
 #include "basic.h"
 #include "settings.h"
+#include "blas.h"
 #include "avector.h"
+#include "realavector.h"
 
 /** @brief Representation of a matrix as an array in column-major order. */
 struct _amatrix {
@@ -90,9 +91,8 @@ init_amatrix(pamatrix a, uint rows, uint cols);
  *  @param coff Column offset, should satisfy <tt>cols+coff<=src->cols</tt>.
  *  @returns Initialized @ref amatrix object. */
 HEADER_PREFIX pamatrix
-init_sub_amatrix(pamatrix a, pamatrix src,
-		 uint rows, uint roff,
-		 uint cols, uint coff);
+init_sub_amatrix(pamatrix a, pamatrix src, uint rows, uint roff, uint cols,
+    uint coff);
 
 /** @brief Initialize an @ref amatrix object by a vector.
  *
@@ -109,6 +109,23 @@ init_sub_amatrix(pamatrix a, pamatrix src,
  *  @returns Initialized @ref amatrix object. */
 HEADER_PREFIX pamatrix
 init_vec_amatrix(pamatrix a, pavector src, uint rows, uint cols);
+
+/** @brief Initialize an @ref amatrix object using a given array for
+ *  the coefficients.
+ *
+ *  Sets up the components of the object and uses the given array to
+ *  represent the coefficients.
+ *
+ *  @remark Should always be matched by a call to @ref uninit_amatrix that
+ *  will <em>not</em> release the coefficient storage.
+ *
+ *  @param a Object to be initialized.
+ *  @param src Source array, should contain at least <tt>rows * cols</tt> elements.
+ *  @param rows Number of rows.
+ *  @param cols Number of columns.
+ *  @returns Initialized @ref amatrix object. */
+HEADER_PREFIX pamatrix
+init_pointer_amatrix(pamatrix a, pfield src, uint rows, uint cols);
 
 /** @brief Initialize an @ref amatrix object and set it to zero.
  *
@@ -179,9 +196,17 @@ new_amatrix(uint rows, uint cols);
  *  @param coff Column offset, should satisfy <tt>cols+coff<=src->cols</tt>.
  *  @returns New @ref amatrix object. */
 HEADER_PREFIX pamatrix
-new_sub_amatrix(pamatrix src,
-		uint rows, uint roff,
-		uint cols, uint coff);
+new_sub_amatrix(pamatrix src, uint rows, uint roff, uint cols, uint coff);
+
+/** @brief Create a new @ref amatrix object using a given array for
+ *  the coefficients.
+ *
+ *  @param src Source array, should contain at least <tt>rows * cols</tt> elements.
+ *  @param rows Number of rows for the new matrix.
+ *  @param cols Number of columns for the new matrix.
+ *  @returns New @ref amatrix object. */
+HEADER_PREFIX pamatrix
+new_pointer_amatrix(field *src, uint rows, uint cols);
 
 /** @brief Create a new @ref amatrix object representing a zero matrix.
  *
@@ -257,8 +282,8 @@ HEADER_PREFIX void
 resizecopy_amatrix(pamatrix a, uint rows, uint cols);
 
 /* ------------------------------------------------------------
-   Access methods
-   ------------------------------------------------------------ */
+ Access methods
+ ------------------------------------------------------------ */
 
 #ifdef __GNUC__
 INLINE_PREFIX field
@@ -275,16 +300,14 @@ addentry_amatrix(pamatrix, uint, uint, field) __attribute__((unused));
  *  @param row Row index @f$i@f$.
  *  @param col Column index @f$j@f$.
  *  @returns Matrix entry @f$a_{ij}@f$. */
-INLINE_PREFIX field
-getentry_amatrix(pcamatrix a, uint row, uint col)
-{
+INLINE_PREFIX field getentry_amatrix(pcamatrix a, uint row, uint col) {
   longindex lda = a->ld;
 #ifdef FULL_DEBUG
   assert(row < a->rows);
   assert(col < a->cols);
 #endif
 
-  return a->a[row+lda*col];
+  return a->a[row + lda * col];
 }
 
 /** @brief Set a matrix entry, @f$a_{ij}\gets x@f$.
@@ -293,16 +316,14 @@ getentry_amatrix(pcamatrix a, uint row, uint col)
  *  @param row Row index @f$i@f$.
  *  @param col Column index @f$j@f$.
  *  @param x New value of @f$a_{ij}@f$. */
-INLINE_PREFIX void
-setentry_amatrix(pamatrix a, uint row, uint col, field x)
-{
+INLINE_PREFIX void setentry_amatrix(pamatrix a, uint row, uint col, field x) {
   longindex lda = a->ld;
 #ifdef FULL_DEBUG
   assert(row < a->rows);
   assert(col < a->cols);
 #endif
 
-  a->a[row+lda*col] = x;
+  a->a[row + lda * col] = x;
 }
 
 /** @brief Add to a matrix entry, @f$a_{ij} \gets a_{ij} + x@f$.
@@ -312,21 +333,19 @@ setentry_amatrix(pamatrix a, uint row, uint col, field x)
  *  @param col Column index @f$j@f$.
  *  @param x Summand.
  *  @returns New value of @f$a_{ij}@f$. */
-INLINE_PREFIX field
-addentry_amatrix(pamatrix a, uint row, uint col, field x)
-{
+INLINE_PREFIX field addentry_amatrix(pamatrix a, uint row, uint col, field x) {
   longindex lda = a->ld;
 #ifdef FULL_DEBUG
   assert(row < a->rows);
   assert(col < a->cols);
 #endif
 
-  return (a->a[row+lda*col] += x);
+  return (a->a[row + lda * col] += x);
 }
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ Statistics
+ ------------------------------------------------------------ */
 
 /** @brief Get number of currently initialized @ref amatrix objects.
  *
@@ -368,14 +387,30 @@ HEADER_PREFIX size_t
 getsize_heap_amatrix(pcamatrix a);
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ Simple utility functions
+ ------------------------------------------------------------ */
 
 /** @brief Set a matrix to zero.
  *
  *  @param a Target matrix. */
 HEADER_PREFIX void
 clear_amatrix(pamatrix a);
+
+/** @brief Set the lower triangular part of a matrix to zero.
+ *
+ *  @param a Target matrix.
+ *  @param strict If set, only the <em>strict</em> lower triangular
+ *     part should be cleared. */
+HEADER_PREFIX void
+clear_lower_amatrix(pamatrix a, bool strict);
+
+/** @brief Set the upper triangular part of a matrix to zero.
+ *
+ *  @param a Target matrix.
+ *  @param strict If set, only the <em>strict</em> upper triangular
+ *     part should be cleared. */
+HEADER_PREFIX void
+clear_upper_amatrix(pamatrix a, bool strict);
 
 /** @brief Set a matrix to identity.
  *
@@ -433,6 +468,13 @@ random_spd_amatrix(pamatrix a, real alpha);
 void
 copy_amatrix(bool atrans, pcamatrix a, pamatrix b);
 
+/** @brief Create a duplicate of an existing @ref amatrix.
+ *
+ *  @param src Matrix to be duplicated.
+ *  @returns Copy of <tt>src</tt>. */
+HEADER_PREFIX pamatrix
+clone_amatrix(pcamatrix src);
+
 /** @brief Copy a matrix into another matrix, @f$B \gets A@f$ or
  *  @f$B \gets A^*@f$.
  *
@@ -473,8 +515,8 @@ HEADER_PREFIX real
 check_ortho_amatrix(bool atrans, pcamatrix a);
 
 /* ------------------------------------------------------------
-   Basic linear algebra
-   ------------------------------------------------------------ */
+ Basic linear algebra
+ ------------------------------------------------------------ */
 
 /** @brief Scale a matrix @f$A@f$ by a factor @f$\alpha@f$,
  *  @f$A \gets \alpha A@f$.
@@ -483,6 +525,14 @@ check_ortho_amatrix(bool atrans, pcamatrix a);
  *  @param a Target matrix @f$A@f$. */
 HEADER_PREFIX void
 scale_amatrix(field alpha, pamatrix a);
+
+/**
+ * @brief compute the complex conjugate @f$ \bar A @f$ of a matrix @f$ A @f$.
+ *
+ * @param a Matrix that will be conjugated.
+ */
+HEADER_PREFIX void
+conjugate_amatrix(pamatrix a);
 
 /** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
  *
@@ -556,7 +606,8 @@ addeval_amatrix_avector(field alpha, pcamatrix a, pcavector src, pavector trg);
  *  @param src Source vector @f$x@f$.
  *  @param trg Target vector @f$y@f$. */
 HEADER_PREFIX void
-addevaltrans_amatrix_avector(field alpha, pcamatrix a, pcavector src, pavector trg);
+addevaltrans_amatrix_avector(field alpha, pcamatrix a, pcavector src,
+    pavector trg);
 
 /** @brief Multiply a matrix @f$A@f$ or its adjoint @f$A^*@f$ by a
  *  vector, @f$y \gets y + \alpha A x@f$ or @f$y \gets y + \alpha A^* x@f$.
@@ -572,7 +623,7 @@ addevaltrans_amatrix_avector(field alpha, pcamatrix a, pcavector src, pavector t
  *  @param trg Target vector @f$y@f$. */
 HEADER_PREFIX void
 mvm_amatrix_avector(field alpha, bool atrans, pcamatrix a, pcavector src,
-	    pavector trg);
+    pavector trg);
 
 /** @brief Add two matrices,
  *  @f$B \gets B + \alpha A@f$ or @f$B \gets B + \alpha A^*@f$.
@@ -582,9 +633,7 @@ mvm_amatrix_avector(field alpha, bool atrans, pcamatrix a, pcavector src,
  *  @param a Source matrix @f$A@f$.
  *  @param b Target matrix @f$B@f$. */
 HEADER_PREFIX void
-add_amatrix(field alpha,
-	    bool atrans, pcamatrix a,
-	    pamatrix b);
+add_amatrix(field alpha, bool atrans, pcamatrix a, pamatrix b);
 
 /** @brief Multiply two matrices,
  *  @f$C \gets C + \alpha A B@f$, @f$C \gets C + \alpha A^* B@f$,
@@ -601,28 +650,8 @@ add_amatrix(field alpha,
  *  @param b Right factor @f$B@f$.
  *  @param c Target matrix @f$C@f$. */
 HEADER_PREFIX void
-addmul_amatrix(field alpha,
-	       bool atrans, pcamatrix a,
-	       bool btrans, pcamatrix b,
-	       pamatrix c);
-
-/** @brief Multiply a matrix by a diagonal matrix,
- *  @f$A \gets \alpha A D@f$ or @f$A \gets \alpha D^* A@f$.
- *
- *  The matrix @f$A@f$ (or @f$A^*@f$) is multiplied by the
- *  diagonal matrix @f$D@f$ described by the vector @f$d@f$, the result
- *  is scaled by @f$\alpha@f$ and written back into @f$A@f$, i.e.,
- *  @f$a_{ij} \gets \alpha a_{ij} d_j@f$ or
- *  @f$a_{ij} \gets \alpha \bar d_i a_{ij}@f$.
- *
- *  @param alpha Scaling factor @f$\alpha@f$.
- *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
- *  @param a Matrix @f$A@f$.
- *  @param d Diagonal entries of @f$A@f$. */
-HEADER_PREFIX void
-diagmul_amatrix(field alpha,
-		bool atrans, pamatrix a,
-		pcavector d);
+addmul_amatrix(field alpha, bool atrans, pcamatrix a, bool btrans, pcamatrix b,
+    pamatrix c);
 
 /** @brief Multiply a matrix by a bidiagonal matrix,
  *  @f$A \gets \alpha A L@f$ or @f$A \gets \alpha L^* A@f$.
@@ -641,9 +670,8 @@ diagmul_amatrix(field alpha,
  *  @param d Diagonal entries of @f$L@f$.
  *  @param l Subdiagonal entries of @f$L@f$. */
 HEADER_PREFIX void
-bidiagmul_amatrix(field alpha,
-		  bool atrans, pamatrix a,
-		  pcavector d, pcavector l);
+bidiagmul_amatrix(field alpha, bool atrans, pamatrix a, pcavector d,
+    pcavector l);
 
 /** @} */
 

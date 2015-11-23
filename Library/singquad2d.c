@@ -88,7 +88,7 @@ build_pow_vert_singquad2d(psingquad2d sq, real * xq, real * wq)
   real     *xx = sq->x_vert;
   real     *yy = sq->y_vert;
   real     *ww = sq->w_vert + 9 * sq->n_vert;
-  uint      q = sq->q;
+  uint      q = sq->q2;
   uint      nq = sq->n_vert;
 
   uint      i, j, k, l, p;
@@ -139,7 +139,7 @@ build_pow_edge_singquad2d(psingquad2d sq, real * xq, real * wq)
   real     *xx = sq->x_edge;
   real     *yy = sq->y_edge;
   real     *ww = sq->w_edge + 9 * sq->n_edge;
-  uint      q = sq->q;
+  uint      q = sq->q2;
   uint      nq = sq->n_edge;
 
   uint      i, j, k, l, p;
@@ -218,7 +218,7 @@ build_pow_id_singquad2d(psingquad2d sq, real * xq, real * wq)
   real     *xx = sq->x_id;
   real     *yy = sq->y_id;
   real     *ww = sq->w_id + 9 * sq->n_id;
-  uint      q = sq->q;
+  uint      q = sq->q2;
   uint      nq = sq->n_id;
 
   uint      i, j, k, l, p;
@@ -290,8 +290,48 @@ build_pow_id_singquad2d(psingquad2d sq, real * xq, real * wq)
 
 }
 
+
+#ifdef USE_TRIQUADPOINTS
+static void
+init_triquadpoints(pcsurface3d gr, psingquad2d sq)
+{
+  uint      n = gr->triangles;
+  uint(*gr_t)[3] = gr->t;
+  real(*gr_x)[3] = gr->x;
+  uint      q2 = sq->q * sq->q;
+  uint      q2ld = ROUNDUP(q2, 4);
+  real     *xx = sq->x_single;
+  real     *yy = sq->y_single;
+
+  real     *tri_x, *tri_y, *tri_z, *A, *B, *C;
+  real      tx, sx, Ax, Bx, Cx;
+  uint      i, t;
+
+  sq->tri_x = tri_x = (real *) allocmem(n * q2ld * sizeof(real));
+  sq->tri_y = tri_y = (real *) allocmem(n * q2ld * sizeof(real));
+  sq->tri_z = tri_z = (real *) allocmem(n * q2ld * sizeof(real));
+
+  for (t = 0; t < n; ++t) {
+    A = gr_x[gr_t[t][0]];
+    B = gr_x[gr_t[t][1]];
+    C = gr_x[gr_t[t][2]];
+    for (i = 0; i < q2; ++i) {
+      tx = xx[i];
+      sx = yy[i];
+      Ax = 1.0 - tx;
+      Bx = tx - sx;
+      Cx = sx;
+
+      tri_x[i + t * q2ld] = A[0] * Ax + B[0] * Bx + C[0] * Cx;
+      tri_y[i + t * q2ld] = A[1] * Ax + B[1] * Bx + C[1] * Cx;
+      tri_z[i + t * q2ld] = A[2] * Ax + B[2] * Bx + C[2] * Cx;
+    }
+  }
+}
+#endif
+
 psingquad2d
-build_singquad2d(uint q, uint q2)
+build_singquad2d(pcsurface3d gr, uint q, uint q2)
 {
   uint      i, nq, nq2;
   real     *x, *w, *x2, *w2;
@@ -319,7 +359,7 @@ build_singquad2d(uint q, uint q2)
 
   sq = allocmem((size_t) sizeof(singquad2d));
 
-  sq->q = q2;
+  sq->q2 = q2;
 
   sq->n_id = 6 * nq2;
   sq->x_id = (real *) allocmem((size_t) 2 * sq->n_id * sizeof(real));
@@ -364,6 +404,11 @@ build_singquad2d(uint q, uint q2)
   build_triangle_singquad2d(sq, x, w);
 
   sq->nmax = 6 * nq2;
+
+
+#ifdef USE_TRIQUADPOINTS
+  init_triquadpoints(gr, sq);
+#endif
 
   freemem(x);
   freemem(w);
@@ -410,6 +455,18 @@ del_singquad2d(psingquad2d sq)
     freemem(sq->y_id);
   if (sq->y_single != NULL)
     freemem(sq->y_single);
+
+#ifdef USE_TRIQUADPOINTS
+  if (sq->tri_x != NULL) {
+    freemem(sq->tri_x);
+  }
+  if (sq->tri_y != NULL) {
+    freemem(sq->tri_y);
+  }
+  if (sq->tri_z != NULL) {
+    freemem(sq->tri_z);
+  }
+#endif
 
   freemem(sq);
 }
@@ -470,9 +527,28 @@ weight_basisfunc_l_singquad2d(real * x, real * y, real * w, uint nq)
 }
 
 uint
+fast_select_quadrature(uint(*geo_t)[3], uint t, uint s)
+{
+  uint      p;
+
+  p = 0;
+  p += (geo_t[t][0] == geo_t[s][0]);
+  p += (geo_t[t][0] == geo_t[s][1]);
+  p += (geo_t[t][0] == geo_t[s][2]);
+  p += (geo_t[t][1] == geo_t[s][0]);
+  p += (geo_t[t][1] == geo_t[s][1]);
+  p += (geo_t[t][1] == geo_t[s][2]);
+  p += (geo_t[t][2] == geo_t[s][0]);
+  p += (geo_t[t][2] == geo_t[s][1]);
+  p += (geo_t[t][2] == geo_t[s][2]);
+
+  return p;
+}
+
+uint
 select_quadrature_singquad2d(pcsingquad2d sq, const uint * tv,
 			     const uint * sv, uint * tp, uint * sp, real ** x,
-			     real ** y, real ** w, uint * n, real * base)
+			     real ** y, real ** w, uint * n, field * base)
 {
 
   uint      p, q, i, j;

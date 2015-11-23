@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
- This is the file "clusterbasis.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "clusterbasis.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file clusterbasis.h
  *  @author Steffen B&ouml;rm
@@ -71,8 +71,8 @@ struct _clusterbasis {
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /** @brief Initialize a @ref clusterbasis object.
  *
@@ -144,7 +144,9 @@ uninit_clusterbasis(pclusterbasis cb);
  *  This call happens automatically if the last object referencing
  *  this object (see @ref ref_clusterbasis) is deleted.
  *
- *  @param t Corresponding cluster. */
+ *  @param t Corresponding cluster.
+ *  @return Returns the newly created @ref clusterbasis object.
+ */
 HEADER_PREFIX pclusterbasis
 new_clusterbasis(pccluster t);
 
@@ -156,7 +158,9 @@ new_clusterbasis(pccluster t);
  *  This call happens automatically if the last object referencing
  *  this object (see @ref ref_clusterbasis) is deleted.
  *
- *  @param t Corresponding cluster. */
+ *  @param t Corresponding cluster.
+ *  @return Returns the newly created @ref clusterbasis object.
+ */
 HEADER_PREFIX pclusterbasis
 new_leaf_clusterbasis(pccluster t);
 
@@ -173,8 +177,8 @@ HEADER_PREFIX void
 del_clusterbasis(pclusterbasis cb);
 
 /* ------------------------------------------------------------
-   Reference counting
-   ------------------------------------------------------------ */
+ * Reference counting
+ * ------------------------------------------------------------ */
 
 /** @brief Set a pointer to a @ref clusterbasis object, increase its
  *  reference counter, and decrease reference counter of original
@@ -197,8 +201,8 @@ HEADER_PREFIX void
 unref_clusterbasis(pclusterbasis cb);
 
 /* ------------------------------------------------------------
- Low-level management
- ------------------------------------------------------------ */
+ * Low-level management
+ * ------------------------------------------------------------ */
 
 /** @brief Updates bookkeeping information, e.g., <tt>cb->ktree,</tt> for
  *  a @ref clusterbasis object after its sons have been altered.
@@ -232,8 +236,8 @@ HEADER_PREFIX void
 resize_clusterbasis(pclusterbasis cb, int k);
 
 /* ------------------------------------------------------------
- Build clusterbasis based on cluster
- ------------------------------------------------------------ */
+ * Build clusterbasis based on cluster
+ * ------------------------------------------------------------ */
 
 /** @brief Construct a @ref clusterbasis from a cluster tree.
  *
@@ -246,8 +250,8 @@ HEADER_PREFIX pclusterbasis
 build_from_cluster_clusterbasis(pccluster t);
 
 /* ------------------------------------------------------------
- Clone a cluster basis
- ------------------------------------------------------------ */
+ * Clone a cluster basis
+ * ------------------------------------------------------------ */
 
 /** @brief Create a copy of a @ref clusterbasis.
  *
@@ -270,8 +274,8 @@ HEADER_PREFIX pclusterbasis
 clonestructure_clusterbasis(pcclusterbasis cb);
 
 /* ------------------------------------------------------------
- Statistics
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 /** @brief Get number of active @ref clusterbasis objects.
  *
@@ -289,8 +293,8 @@ HEADER_PREFIX size_t
 getsize_clusterbasis(pcclusterbasis cb);
 
 /* ------------------------------------------------------------
- Simple utility functions
- ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 /** @brief Delete all weight matrices of the @ref clusterbasis
  *  and its descendants.
@@ -300,8 +304,8 @@ HEADER_PREFIX void
 clear_weight_clusterbasis(pclusterbasis cb);
 
 /* ------------------------------------------------------------
- Hierarchical iterator
- ------------------------------------------------------------ */
+ * Hierarchical iterator
+ * ------------------------------------------------------------ */
 
 /** @brief Hierarchical iterator for a @ref clusterbasis.
  *
@@ -355,8 +359,8 @@ iterate_parallel_clusterbasis(pcclusterbasis cb, uint cbname, uint pardepth,
 			      void *data);
 
 /* ------------------------------------------------------------
- Enumeration by cluster number
- ------------------------------------------------------------ */
+ * Enumeration by cluster number
+ * ------------------------------------------------------------ */
 
 /** @brief Enumerate @ref clusterbasis according to cluster tree.
  *
@@ -376,8 +380,8 @@ HEADER_PREFIX pclusterbasis *
 enumerate_clusterbasis(pccluster t, pclusterbasis cb);
 
 /* ------------------------------------------------------------
- Forward and backward transformation
- ------------------------------------------------------------ */
+ * Forward and backward transformation
+ * ------------------------------------------------------------ */
 
 /** @brief Create coefficient vector for cluster basis.
  *
@@ -559,8 +563,8 @@ HEADER_PREFIX void
 backward_notransfer_clusterbasis_avector(pcclusterbasis cb, pavector yt, pavector y);
 
 /* ------------------------------------------------------------
- Forward and backward transformation for the root only
- ------------------------------------------------------------ */
+ * Forward and backward transformation for the root only
+ * ------------------------------------------------------------ */
 
 /** @brief Compute @f$\hat x_t = V_t^* x@f$.
  *
@@ -634,8 +638,8 @@ compress_parallel_clusterbasis_amatrix(pcclusterbasis cb, pcamatrix Xp,
 				    pamatrix Xt, uint pardepth);
 
 /* ------------------------------------------------------------
- Forward and backward transformation for matrices
- ------------------------------------------------------------ */
+ * Forward and backward transformation for matrices
+ * ------------------------------------------------------------ */
 
 /** @brief Matrix forward transformation.
  *
@@ -702,8 +706,8 @@ HEADER_PREFIX void
 backward_clusterbasis_trans_amatrix(pcclusterbasis cb, pamatrix Yt, pamatrix Yp);
 
 /* ------------------------------------------------------------
- Simple computations
- ------------------------------------------------------------ */
+ * Simple computations
+ * ------------------------------------------------------------ */
 
 /** @brief Compute @f$y \gets y + \alpha V_t \hat y_t@f$.
  *
@@ -734,8 +738,8 @@ addevaltrans_clusterbasis_avector(field alpha, pcclusterbasis cb,
 			  pcavector xp, pavector xc);
 
 /* ------------------------------------------------------------
- Orthogonalization
- ------------------------------------------------------------ */
+ * Orthogonalization
+ * ------------------------------------------------------------ */
 
 /** @brief Create an orthogonal cluster basis.
  *
@@ -763,7 +767,10 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator co);
  *  If the result is significantly larger than machine eps, the
  *  cluster basis should not be considered orthogonal.
  *
- *  @param cb Cluster basis. */
+ *  @param cb Cluster basis.
+ *  @return Returns a measure for the orthogonality of the @ref clusterbasis
+ *    @p cb.
+ */
 HEADER_PREFIX real
 check_ortho_clusterbasis(pcclusterbasis cb);
 
@@ -785,6 +792,44 @@ weight_clusterbasis_clusteroperator(pcclusterbasis cb, pclusteroperator co);
 
 HEADER_PREFIX pamatrix
 weight_enum_clusterbasis_clusteroperator(pcclusterbasis cb);
+
+/* ------------------------------------------------------------
+ * File I/O
+ * ------------------------------------------------------------ */
+
+#ifdef USE_NETCDF
+/** @brief Write @ref clusterbasis to NetCDF file.
+ *
+ *  @param cb Cluster basis.
+ *  @param name File name. */
+HEADER_PREFIX void
+write_cdf_clusterbasis(pcclusterbasis cb, const char *name);
+
+/** @brief Write @ref clusterbasis to part of NetCDF file.
+ *
+ *  @param cb Cluster basis.
+ *  @param nc_file File handle.
+ *  @param prefix Prefix for variable names. */
+HEADER_PREFIX void
+write_cdfpart_clusterbasis(pcclusterbasis cb, int nc_file, const char *prefix);
+
+/** @brief Read @ref clusterbasis from NetCdf file.
+ *
+ *  @param name File name.
+ *  @param t Root @ref cluster for cluster basis.
+ *  @returns Cluster basis read from file. */
+HEADER_PREFIX pclusterbasis
+read_cdf_clusterbasis(const char *name, pccluster t);
+
+/** @brief Read @ref clusterbasis from part of a NetCdf file.
+ *
+ *  @param nc_file File handle.
+ *  @param prefix Prefix for variable names.
+ *  @param t Root @ref cluster for cluster basis.
+ *  @returns Cluster basis read from file. */
+HEADER_PREFIX pclusterbasis
+read_cdfpart_clusterbasis(int nc_file, const char *prefix, pccluster t);
+#endif
 
 /** @} */
 

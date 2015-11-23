@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "block.c" of the H2Lib package.
-   All rights reserved, Knut Reimer 2009
-   ------------------------------------------------------------ */
+ This is the file "block.c" of the H2Lib package.
+ All rights reserved, Knut Reimer 2009
+ ------------------------------------------------------------ */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -125,6 +124,32 @@ admissible_sphere_cluster(pcluster rc, pcluster cc, void *data)
   return i;
 }
 
+bool
+admissible_2_min_cluster(pcluster rc, pcluster cc, void *data)
+{
+  real      eta = *(real *) data;
+
+  bool      i;
+
+  real      diamt, diams, dist;
+  real      a;
+
+  diamt = getdiam_2_cluster(rc);
+  diams = getdiam_2_cluster(cc);
+  dist = getdist_2_cluster(rc, cc);
+
+  a = REAL_MIN(diamt, diams);
+
+  if (a < eta * dist) {
+    i = true;
+  }
+  else {
+    i = false;
+  }
+
+  return i;
+}
+
 /* ------------------------------------------------------------
  Constructors and destructors
  ------------------------------------------------------------ */
@@ -220,8 +245,8 @@ build_nonstrict_block(pcluster rc, pcluster cc, void *eta, admissible admis)
 
   for (i = 0; i < rsons; i++) {
     for (j = 0; j < csons; j++) {
-      b->son[i + j * rsons] = build_nonstrict_block(rc->son[i], cc->son[j],
-						    eta, admis);
+      b->son[i + j * rsons] =
+	build_nonstrict_block(rc->son[i], cc->son[j], eta, admis);
     }
   }
 
@@ -296,6 +321,81 @@ build_strict_block(pcluster rc, pcluster cc, void *eta, admissible admis)
   return b;
 }
 
+pblock
+build_strict_lower_block(pcluster rc, pcluster cc, void *eta,
+			 admissible admis)
+{
+  pblock    b;
+
+  bool      a;
+  uint      rsons, csons;
+  uint      i, j;
+
+  a = admis(rc, cc, eta);
+
+  if (a == false) {
+    if (rc->sons == 0) {
+      /* inadmissible leaf */
+      if (cc->sons == 0) {
+	rsons = 0;
+	csons = 0;
+	b = new_block(rc, cc, a, rsons, csons);
+      }
+      /* no leaf */
+      else {
+	rsons = 1;
+	csons = cc->sons;
+	b = new_block(rc, cc, a, rsons, csons);
+	for (j = 0; j < csons; j++) {
+	  b->son[j] = build_strict_block(rc, cc->son[j], eta, admis);
+	}
+      }
+    }
+    else {
+      /* no leaf */
+      if (cc->sons == 0) {
+	rsons = rc->sons;
+	csons = 1;
+	b = new_block(rc, cc, a, rsons, csons);
+	for (i = 0; i < rsons; i++) {
+	  b->son[i] = build_strict_block(rc->son[i], cc, eta, admis);
+	}
+      }
+      /* no leaf */
+      else {
+	rsons = rc->sons;
+	csons = cc->sons;
+	b = new_block(rc, cc, a, rsons, csons);
+	for (j = 0; j < csons; j++) {
+	  for (i = 0; i < j; ++i) {
+	    b->son[i + j * rsons] = new_block(rc->son[i], cc->son[j], true, 0,
+					      0);
+	    update_block(b->son[i + j * rsons]);
+	  }
+	  b->son[i + j * rsons] = build_strict_lower_block(rc->son[i],
+							   cc->son[j], eta,
+							   admis);
+	  for (i = j + 1; i < rsons; i++) {
+	    b->son[i + j * rsons] = build_strict_block(rc->son[i], cc->son[j],
+						       eta, admis);
+	  }
+	}
+      }
+    }
+  }
+  /* admissible leaf */
+  else {
+    assert(a == true);
+    rsons = 0;
+    csons = 0;
+    b = new_block(rc, cc, a, rsons, csons);
+  }
+
+  update_block(b);
+
+  return b;
+}
+
 /* ------------------------------------------------------------
  Drawing block cluster trees
  ------------------------------------------------------------ */
@@ -336,23 +436,26 @@ draw_cairo_subblock(cairo_t * cr, pcblock b, int levels)
 
     if (b->son) {
       cairo_new_path(cr);
+      cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0);
       cairo_rectangle(cr, 0.0, 0.0, csize, rsize);
       cairo_stroke(cr);
     }
     else if (b->a > 0) {
       cairo_new_path(cr);
+      cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0);
       cairo_rectangle(cr, 0.0, 0.0, csize, rsize);
       cairo_save(cr);
-      cairo_set_source_rgb(cr, 0.2, 0.2, 1.0);
+      cairo_set_source_rgba(cr, 0.2, 0.2, 1.0, 1.0);
       cairo_fill_preserve(cr);
       cairo_restore(cr);
       cairo_stroke(cr);
     }
     else {
       cairo_new_path(cr);
+      cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0);
       cairo_rectangle(cr, 0.0, 0.0, csize, rsize);
       cairo_save(cr);
-      cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
+      cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 1.0);
       cairo_fill_preserve(cr);
       cairo_restore(cr);
       cairo_stroke(cr);
@@ -377,11 +480,10 @@ draw_cairo_block(cairo_t * cr, pcblock b, int levels)
 
   scale = (scalex < scaley ? scalex : scaley);
 
-  cairo_translate(cr,
-		  0.5 * (ex + sx - scale * rsize),
+  cairo_translate(cr, 0.5 * (ex + sx - scale * rsize),
 		  0.5 * (ey + sy - scale * csize));
   cairo_scale(cr, scale, scale);
-  cairo_set_line_width(cr, cairo_get_line_width(cr) / scale);
+  cairo_set_line_width(cr, 0.5 * cairo_get_line_width(cr) / scale);
 
   draw_cairo_subblock(cr, b, levels);
 }
@@ -663,11 +765,10 @@ view_block(pcblock b)
 
 void
 iterate_block(pcblock b, uint bname, uint rname, uint cname,
-	      void (*pre) (pcblock b, uint bname, uint rname,
-			   uint cname, uint pardepth, void *data),
-	      void (*post) (pcblock b, uint bname, uint rname,
-			    uint cname, uint pardepth, void *data),
-	      void *data)
+	      void (*pre) (pcblock b, uint bname, uint rname, uint cname,
+			   uint pardepth, void *data),
+	      void (*post) (pcblock b, uint bname, uint rname, uint cname,
+			    uint pardepth, void *data), void *data)
 {
   pcblock   b1;
   uint      bname1, rname1, cname1;
@@ -757,9 +858,9 @@ addrow(pcblock b, uint bname, uint rname, uint cname,
 }
 
 static void
-iterate_rowlist(pccluster rc, uint rname,
-		pblockentry pb, uint pardepth,
-		void (*pre) (pcblockentry pb, uint pardepth, void *data),
+iterate_rowlist(pccluster rc, uint rname, pblockentry pb,
+		uint pardepth, void (*pre) (pcblockentry pb, uint pardepth,
+					    void *data),
 		void (*post) (pcblockentry pb, uint pardepth, void *data),
 		void *data)
 {
@@ -854,12 +955,10 @@ iterate_rowlist(pccluster rc, uint rname,
 
 void
 iterate_rowlist_block(pcblock b, uint bname, uint rname, uint cname,
-		      uint pardepth,
-		      void (*pre) (pcblockentry pb, uint pardepth,
-				   void *data), void (*post) (pcblockentry pb,
-							      uint pardepth,
-							      void *data),
-		      void *data)
+		      uint pardepth, void (*pre) (pcblockentry pb,
+						  uint pardepth, void *data),
+		      void (*post) (pcblockentry pb, uint pardepth,
+				    void *data), void *data)
 {
   pblockentry pb;
 
@@ -912,9 +1011,9 @@ addcol(pcblock b, uint bname, uint rname, uint cname,
 }
 
 static void
-iterate_collist(pccluster cc, uint cname,
-		pblockentry pb, uint pardepth,
-		void (*pre) (pcblockentry pb, uint pardepth, void *data),
+iterate_collist(pccluster cc, uint cname, pblockentry pb,
+		uint pardepth, void (*pre) (pcblockentry pb, uint pardepth,
+					    void *data),
 		void (*post) (pcblockentry pb, uint pardepth, void *data),
 		void *data)
 {
@@ -1010,12 +1109,10 @@ iterate_collist(pccluster cc, uint cname,
 
 void
 iterate_collist_block(pcblock b, uint bname, uint rname, uint cname,
-		      uint pardepth,
-		      void (*pre) (pcblockentry pb, uint pardepth,
-				   void *data), void (*post) (pcblockentry pb,
-							      uint pardepth,
-							      void *data),
-		      void *data)
+		      uint pardepth, void (*pre) (pcblockentry pb,
+						  uint pardepth, void *data),
+		      void (*post) (pcblockentry pb, uint pardepth,
+				    void *data), void *data)
 {
   pblockentry pb;
 
@@ -1036,9 +1133,9 @@ struct _listdata {
 
 static void
 call_reversed_blockentry(pcblockentry pb, uint pardepth,
-			 void (*pre) (pcblock b, uint bname,
-				      uint rname, uint cname,
-				      uint pardepth, void *data), void *data)
+			 void (*pre) (pcblock b, uint bname, uint rname,
+				      uint cname, uint pardepth, void *data),
+			 void *data)
 {
   if (pb->next)
     call_reversed_blockentry(pb->next, pardepth, pre, data);
@@ -1057,9 +1154,9 @@ pre_blocklist(pcblockentry pb, uint pardepth, void *data)
 
 static void
 call_inorder_blockentry(pcblockentry pb, uint pardepth,
-			void (*post) (pcblock b, uint bname,
-				      uint rname, uint cname,
-				      uint pardepth, void *data), void *data)
+			void (*post) (pcblock b, uint bname, uint rname,
+				      uint cname, uint pardepth, void *data),
+			void *data)
 {
   post(pb->b, pb->bname, pb->rname, pb->cname, pardepth, data);
 
@@ -1079,12 +1176,11 @@ post_blocklist(pcblockentry pb, uint pardepth, void *data)
 void
 iterate_byrow_block(pcblock b, uint bname, uint rname, uint cname,
 		    uint pardepth,
-		    void (*pre) (pcblock b, uint bname,
-				 uint rname, uint cname,
-				 uint pardepth, void *data),
-		    void (*post) (pcblock b, uint bname,
-				  uint rname, uint cname,
-				  uint pardepth, void *data), void *data)
+		    void (*pre) (pcblock b, uint bname, uint rname,
+				 uint cname, uint pardepth, void *data),
+		    void (*post) (pcblock b, uint bname, uint rname,
+				  uint cname, uint pardepth, void *data),
+		    void *data)
 {
   struct _listdata ld;
   pblockentry pb;
@@ -1095,8 +1191,8 @@ iterate_byrow_block(pcblock b, uint bname, uint rname, uint cname,
 
   pb = addrow(b, bname, rname, cname, 0, 0);
 
-  iterate_rowlist(b->rc, rname, pb, pardepth,
-		  pre_blocklist, post_blocklist, &ld);
+  iterate_rowlist(b->rc, rname, pb, pardepth, pre_blocklist, post_blocklist,
+		  &ld);
 
   del_blockentry(pb);
 }
@@ -1104,12 +1200,11 @@ iterate_byrow_block(pcblock b, uint bname, uint rname, uint cname,
 void
 iterate_bycol_block(pcblock b, uint bname, uint rname, uint cname,
 		    uint pardepth,
-		    void (*pre) (pcblock b, uint bname,
-				 uint rname, uint cname,
-				 uint pardepth, void *data),
-		    void (*post) (pcblock b, uint bname,
-				  uint rname, uint cname,
-				  uint pardepth, void *data), void *data)
+		    void (*pre) (pcblock b, uint bname, uint rname,
+				 uint cname, uint pardepth, void *data),
+		    void (*post) (pcblock b, uint bname, uint rname,
+				  uint cname, uint pardepth, void *data),
+		    void *data)
 {
   struct _listdata ld;
   pblockentry pb;
@@ -1120,8 +1215,8 @@ iterate_bycol_block(pcblock b, uint bname, uint rname, uint cname,
 
   pb = addcol(b, bname, rname, cname, 0, 0);
 
-  iterate_collist(b->cc, cname, pb, pardepth,
-		  pre_blocklist, post_blocklist, &ld);
+  iterate_collist(b->cc, cname, pb, pardepth, pre_blocklist, post_blocklist,
+		  &ld);
 
   del_blockentry(pb);
 }
@@ -1206,9 +1301,8 @@ getdepth_block(pcblock b)
 	p = UINT_MAX(p, getdepth_block(b->son[i + j * rsons]));
       }
     }
+    p++;
   }
-
-  p++;
 
   return p;
 }

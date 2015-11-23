@@ -86,7 +86,7 @@ fill_slp_cc_laplacebem2d(const uint * ridx, const uint * cidx,
   const     real(*gr_x)[2] = (const real(*)[2]) gr->x;
   const     uint(*gr_e)[2] = (const uint(*)[2]) gr->e;
   const preal gr_g = (const preal) gr->g;
-  real     *aa = N->a;
+  field    *aa = N->a;
   uint      rows = N->rows;
   uint      cols = N->cols;
   longindex ld = N->ld;
@@ -328,7 +328,7 @@ fill_dlp_cc_laplacebem2d(const uint * ridx, const uint * cidx,
   const     uint(*gr_e)[2] = (const uint(*)[2]) gr->e;
   const     real(*gr_n)[2] = (const real(*)[2]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  real     *aa = N->a;
+  field    *aa = N->a;
   uint      rows = N->rows;
   uint      cols = N->cols;
   longindex ld = N->ld;

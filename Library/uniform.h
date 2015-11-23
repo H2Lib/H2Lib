@@ -72,10 +72,14 @@ struct _uniform {
   pclusterbasis cb;
   /** @brief Coupling matrix */
   amatrix S;
-  /** @brief Row block list */
-  puniform rnext, rprev;
-  /** @brief Column block list */
-  puniform cnext, cprev;
+  /** @brief Next row block in list */
+  puniform rnext;
+  /** @brief Previous row block in list */
+  puniform rprev;
+  /** @brief Next column block in list */
+  puniform cnext;
+  /** @brief Previous column block in list */
+  puniform cprev;
 };
 
 /* ------------------------------------------------------------

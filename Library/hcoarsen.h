@@ -18,9 +18,9 @@
  *  @{ */
 
 /**
- * @brief Coarsen the block structure of an @ref hmatrix.
+ * @brief Coarsen the block structure of a @ref hmatrix.
  *
- * For an @ref hmatrix consisting only of admissible or inadmissible leafs
+ * For a @ref hmatrix consisting only of admissible or inadmissible leafs
  * it can be advantageous to store the @ref hmatrix as a single low rank matrix
  * with a slightly higher rank.
  *
@@ -61,12 +61,13 @@
  * as long as they only consist of leaf blocks aswell.
  *
  * @param G Input @ref hmatrix. Will be changed during the coarsening process.
+ * @param tm Truncation mode.
  * @param eps Accuracy for low rank truncation.
  * @param recursive Flag to indicate whether the coarsening algorithm should
  * be applied to the son blocks aswell or not.
  */
 HEADER_PREFIX void
-coarsen_hmatrix(phmatrix G, real eps, bool recursive);
+coarsen_hmatrix(phmatrix G, ptruncmode tm, real eps, bool recursive);
 
 /**
  * @}

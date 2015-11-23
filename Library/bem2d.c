@@ -24,7 +24,7 @@
  * it is expanded to @f$[a - 0.5 \cdot \texttt{INTERPOLATION\_EPS\_BEM2D},
  * b + 0.5 \cdot \texttt{INTERPOLATION\_EPS\_BEM2D} ]@f$ .
  */
-#define INTERPOLATION_EPS_BEM2D 1.0e-12
+#define INTERPOLATION_EPS_BEM2D 5.0e-3
 
 /*
  * Just an abbreviation for the struct _greencluster2d .
@@ -259,24 +259,26 @@ struct _parbem2d {
 
 struct _greencluster2d {
   uint     *xi;
-	    /** local indices of pivot elements */
+  /** local indices of pivot elements */
   uint     *xihat;
-	       /** global indices of pivot elements */
-  pamatrix  V;/** */
+  /** global indices of pivot elements */
+  pamatrix  V;
+  /** */
   pccluster t; /** corresponding cluster */
   uint      sons;
-	     /** number of sons for current cluster */
+/** number of sons for current cluster */
 };
 
 struct _greenclusterbasis2d {
   uint     *xi;
-	    /** local indices of pivot elements */
+  /** local indices of pivot elements */
   uint     *xihat;
-	       /** global indices of pivot elements */
-  pamatrix  Qinv;/** Triangular factor of QR-decomposition */
+  /** global indices of pivot elements */
+  pamatrix  Qinv;
+  /** Triangular factor of QR-decomposition */
   pcclusterbasis cb; /** corresponding clusterbasis */
   uint      sons;
-	     /** number of sons for current clusterbasis */
+/** number of sons for current clusterbasis */
 };
 
 /* ------------------------------------------------------------
@@ -340,7 +342,7 @@ uninit_recompression_bem2d(paprxbem2d aprx)
   }
 }
 
-static pgreencluster2d
+static    pgreencluster2d
 new_greencluster2d(pccluster c)
 {
   pgreencluster2d gc;
@@ -376,7 +378,7 @@ del_greencluster2d(pgreencluster2d gc)
   freemem(gc);
 }
 
-static pgreenclusterbasis2d
+static    pgreenclusterbasis2d
 new_greenclusterbasis2d(pcclusterbasis cb)
 {
   pgreenclusterbasis2d gcb;
@@ -410,7 +412,7 @@ del_greenclusterbasis2d(pgreenclusterbasis2d gcb)
   freemem(gcb);
 }
 
-static paprxbem2d
+static    paprxbem2d
 new_aprxbem2d()
 {
   paprxbem2d aprx;
@@ -462,7 +464,7 @@ del_aprxbem2d(paprxbem2d aprx)
   freemem(aprx);
 }
 
-static pkernelbem2d
+static    pkernelbem2d
 new_kernelbem2d()
 {
   pkernelbem2d kernels;
@@ -489,7 +491,7 @@ del_kernelbem2d(pkernelbem2d kernels)
   freemem(kernels);
 }
 
-static pparbem2d
+static    pparbem2d
 new_parbem2d()
 {
   pparbem2d par;
@@ -1410,7 +1412,7 @@ assemble_bem2d_greenhybrid_row_rkmatrix(pccluster rc, uint rname,
   {
     grc = par->grcn[rname];
 
-    if(grc == NULL) {
+    if (grc == NULL) {
       grc = par->grcn[rname] = new_greencluster2d(rc);
       assemble_row_greencluster2d(bem, grc);
     }
@@ -1517,7 +1519,7 @@ assemble_bem2d_greenhybrid_col_rkmatrix(pccluster rc, uint rname,
   {
     gcc = par->gccn[cname];
 
-    if(gcc == NULL) {
+    if (gcc == NULL) {
       gcc = par->gccn[cname] = new_greencluster2d(cc);
       assemble_col_greencluster2d(bem, gcc);
     }
@@ -1627,9 +1629,7 @@ assemble_bem2d_PACA_rkmatrix(pccluster rc, uint rname, pccluster cc,
 {
   paprxbem2d aprx = bem->aprx;
   const real accur = aprx->accur_aca;
-  void      (*entry) (const uint *, const uint *, void *, bool, pamatrix) =
-    (void (*)(const uint *, const uint *, void *, bool, pamatrix)) bem->
-    nearfield;
+  matrixentry_t entry = (matrixentry_t) bem->nearfield;
   const uint *ridx = rc->idx;
   const uint *cidx = cc->idx;
   const uint rows = rc->size;
@@ -3667,7 +3667,7 @@ assemblecoarsen_bem2d_block_hmatrix(pcblock b, uint bname,
   if (G->r) {
     bem->farfield_rk(G->rc, rname, G->cc, cname, bem, G->r);
     if (aprx->recomp == true) {
-      trunc_rkmatrix(0, aprx->accur_recomp, G->r);
+      trunc_rkmatrix(NULL, aprx->accur_recomp, G->r);
     }
 
   }
@@ -3676,7 +3676,7 @@ assemblecoarsen_bem2d_block_hmatrix(pcblock b, uint bname,
   }
   else {
     assert(G->son != NULL);
-    coarsen_hmatrix(G, aprx->accur_coarsen, false);
+    coarsen_hmatrix(G, NULL, aprx->accur_coarsen, false);
   }
 }
 
@@ -3859,7 +3859,7 @@ assemblehiercomp_bem2d_h2matrix(pbem2d bem, pblock b, ph2matrix G)
     par->cwn[i] = NULL;
   }
 
-  s = pow(aprx->tm->zeta_level, getdepth_block(b));
+  s = REAL_POW(aprx->tm->zeta_level, getdepth_block(b));
   aprx->accur_hiercomp /= s;
 
   iterate_byrow_block(b, 0, 0, 0, max_pardepth, NULL,

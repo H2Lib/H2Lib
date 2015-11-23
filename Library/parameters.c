@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "parameters.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ This is the file "parameters.c" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2009
+ ------------------------------------------------------------ */
 
 #include "parameters.h"
 
@@ -71,21 +70,20 @@ askforreal(const char *question, const char *envname, real deflt)
   char     *env;
 
   env = getenv(envname);
-  if (env && sscanf(env, "%lf", &res) == 1)
+  if (env && sscanf(env, "%" SCANF_PREFIX "f", &res) == 1)
     return res;
 
   (void) printf("%s (%.3e)\n", question, deflt);
   res = deflt;
   if (fgets(buf, 80, stdin))
-    sscanf(buf, "%lf", &res);
+    sscanf(buf, "%" SCANF_PREFIX "f", &res);
 
   return res;
 }
 
 char     *
-askforstring(const char *question,
-	     const char *envname,
-	     const char *deflt, char *buffer, uint bufsize)
+askforstring(const char *question, const char *envname, const char *deflt,
+	     char *buffer, uint bufsize)
 {
   char     *env;
   char     *bufptr;

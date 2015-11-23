@@ -29,7 +29,7 @@ typedef truncmode *ptruncmode;
  */
 typedef const truncmode *pctruncmode;
 
-#include "avector.h"
+#include "realavector.h"
 #include "settings.h"
 
 /* ------------------------------------------------------------
@@ -96,10 +96,6 @@ new_relfrob_truncmode();
  * @brief Create a new @ref truncmode object with block relative euclidean
  * error norm.
  *
- * @attention This function is intended for use with @ref h2matrix objects
- * only. @ref hmatrix objects handle truncation differently and always use
- * block-relative truncation.
- *
  * @return A new @ref truncmode object is returned using block relative
  * euclidean error norm.
  */
@@ -109,10 +105,6 @@ new_blockreleucl_truncmode();
 /**
  * @brief Create a new @ref truncmode object with block relative frobenius
  * error norm.
- *
- * @attention This function is intended for use with @ref h2matrix objects
- * only. @ref hmatrix objects handle truncation differently and always use
- * block-relative truncation.
  *
  * @return A new @ref truncmode object is returned using block relative
  * frobenius error norm.
@@ -142,12 +134,11 @@ new_abseucl_truncmode();
  *
  * @param tm Truncation strategy
  * @param eps Trucation accuracy
- * @param sigma @ref avector "Avector" containing the singular values.
+ * @param sigma @ref realavector "Realavector" containing the singular values.
  * @return Returns the new suitable rank.
  */
 HEADER_PREFIX uint
-findrank_truncmode(pctruncmode tm, real eps, pcavector sigma);
-
+findrank_truncmode(pctruncmode tm, real eps, pcrealavector sigma);
 
 /**
  * @}

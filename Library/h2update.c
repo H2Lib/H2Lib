@@ -1,4 +1,3 @@
-
 #include "h2update.h"
 
 #include <stdio.h>
@@ -9,7 +8,6 @@
 
 #include "laplacebem2d.h"
 #include "laplacebem3d.h"
-
 
 real
 norm2_rkupdate_uniform(puniform u, uint k)
@@ -56,7 +54,7 @@ norm2_rkupdate_uniform(puniform u, uint k)
   if (cb->Z)
     uninit_amatrix(uz);
 
-  return sqrt(norm);
+  return REAL_SQRT(norm);
 }
 
 real
@@ -107,7 +105,6 @@ normfrob_rkupdate_uniform(puniform u, uint k)
   return norm;
 }
 
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* compute the R of QR decomposition of the extended clusterbasis (V A) */
 static void
@@ -156,9 +153,8 @@ orthoweight_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A)
 
       assert(son[i]->Z->cols == cb->son[i]->k + k);
       Vhat1 = init_sub_amatrix(&tmp2, Vhat, son[i]->Z->rows, off, k, cb->k);
-      R =
-	init_sub_amatrix(&tmp4, son[i]->Z, son[i]->Z->rows, 0, k,
-			 cb->son[i]->k);
+      R = init_sub_amatrix(&tmp4, son[i]->Z, son[i]->Z->rows, 0, k,
+			   cb->son[i]->k);
       copy_amatrix(false, R, Vhat1);
       uninit_amatrix(Vhat1);
       uninit_amatrix(R);
@@ -194,12 +190,11 @@ orthoweight_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A)
   uninit_amatrix(Vhat);
 }
 
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* computes the totalweights for all sons of the extended row clusterbasis */
 static void
-rowweight_rkupdate_clusteroperator(pclusterbasis rb, pclusteroperator rw,
-				   int k, ptruncmode tm)
+rowweight_rkupdate_clusteroperator(pclusterbasis rb,
+				   pclusteroperator rw, int k, ptruncmode tm)
 {
   uint      sons = rw->sons;
 
@@ -331,12 +326,11 @@ rowweight_rkupdate_clusteroperator(pclusterbasis rb, pclusteroperator rw,
   }
 }
 
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* computes the totalweights for all sons of the extended col clusterbasis */
 static void
-colweight_rkupdate_clusteroperator(pclusterbasis cb, pclusteroperator cw,
-				   int k, ptruncmode tm)
+colweight_rkupdate_clusteroperator(pclusterbasis cb,
+				   pclusteroperator cw, int k, ptruncmode tm)
 {
   uint      sons = cw->sons;
 
@@ -469,7 +463,6 @@ colweight_rkupdate_clusteroperator(pclusterbasis cb, pclusteroperator cw,
   }
 }
 
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* compute adaptive clusterbasis for extended clusterbasis (V A) */
 static void
@@ -477,9 +470,9 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
 			       pclusteroperator cw, pctruncmode tm, real eps)
 {
   amatrix   tmp1, tmp2, tmp3;
-  avector   tmp4;
+  realavector tmp4;
   pamatrix  Vhat, Vhat1, VhatZ, Q, Q1, A1, C1;
-  pavector  sigma;
+  prealavector sigma;
   pclusteroperator cw1;
   real      zeta_level;
   uint      i, off, m, k;
@@ -523,9 +516,8 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
     off = 0;
     for (i = 0; i < cb->sons; i++) {
       Vhat1 = init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, cb->k, 0);
-      C1 =
-	init_sub_amatrix(&tmp3, &cw->son[i]->C, cb->son[i]->k, 0,
-			 cb->son[i]->E.rows, 0);
+      C1 = init_sub_amatrix(&tmp3, &cw->son[i]->C, cb->son[i]->k, 0,
+			    cb->son[i]->E.rows, 0);
       clear_amatrix(Vhat1);
       addmul_amatrix(1.0, false, C1, false, &cb->son[i]->E, Vhat1);
       uninit_amatrix(Vhat1);
@@ -553,13 +545,13 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
   /* Compute singular value decomposition of VhatZ */
   k = UINT_MIN(VhatZ->rows, VhatZ->cols);
   Q = init_amatrix(&tmp3, VhatZ->rows, VhatZ->cols);
-  sigma = init_avector(&tmp4, k);
+  sigma = init_realavector(&tmp4, k);
   svd_amatrix(VhatZ, sigma, Q, 0);
   uninit_amatrix(VhatZ);
 
   /* Find appropriate rank */
   k = findrank_truncmode(tm, eps, sigma);
-  uninit_avector(sigma);
+  uninit_realavector(sigma);
 
   /* Set rank of new cluster basis */
   resize_clusterbasis(cb, k);
@@ -602,7 +594,6 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
 
   update_clusterbasis(cb);
 }
-
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* adapts the coupling matrices of subblocks */
@@ -706,7 +697,6 @@ rkupdate_inside_h2matrix(ph2matrix Gh2, pamatrix A, pamatrix B,
   }
 }
 
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* adapts the coupling matrices outside the block of AB* to new row clusterbasis */
 static void
@@ -746,7 +736,6 @@ rkupdate_rowout_h2matrix(pclusterbasis rb, pclusteroperator rw)
     rkupdate_rowout_h2matrix(rb->son[i], rw->son[i]);
   }
 }
-
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* adapts the coupling matrices outside the block of AB* to new col clusterbasis */
@@ -788,12 +777,11 @@ rkupdate_colout_h2matrix(pclusterbasis cb, pclusteroperator cw)
   }
 }
 
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* compute the new total weights for the row cluster */
 static void
-totalweights_row_clusteroperator(pclusterbasis rb, pclusteroperator rw,
-				 ptruncmode tm)
+totalweights_row_clusteroperator(pclusterbasis rb,
+				 pclusteroperator rw, ptruncmode tm)
 {
   uint      sons = rw->sons;
 
@@ -870,11 +858,10 @@ totalweights_row_clusteroperator(pclusterbasis rb, pclusteroperator rw,
   }
 }
 
-
 /* compute the new total weights for the column cluster */
 static void
-totalweights_col_clusteroperator(pclusterbasis cb, pclusteroperator cw,
-				 ptruncmode tm)
+totalweights_col_clusteroperator(pclusterbasis cb,
+				 pclusteroperator cw, ptruncmode tm)
 {
   uint      sons = cw->sons;
 
@@ -950,7 +937,6 @@ totalweights_col_clusteroperator(pclusterbasis cb, pclusteroperator cw,
     }
   }
 }
-
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 /* adds a uniform block to the h2matrix structure */
@@ -1372,7 +1358,6 @@ rkupdate_h2matrix(prkmatrix R, ph2matrix Gh2, pclusteroperator rwf,
   clear_weight_clusterbasis(cb);
 }
 
-
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 /* builds a clusteroperator and computes the total weights for the row cluster basis */
 pclusteroperator
@@ -1395,7 +1380,6 @@ prepare_row_clusteroperator(pclusterbasis rb, pclusterbasis cb, ptruncmode tm)
 
   return rwf;
 }
-
 
 /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 /* builds a clusteroperator and computes the total weights for the column cluster basis */

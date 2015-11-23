@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "cluster.h" of the H2Lib package.
- All rights reserved, Knut Reimer 2009
- ------------------------------------------------------------ */
+ * This is the file "cluster.h" of the H2Lib package.
+ * All rights reserved, Knut Reimer 2009
+ * ------------------------------------------------------------ */
 
 /** @file cluster.h
  *  @author Knut Reimer
@@ -27,6 +28,7 @@ typedef cluster* pcluster;
 typedef const cluster *pccluster;
 
 #include "settings.h"
+#include "clustergeometry.h"
 
 /** @brief Representation of cluster trees.
  * 
@@ -68,8 +70,8 @@ struct _cluster {
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /** @brief Create a new @ref cluster object.
  * 
@@ -105,9 +107,132 @@ del_cluster(pcluster t);
 HEADER_PREFIX void
 update_cluster(pcluster t);
 
+
 /* ------------------------------------------------------------
- Statistics
+ Clustering strategies
  ------------------------------------------------------------ */
+
+/** @brief Set the clustering strategy. 
+ * 
+ * Characterises the cluster strategy stored in clustermode.
+ * 
+ * @remark Used to forward a cluster strategy to @ref build_cluster.
+ */
+
+typedef enum {
+  /** @brief  Geometrically adaptive clustering.*/
+  H2_ADAPTIVE,
+  /** @brief Geometrically regular clustering.*/
+  H2_REGULAR,
+  /** @brief Simultaneous subdivision clustering. */
+  H2_SIMSUB,
+  /** @brief Geometrically clustering based principal component analysis (PCA).*/
+  H2_PCA
+} clustermode;
+
+/**
+ * @brief Build a @ref cluster tree from a @ref clustergeometry object using
+ * adaptive clustering.
+ * 
+ * Builds an adaptive cluster tree (clustermode = H2_ADAPTIVE) basing on the 
+ * geometrical informations of the clustergeometry object.
+ * The boundig box is splitted adaptively into two parts corresponding to two
+ * sons in the direction with the largest spatial extension and the index set
+ * is splitted accordingl, if its size is greater than the leaf size, else the
+ * cluster is a leaf cluster.
+ * During this clustering the bounding boxes are updated.
+ * 
+ * @param cf clustergeometry object with geometrical information.
+ * @param size Number of indices.
+ * @param idx Index set.
+ * @param clf Maximal leaf size.
+ * @return Returns an adaptive @ref cluster tree object.
+ */
+HEADER_PREFIX pcluster
+build_adaptive_cluster(pclustergeometry cf, uint size, uint *idx, uint clf);
+
+/**
+ * @brief Build a @ref cluster tree from a @ref clustergeometry object using
+ * regular clustering.
+ * 
+ * Builds a regular @ref cluster tree (clustermode = H2_REGULAR) basing on the 
+ * geometrical informations of the @ref clustergeometry object.
+ * The splitting starts with the forwarded direction and the following directions
+ * are chosen via cycling through all possible directions.
+ * The bounding box is splitted regularly in two parts corresponding to two sons
+ * and the index set is subdivided accordingly, if its size is greater than the 
+ * leaf size, else the cluster is a leaf cluster.
+ * During this clustering the bounding boxes are updated.
+ * 
+ * @param cf @ref clustergeometry object with geometrical information.
+ * @param size Number of indices.
+ * @param idx Index set.
+ * @param clf Maximal leaf size.
+ * @param direction Direction for the next splitting step.
+ * @return Returns a regular @ref cluster tree object.
+ */
+HEADER_PREFIX pcluster
+build_regular_cluster(pclustergeometry cf, uint size, uint *idx, uint clf,
+    uint direction);
+
+/**
+ * @brief Build a @ref cluster tree from a @ref clustergeometry object using
+ *  simultaneous subdivision clustering.
+ * 
+ *  The bounding box of a cluster is regularly subdivided along each
+ *  coordinate direction, then empty sub-boxes are removed.
+ * 
+ * @param cf @ref clustergeometry object with geometrical information.
+ * @param size Number of indices.
+ * @param idx Index set.
+ * @param clf Maximal leaf size.
+ * @return Returns a @ref cluster tree object basing on simultaneous subdivision
+ * clustering
+ */
+HEADER_PREFIX pcluster
+build_simsub_cluster(pclustergeometry cf, uint size, uint *idx, uint clf);
+
+/**
+ * @brief Build a @ref cluster tree from a @ref clustergeometry object
+ *  based on the principal component analysis.
+ * 
+ *  Compute the principal directions of a cluster and split it along
+ *  the largest extent.
+ * 
+ * @param cf @ref clustergeometry object with geometrical information.
+ * @param size Number of indices.
+ * @param idx Index set.
+ * @param clf Maximal leaf size.
+ * @return Returns a @ref cluster tree object basing on pca.
+ */
+HEADER_PREFIX pcluster
+build_pca_cluster(pclustergeometry cf, uint size, uint* idx, uint clf);
+
+/**
+ * @brief Build a @ref cluster tree from a @ref clustergeometry object using
+ * cluster strategy @ref clustermode.
+ * 
+ * Builds a cluster tree basing on the geometrical information of the 
+ * @ref clustergeometry object.
+ * The parameter @ref clustermode sets the used cluster strategy and the 
+ * appropriate function defined above is called.
+ * 
+ * @param cf @ref clustergeometry object with geometrical information.
+ * @param size Number of indices.
+ * @param idx Index set.
+ * @param clf Maximal leaf size.
+ * @param mode Cluster strategy
+ * @return Returns the newly created @ref cluster tree.
+ */
+HEADER_PREFIX pcluster
+build_cluster(pclustergeometry cf, uint size, uint *idx, uint clf,
+    clustermode mode);
+
+
+
+/* ------------------------------------------------------------
+ * Statistics
+ * ------------------------------------------------------------ */
 
 /** @brief Compute the depth of a @ref cluster object.
  *
@@ -130,10 +255,16 @@ HEADER_PREFIX uint
 getmindepth_cluster(pccluster t);
 
 /* ------------------------------------------------------------
- Structure Adaptation
- ------------------------------------------------------------ */
+ * Structure Adaptation
+ * ------------------------------------------------------------ */
 
-/* Extends t until getmindepth_cluster(t) == depth */
+/**
+ * @brief Extends a given cluster @f$t@f$ until getmindepth_cluster(t) == depth.
+ *
+ * @param t Input cluster tree which minimal depth will be extended to
+ *   <tt>depth</tt>
+ * @param depth Minimal depth of the cluster tree to be reached.
+ */
 HEADER_PREFIX void
 extend_cluster(pcluster t, uint depth);
 
@@ -183,8 +314,8 @@ HEADER_PREFIX void
 setsons_cluster(pcluster t, uint sons);
 
 /* ------------------------------------------------------------
- Bounding box
- ------------------------------------------------------------ */
+ * Bounding box
+ * ------------------------------------------------------------ */
 
 /** @brief Compute the euclidian diameter of the bounding box of a cluster.
  * 
@@ -194,8 +325,7 @@ setsons_cluster(pcluster t, uint sons);
  * x,y \in B_t\right\}@f$.
  * 
  * @param t Of this cluster the euclidian diameter is computed.
- * @return Returns the euclidian diameter of the bounding box.
- */
+ * @return Returns the euclidian diameter of the bounding box. */
 HEADER_PREFIX real
 getdiam_2_cluster(pccluster t);
 
@@ -208,8 +338,7 @@ getdiam_2_cluster(pccluster t);
  * 
  * @param t Row cluster.
  * @param s Col cluster.
- * @return Returns the euclidian distance of two clusters.
- */
+ * @return Returns the euclidian distance of two clusters. */
 HEADER_PREFIX real
 getdist_2_cluster(pccluster t, pccluster s);
 
@@ -221,8 +350,7 @@ getdist_2_cluster(pccluster t, pccluster s);
  * x, y \in B_t \right\}@f$.
  * 
  * @param t Of this cluster the diameter is computed.
- * @return Returns the diameter of the bounding box in the maximum norm.
- */
+ * @return Returns the diameter of the bounding box in the maximum norm. */
 HEADER_PREFIX real
 getdiam_max_cluster(pccluster t);
 
@@ -235,14 +363,13 @@ getdiam_max_cluster(pccluster t);
  * 
  * @param t Row cluster. 
  * @param s Col cluster.
- * @return Returns the distant of two clusters in the maximum norm.
- */
+ * @return Returns the distant of two clusters in the maximum norm. */
 HEADER_PREFIX real
 getdist_max_cluster(pccluster t, pccluster s);
 
 /* ------------------------------------------------------------
- Hierarchical iterator
- ------------------------------------------------------------ */
+ * Hierarchical iterator
+ * ------------------------------------------------------------ */
 
 /** @brief Hierarchical iterator for a @ref cluster tree.
  * 
@@ -265,8 +392,8 @@ getdist_max_cluster(pccluster t, pccluster s);
  * @param pre Callback function applied before iterating through childs.
  * @param post Callback function applied after iterating through childs.
  * @param data Auxiliary data for the callback functions <tt> pre </tt> and 
- * <tt> post </tt>.
- */
+ * <tt> post </tt>. */
+
 HEADER_PREFIX void
 iterate_cluster(pccluster t, uint tname,
     void (*pre)(pccluster t, uint tname, void *data),
@@ -294,8 +421,8 @@ iterate_cluster(pccluster t, uint tname,
  * @param pre  Callback function applied for iterating through childs.
  * @param post Callback function applied for iterating through childs.
  * @param data Auxiliary data for the callback funtions <tt> pre </tt> and 
- * <tt> post </tt>.
- */
+ * <tt> post </tt>. */
+
 HEADER_PREFIX void
 iterate_parallel_cluster(pccluster t, uint tname, uint pardepth,
     void (*pre)(pccluster t, uint tname, void *data),
@@ -304,20 +431,58 @@ iterate_parallel_cluster(pccluster t, uint tname, uint pardepth,
 /* ------------------------------------------------------------
  Enumeration
  ------------------------------------------------------------ */
-/** @brief Enumerate a cluster tree.
- * 
- * Enumerates the @ref cluster tree @f$ t @f$ in an array of size @f$ t->desc @f$ 
- * by passing through all descendants
- * and ordering them in a pointer to a @ref cluster tree object.
- * The enumeration starts with @f$ 0 @f$ assigned to the root and then proceeds
- * with depth-first search.
- * 
- * @param t Cluster tree to be enumerated.
- * @return Returns a pointer, length @f$ t->desc @f$, to the cluster tree
- * enumerating all descendants. 
- */
+
+/** @brief Enumerate all clusters in a cluster tree.
+ *
+ *  The clusters are enumerated recursively, top-down and left-to-right,
+ *  i.e., the root gets the index <tt>0</tt>, the first son gets the
+ *  indices <tt>1</tt> to <tt>t->son[0]->desc</tt>, the second son
+ *  gets the indices <tt>t->son[0]->desc+1</tt> to
+ *  <tt>t->son[0]->desc+t->son[1]->desc</tt>, and so on.
+ *
+ *  The resulting array has <tt>t->desc</tt> entries.
+ *
+ *  @param t Root cluster.
+ *  @returns Array of pointers to all <tt>t->desc</tt> clusters, enumerated
+ *    top-down and left-to-right. */
 HEADER_PREFIX pcluster *
 enumerate_cluster(pcluster t);
+
+/* ------------------------------------------------------------
+ * File I/O
+ * ------------------------------------------------------------ */
+
+#ifdef USE_NETCDF
+/** @brief Write @ref cluster to NetCDF file.
+ *
+ *  @param t Cluster.
+ *  @param name File name. */
+HEADER_PREFIX void
+write_cdf_cluster(pccluster t, const char *name);
+
+/** @brief Write @ref cluster to part of a NetCDF file.
+ *
+ *  @param t Cluster.
+ *  @param nc_file File handle.
+ *  @param prefix Prefix for variable names. */
+HEADER_PREFIX void
+write_cdfpart_cluster(pccluster t, int nc_file, const char *prefix);
+
+/** @brief Read @ref cluster from NetCDF file.
+ *
+ *  @param name File name.
+ *  @returns @ref cluster read from file. */
+HEADER_PREFIX pcluster
+read_cdf_cluster(const char *name);
+
+/** @brief Read @ref cluster from part of a NetCDF file.
+ *
+ *  @param nc_file File handle.
+ *  @param prefix Prefix for variable names.
+ *  @returns @ref cluster read from file. */
+HEADER_PREFIX pcluster
+read_cdfpart_cluster(int nc_file, const char *prefix);
+#endif
 
 /** @}*/
 

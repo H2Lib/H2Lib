@@ -4,32 +4,48 @@
 #include <stdlib.h>
 
 #include "eigensolvers.h"
+#include "factorizations.h"
 
 static uint problems = 0;
-static const real tolerance = 1e-12;
+
+#ifdef USE_FLOAT
+static const real tolerance = 5.0e-5;
+#else
+static const real tolerance = 1.0e-12;
+#endif
 
 int
 main()
 {
   ptridiag  T, Tcopy;
   pamatrix  A, Acopy, Q, U, Vt;
-  pavector  sigma, work, lambda;
-  pavector  Td, Tl;
+  pavector  work;
+  prealavector sigma, lambda;
   real      error;
   uint      rows, cols, mid;
-  uint      i, j, n, iter;
+  uint      i, n, iter;
+  int       info;
+
+  /* ------------------------------------------------------------
+   * Testing symmetric tridiagonal eigenvalue solver
+   * ------------------------------------------------------------ */
 
   n = 6;
 
   /* Testing symmetric tridiagonal eigenvalue solver */
 
-  (void) printf("--------------------------------------------------\n"
-		"Setting up tridiagonal matrix\n");
+  (void) printf("==================================================\n"
+		"Testing symmetric tridiagonal eigenvalue solver\n"
+		"==================================================\n"
+		"Setting up %u x %u tridiagonal matrix\n", n, n);
   T = new_tridiag(n);
   for (i = 0; i < n; i++)
     T->d[i] = 2.0;
   for (i = 0; i < n - 1; i++)
     T->l[i] = T->u[i] = -1.0;
+  Tcopy = new_tridiag(n);
+  copy_tridiag(T, Tcopy);
+
   A = new_amatrix(n, n);
   clear_amatrix(A);
   for (i = 0; i < n; i++)
@@ -38,43 +54,67 @@ main()
     A->a[(i + 1) + i * A->ld] = T->l[i];
     A->a[i + (i + 1) * A->ld] = T->u[i];
   }
+  Acopy = clone_amatrix(A);
 
-  (void) printf("Setting up matrix for eigenvectors\n");
   Q = new_identity_amatrix(n, n);
+  U = new_amatrix(n, n);
 
-  (void) printf("Performing implicit QR iteration\n");
+  (void) printf("Performing self-made implicit QR iteration\n");
   iter = sb_muleig_tridiag(T, Q, 8 * n);
 
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, Q);
-  (void) printf("  Orthogonality Q %g, %sokay\n",
-		error, (error < tolerance ? "" : "    NOT "));
+  (void) printf("  Orthogonality Q %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
   if (error >= tolerance)
     problems++;
 
-  U = new_amatrix(n, n);
   copy_amatrix(false, Q, U);
-  for (j = 0; j < n; j++)
-    for (i = 0; i < n; i++)
-      U->a[i + j * U->ld] *= T->d[j];
+  diageval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, true, Q, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g. %sokay\n",
-		error, (error < tolerance ? "" : "    NOT "));
+  (void) printf("  Accuracy %g. %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  (void) printf("Performing default implicit QR iteration\n");
+  identity_amatrix(Q);
+  i = muleig_tridiag(Tcopy, Q);
+  if (i == 0)
+    (void) printf("  Success\n");
+  else {
+    (void) printf("  Failure\n");
+    problems++;
+  }
+
+  (void) printf("Checking accuracy\n");
+  error = check_ortho_amatrix(false, Q);
+  (void) printf("  Orthogonality Q %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  copy_amatrix(false, Q, U);
+  diageval_tridiag_amatrix(1.0, true, Tcopy, true, U);
+  addmul_amatrix(-1.0, false, U, true, Q, Acopy);
+  error = normfrob_amatrix(Acopy);
+  (void) printf("  Accuracy %g. %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
   if (error >= tolerance)
     problems++;
 
   del_amatrix(U);
   del_amatrix(Q);
+  del_amatrix(Acopy);
   del_amatrix(A);
+  del_tridiag(Tcopy);
   del_tridiag(T);
 
-  /* Testing symmetric tridiagonal eigenvalue solver */
-
   (void) printf("--------------------------------------------------\n"
-		"Setting up random tridiagonal matrix\n");
+		"Setting up random %u x %u tridiagonal matrix\n", n, n);
   T = new_tridiag(n);
   for (i = 0; i < n; i++)
     T->d[i] = 2.0 * rand() / RAND_MAX - 1.0;
@@ -92,11 +132,10 @@ main()
   }
   Tcopy = new_tridiag(n);
   copy_tridiag(T, Tcopy);
-  Acopy = new_amatrix(n, n);
-  copy_amatrix(false, A, Acopy);
+  Acopy = clone_amatrix(A);
 
-  (void) printf("Setting up matrix for eigenvectors\n");
   Q = new_identity_amatrix(n, n);
+  U = new_amatrix(n, n);
 
   (void) printf("Performing implicit QR iteration\n");
   iter = sb_muleig_tridiag(T, Q, 8 * n);
@@ -105,44 +144,37 @@ main()
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, Q);
-  (void) printf("  Orthogonality Q %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Q %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  U = new_amatrix(n, n);
   copy_amatrix(false, Q, U);
-  for (j = 0; j < n; j++)
-    for (i = 0; i < n; i++)
-      U->a[i + j * U->ld] *= T->d[j];
+  diageval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, true, Q, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g. %sokay\n",
-		error, (error < tolerance ? "" : "    NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
   if (error >= tolerance)
     problems++;
 
   (void) printf("Using default eigenvalue solver\n");
-  copy_tridiag(Tcopy, T);
-  copy_amatrix(false, Acopy, A);
   identity_amatrix(Q);
-  muleig_tridiag(T, Q);
+  muleig_tridiag(Tcopy, Q);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, Q);
-  (void) printf("  Orthogonality Q %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Q %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Q, U);
-  for (j = 0; j < n; j++)
-    for (i = 0; i < n; i++)
-      U->a[i + j * U->ld] *= T->d[j];
-  addmul_amatrix(-1.0, false, U, true, Q, A);
-  error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g. %sokay\n",
-		error, (error < tolerance ? "" : "    NOT "));
+  diageval_tridiag_amatrix(1.0, true, Tcopy, true, U);
+  addmul_amatrix(-1.0, false, U, true, Q, Acopy);
+  error = normfrob_amatrix(Acopy);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
   if (error >= tolerance)
     problems++;
 
@@ -153,16 +185,21 @@ main()
   del_tridiag(Tcopy);
   del_tridiag(T);
 
-  (void) printf("--------------------------------------------------\n"
-		"Setting up random self-adjoint matrix\n");
+  /* ------------------------------------------------------------
+   * Testing self-adjoint matrix eigenvalue solver
+   * ------------------------------------------------------------ */
+
+  (void) printf("==================================================\n"
+		"Testing self-adjoint matrix eigenvalue solver\n"
+		"==================================================\n"
+		"Setting up random %u x %u self-adjoint matrix\n", n, n);
   A = new_amatrix(n, n);
   random_selfadjoint_amatrix(A);
 
   Acopy = new_amatrix(n, n);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrix for eigenvectors\n");
-  lambda = new_avector(n);
+  lambda = new_realavector(n);
   Q = new_identity_amatrix(n, n);
 
   (void) printf("Performing implicit QR iteration\n");
@@ -172,56 +209,56 @@ main()
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, Q);
-  (void) printf("  Orthogonality Q %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Q %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   U = new_amatrix(n, n);
   copy_amatrix(false, Q, U);
   copy_amatrix(false, Acopy, A);
-  for (j = 0; j < n; j++)
-    for (i = 0; i < n; i++)
-      U->a[i + j * U->ld] *= lambda->v[j];
+  diageval_realavector_amatrix(1.0, true, lambda, true, U);
   addmul_amatrix(-1.0, false, U, true, Q, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g. %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   (void) printf("Using default eigenvalue solver\n");
   copy_amatrix(false, Acopy, A);
-  eig_amatrix(A, lambda, Q);
+  info = eig_amatrix(A, lambda, Q);
+  assert(info == 0);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, Q);
-  (void) printf("  Orthogonality Q %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Q %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Q, U);
-  copy_amatrix(false, Acopy, A);
-  for (j = 0; j < n; j++)
-    for (i = 0; i < n; i++)
-      U->a[i + j * U->ld] *= lambda->v[j];
-  addmul_amatrix(-1.0, false, U, true, Q, A);
-  error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g. %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  diageval_realavector_amatrix(1.0, true, lambda, true, U);
+  addmul_amatrix(-1.0, false, U, true, Q, Acopy);
+  error = normfrob_amatrix(Acopy);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_amatrix(U);
   del_amatrix(Q);
-  del_avector(lambda);
+  del_realavector(lambda);
   del_amatrix(Acopy);
   del_amatrix(A);
 
-  /* Testing bidiagonal SVD computation */
+  /* ------------------------------------------------------------
+   * Testing bidiagonal SVD solver
+   * ------------------------------------------------------------ */
 
-  (void) printf("--------------------------------------------------\n"
+  (void) printf("==================================================\n"
+		"Testing bidiagonal SVD solver\n"
+		"==================================================\n"
 		"Setting up bidiagonal %u x %u matrix\n", n, n);
   T = new_tridiag(n);
   for (i = 0; i < n; i++)
@@ -242,35 +279,31 @@ main()
   Acopy = new_amatrix(n, n);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_identity_amatrix(n, n);
   Vt = new_identity_amatrix(n, n);
 
-  (void) printf("Performing implicit SVD iteration\n");
+  (void) printf("Performing self-made implicit SVD iteration\n");
   iter = sb_mulsvd_tridiag(T, U, Vt, 8 * n);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= T->d[j];
+  diageval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
@@ -282,25 +315,23 @@ main()
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Acopy, A);
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= T->d[j];
+  diageval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
@@ -310,8 +341,6 @@ main()
   del_tridiag(Tcopy);
   del_amatrix(A);
   del_tridiag(T);
-
-  /* Testing random bidiagonal SVD computation */
 
   (void) printf("--------------------------------------------------\n"
 		"Setting up random bidiagonal %u x %u matrix\n", n, n);
@@ -332,38 +361,33 @@ main()
 
   Tcopy = new_tridiag(n);
   copy_tridiag(T, Tcopy);
-  Acopy = new_amatrix(n, n);
-  copy_amatrix(false, A, Acopy);
+  Acopy = clone_amatrix(A);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_identity_amatrix(n, n);
   Vt = new_identity_amatrix(n, n);
 
   (void) printf("Performing implicit SVD iteration\n");
   iter = sb_mulsvd_tridiag(T, U, Vt, 8 * n);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= T->d[j];
+  diageval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
@@ -376,24 +400,22 @@ main()
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= T->d[j];
+  diageval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
@@ -404,10 +426,57 @@ main()
   del_amatrix(A);
   del_tridiag(T);
 
-  /* Testing bidiagonalization */
+  /* ------------------------------------------------------------
+   * Testing Golub-Kahan bidiagonalization
+   * ------------------------------------------------------------ */
 
   rows = 10;
   cols = 7;
+  mid = UINT_MIN(rows, cols);
+  (void) printf("==================================================\n"
+		"Testing Golub-Kahan bidiagonalization\n"
+		"==================================================\n"
+		"Setting up random %u x %u matrix\n", rows, cols);
+  A = new_amatrix(rows, cols);
+  random_amatrix(A);
+  Acopy = new_amatrix(rows, cols);
+  copy_amatrix(false, A, Acopy);
+  U = new_amatrix(rows, mid);
+  Vt = new_amatrix(mid, cols);
+  T = new_tridiag(mid);
+
+  (void) printf("Bidiagonalizing\n");
+  bidiagonalize_amatrix(A, T, U, Vt);
+
+  (void) printf("Checking accuracy\n");
+  error = check_ortho_amatrix(false, U);
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  error = check_ortho_amatrix(true, Vt);
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  lowereval_tridiag_amatrix(1.0, true, T, true, U);
+  addmul_amatrix(-1.0, false, U, false, Vt, Acopy);
+  error = normfrob_amatrix(Acopy);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  del_tridiag(T);
+  del_amatrix(Vt);
+  del_amatrix(U);
+  del_amatrix(Acopy);
+  del_amatrix(A);
+
+  rows = 8;
+  cols = 15;
   mid = UINT_MIN(rows, cols);
   (void) printf("--------------------------------------------------\n"
 		"Setting up %u x %u matrix\n", rows, cols);
@@ -416,46 +485,46 @@ main()
   Acopy = new_amatrix(rows, cols);
   copy_amatrix(false, A, Acopy);
   U = new_amatrix(rows, mid);
-  Vt = new_amatrix(cols, mid);
+  Vt = new_amatrix(mid, cols);
   T = new_tridiag(mid);
 
   (void) printf("Bidiagonalizing\n");
-  sb_bidiagonalize_amatrix(A, T, U, Vt);
+  bidiagonalize_amatrix(A, T, U, Vt);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  Td = new_pointer_avector(T->d, T->dim);
-  Tl = new_pointer_avector(T->l, T->dim - 1);
-  bidiagmul_amatrix(1.0, false, U, Td, Tl);
+  lowereval_tridiag_amatrix(1.0, true, T, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, Acopy);
   error = normfrob_amatrix(Acopy);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  del_avector(Tl);
-  del_avector(Td);
   del_tridiag(T);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
   del_amatrix(A);
 
-  /* Testing general SVD computation */
+  /* ------------------------------------------------------------
+   * Testing general SVD solver
+   * ------------------------------------------------------------ */
 
-  (void) printf("--------------------------------------------------\n"
+  (void) printf("==================================================\n"
+		"Testing general SVD solver\n"
+		"==================================================\n"
 		"Setting up 3 x 4 matrix\n");
   A = new_amatrix(3, 4);
   setentry_amatrix(A, 0, 0, 1.0);
@@ -474,42 +543,39 @@ main()
   Acopy = new_amatrix(A->rows, A->cols);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_identity_amatrix(3, 3);
   Vt = new_identity_amatrix(3, 4);
-  sigma = new_avector(3);
+  sigma = new_realavector(3);
   work = new_avector(3 * 3);
 
-  (void) printf("Computing SVD\n");
+  (void) printf("Running self-made SVD solver\n");
   iter = sb_svd_amatrix(A, sigma, U, Vt, 24);
 
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, Acopy);
   error = normfrob_amatrix(Acopy);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_avector(work);
-  del_avector(sigma);
+  del_realavector(sigma);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
@@ -534,48 +600,42 @@ main()
   Acopy = new_amatrix(A->rows, A->cols);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_amatrix(4, 3);
   Vt = new_amatrix(3, 3);
-  sigma = new_avector(3);
+  sigma = new_realavector(3);
   work = new_avector(3 * 3);
 
-  (void) printf("Computing SVD\n");
+  (void) printf("Running self-made SVD solver\n");
   iter = sb_svd_amatrix(A, sigma, U, Vt, 24);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality V %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality V %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, Acopy);
   error = normfrob_amatrix(Acopy);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_avector(work);
-  del_avector(sigma);
+  del_realavector(sigma);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
   del_amatrix(A);
-
-  /* Testing thin SVD computation */
 
   (void) printf("--------------------------------------------------\n"
 		"Setting up 4 x 3 matrix\n");
@@ -593,54 +653,47 @@ main()
   setentry_amatrix(A, 3, 1, 4.0);
   setentry_amatrix(A, 3, 2, 7.0);
 
-  Acopy = new_amatrix(A->rows, A->cols);
-  copy_amatrix(false, A, Acopy);
+  Acopy = clone_amatrix(A);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_amatrix(4, 3);
   Vt = new_amatrix(3, 3);
-  sigma = new_avector(3);
+  sigma = new_realavector(3);
   work = new_avector(3 * 3);
 
-  (void) printf("Computing SVD\n");
+  (void) printf("Running self-made SVD solver\n");
   iter = sb_svd_amatrix(A, sigma, U, Vt, 24);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, Acopy);
   error = normfrob_amatrix(Acopy);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_avector(work);
-  del_avector(sigma);
+  del_realavector(sigma);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
   del_amatrix(A);
-
-  /* Testing random thin SVD computation */
 
   rows = 9;
-  cols = 9;
+  cols = 7;
   mid = UINT_MIN(rows, cols);
   (void) printf("--------------------------------------------------\n"
 		"Setting up random %u x %u matrix\n", rows, cols);
@@ -650,42 +703,38 @@ main()
   Acopy = new_amatrix(A->rows, A->cols);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_amatrix(rows, mid);
   Vt = new_amatrix(mid, cols);
-  sigma = new_avector(mid);
+  sigma = new_realavector(mid);
   work = new_avector(3 * mid);
 
-  (void) printf("Computing SVD\n");
+  (void) printf("Running self-made SVD solver\n");
   iter = sb_svd_amatrix(A, sigma, U, Vt, 10 * mid);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, Acopy);
   error = normfrob_amatrix(Acopy);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_avector(work);
-  del_avector(sigma);
+  del_realavector(sigma);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
@@ -702,71 +751,65 @@ main()
   Acopy = new_amatrix(A->rows, A->cols);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_amatrix(rows, mid);
   Vt = new_amatrix(mid, cols);
-  sigma = new_avector(mid);
+  sigma = new_realavector(mid);
   work = new_avector(3 * mid);
 
-  (void) printf("Computing SVD\n");
+  (void) printf("Running self-made SVD solver\n");
   iter = sb_svd_amatrix(A, sigma, U, Vt, 10 * mid);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Acopy, A);
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  (void) printf("Using default SVD solver\n");
+  (void) printf("Running default SVD solver\n");
   copy_amatrix(false, Acopy, A);
   svd_amatrix(A, sigma, U, Vt);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Acopy, A);
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_avector(work);
-  del_avector(sigma);
+  del_realavector(sigma);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
@@ -783,81 +826,74 @@ main()
   Acopy = new_amatrix(A->rows, A->cols);
   copy_amatrix(false, A, Acopy);
 
-  (void) printf("Setting up matrices for singular vectors\n");
   U = new_amatrix(rows, mid);
   Vt = new_amatrix(mid, cols);
-  sigma = new_avector(mid);
+  sigma = new_realavector(mid);
   work = new_avector(3 * mid);
 
-  (void) printf("Computing SVD\n");
+  (void) printf("Running self-made SVD solver\n");
   iter = sb_svd_amatrix(A, sigma, U, Vt, 10 * mid);
-
   (void) printf("  %u iterations\n", iter);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Acopy, A);
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
-  (void) printf("Using default SVD solver\n");
+  (void) printf("Running default SVD solver\n");
   copy_amatrix(false, Acopy, A);
   svd_amatrix(A, sigma, U, Vt);
 
   (void) printf("Checking accuracy\n");
   error = check_ortho_amatrix(false, U);
-  (void) printf("  Orthogonality U %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality U %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   error = check_ortho_amatrix(true, Vt);
-  (void) printf("  Orthogonality Vt %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Orthogonality Vt %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   copy_amatrix(false, Acopy, A);
-  for (j = 0; j < U->cols; j++)
-    for (i = 0; i < U->rows; i++)
-      U->a[i + j * U->ld] *= sigma->v[j];
+  diageval_realavector_amatrix(1.0, true, sigma, true, U);
   addmul_amatrix(-1.0, false, U, false, Vt, A);
   error = normfrob_amatrix(A);
-  (void) printf("  Accuracy %g, %sokay\n",
-		error, (error < tolerance ? "" : "NOT "));
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "NOT "));
   if (error >= tolerance)
     problems++;
 
   del_avector(work);
-  del_avector(sigma);
+  del_realavector(sigma);
   del_amatrix(Vt);
   del_amatrix(U);
   del_amatrix(Acopy);
   del_amatrix(A);
 
-  (void) printf("----------------------------------------\n"
-		"  %u matrices and\n"
-		"  %u vectors still active\n"
-		"  %u errors found\n",
-		getactives_amatrix(), getactives_avector(), problems);
+  printf("  %u matrices and\n"
+	 "  %u vectors still active\n"
+	 "  %u errors found\n", getactives_amatrix(), getactives_avector(),
+	 problems);
 
   return problems;
 }

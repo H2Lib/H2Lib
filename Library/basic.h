@@ -1,12 +1,11 @@
 
 /* ------------------------------------------------------------
-   This is the file "basic.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ * This is the file "basic.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file basic.h
-    @author Steffen B&ouml;rm */
-
+ *  @author Steffen B&ouml;rm */
 
 #ifndef BASIC_H
 #define BASIC_H
@@ -31,8 +30,8 @@ typedef stopwatch *pstopwatch;
 #include "settings.h"
 
 /* ------------------------------------------------------------
-   Miscellaneous
-   ------------------------------------------------------------ */
+ * Miscellaneous
+ * ------------------------------------------------------------ */
 
 /** @brief Mathematical constant @f$\pi@f$. */
 #ifndef M_PI
@@ -54,14 +53,18 @@ extern int max_pardepth;
 #define H2_MACH_EPS 1e-13
 
 /* ------------------------------------------------------------
-   Set up the library
-   ------------------------------------------------------------ */
+ Set up the library
+ ------------------------------------------------------------ */
 
 /** @brief Initialize the library.
  *
  *  This function prepares the run-time environment for calls to
  *  library functions, e.g., by initializing external libraries
- *  like GTK+ or FreeGLUT that are required by some functions. */
+ *  like GTK+ or FreeGLUT that are required by some functions.
+ *
+ *  @param argc Number of command line parameters.
+ *  @param argv Values of command line parameters.
+ */
 HEADER_PREFIX void
 init_h2lib(int *argc, char ***argv);
 
@@ -73,8 +76,8 @@ HEADER_PREFIX void
 uninit_h2lib();
 
 /* ------------------------------------------------------------
-   General utility macros and functions
-   ------------------------------------------------------------ */
+ * General utility macros and functions
+ * ------------------------------------------------------------ */
 
 #ifdef ABS
 #undef ABS
@@ -86,23 +89,50 @@ uninit_h2lib();
 
 /* Macros for the type "field" */
 
-/** @brief Compute the complex conjugate @f$\bar x@f$ of a field element @f$x@f$. */
-#define CONJ(x) (x)
-
 /** @brief Get the real part @f$a@f$ of a field element @f$x=a+ib@f$. */
+#ifdef USE_COMPLEX
+#ifdef USE_FLOAT
+#define REAL(x) crealf(x)
+#else
+#define REAL(x) creal(x)
+#endif
+#else
 #define REAL(x) (x)
+#endif
 
 /** @brief Get the imaginary part @f$b@f$ of a field element @f$x=a+ib@f$. */
-#define IMAG(x) 0
+#ifdef USE_COMPLEX
+#ifdef USE_FLOAT
+#define IMAG(x) cimagf(x)
+#else
+#define IMAG(x) cimag(x)
+#endif
+#else
+#define IMAG(x) 0.0
+#endif
+
+/** @brief Compute the complex conjugate @f$\bar x@f$ of a field element @f$x@f$. */
+#ifdef USE_COMPLEX
+#ifdef USE_FLOAT
+#define CONJ(x) conjf(x)
+#else
+#define CONJ(x) conj(x)
+#endif
+#else
+#define CONJ(x) (x)
+#endif
 
 /** @brief Compute the square of the absolute value @f$|x|^2@f$ of a field element @f$x@f$. */
 #define ABSSQR(x) _h2_abssqr(x)
 
 /** @brief Compute the absolute value @f$|x|@f$ of a field element @f$x@f$. */
-#define ABS(x) fabs(x)
+#define ABS(x) REAL_SQRT(ABSSQR(x))
 
 /** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$. */
 #define SIGN(x) _h2_sgn(x)
+
+/** @brief Compute a (pseudo-)random field element */
+#define FIELD_RAND() _h2_fieldrand()
 
 /* Macros for the type "real" */
 
@@ -112,17 +142,109 @@ uninit_h2lib();
 /** @brief Compute the square @f$x^2@f$ of a real number @f$x@f$. */
 #define REAL_SQR(x) _h2_real_sqr(x)
 
-/** @brief Compute the square root @f$\sqrt{x}@f$ of a non-negative real nunber @f$x@f$. */
-#define REAL_SQRT(x) sqrt(x)
-
-/** @brief Compute the natural logarithm @f$\ln(x)@f$ of a positive real number @f$x@f$. */
-#define REAL_LOG(x) log(x)
-
 /** @brief Compute the sine @f$\sin(x)@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_SIN(x) sinf(x)
+#else
 #define REAL_SIN(x) sin(x)
+#endif
+
+/** @brief Compute the cosine @f$\cos(x)@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_COS(x) cosf(x)
+#else
+#define REAL_COS(x) cos(x)
+#endif
+
+/** @brief Compute the tangent @f$\tan(x)@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_TAN(x) tanf(x)
+#else
+#define REAL_TAN(x) tan(x)
+#endif
+
+/** @brief Compute the square root @f$\sqrt{x}@f$ of a non-negative real nunber @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_SQRT(x) sqrtf(x)
+#else
+#define REAL_SQRT(x) sqrt(x)
+#endif
+
+/** @brief Compute the reciprocal square root @f$1.0/\sqrt{x}@f$ of a
+ *  non-negative real nunber @f$x@f$. */
+#define REAL_RSQRT(x) _h2_rsqrt(x)
 
 /** @brief Compute the @f$y@f$-th power @f$x^y@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_POW(x, y) powf(x, y)
+#else
 #define REAL_POW(x, y) pow(x, y)
+#endif
+
+/** @brief Compute the natural logarithm @f$\ln(x)@f$ of a positive real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_LOG(x) logf(x)
+#else
+#define REAL_LOG(x) log(x)
+#endif
+
+/** @brief Compute the exponetial function @f$\exp(x)@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_EXP(x) expf(x)
+#else
+#define REAL_EXP(x) exp(x)
+#endif
+
+/** @brief Compute a (pseudo-)random real number */
+#define REAL_RAND() _h2_realrand()
+
+/** @brief Compute dot product of vectors of dimension 2, i.e.
+ *   @f$ \bar x_1 y_1 + \bar x_2 y_2 @f$ */
+#define DOT2(x,y) (CONJ(x[0]) * y[0] + CONJ(x[1]) * y[1])
+
+/** @brief Compute dot product of vectors of dimension 3, i.e.
+ *   @f$ \bar x_1 y_1 + \bar x_2 y_2 + \bar x_3 y_3 @f$ */
+#define DOT3(x,y) (CONJ(x[0]) * y[0] + CONJ(x[1]) * y[1] + CONJ(x[2]) * y[2])
+
+/** @brief Compute squared 2-norm of a vector of  dimension 2, i.e.
+ *   @f$ \lvert x \rvert^2 + \lvert y \rvert^2 @f$*/
+#define NORMSQR2(x,y) (ABSSQR(x) + ABSSQR(y))
+
+/** @brief Compute squared 2-norm of a vector of dimension 3, i.e.
+ *   @f$ \lvert x \rvert^2 + \lvert y \rvert^2 + \lvert z \rvert^2 @f$*/
+#define NORMSQR3(x,y,z) (ABSSQR(x) + ABSSQR(y) + ABSSQR(z))
+
+/** @brief Compute 2-norm of a vector of dimension 2, i.e.
+ *   @f$ \sqrt{\lvert x \rvert^2 + \lvert y \rvert^2} @f$*/
+#define NORM2(x,y) REAL_SQRT(ABSSQR(x) + ABSSQR(y))
+
+/** @brief Compute 2-norm of a vector of dimension 3, i.e.
+ *   @f$ \sqrt{\lvert x \rvert^2 + \lvert y \rvert^2 + \lvert z \rvert^2} @f$*/
+#define NORM3(x,y,z) REAL_SQRT(ABSSQR(x) + ABSSQR(y) + ABSSQR(z))
+
+/** @brief Compute dot product of vectors of reals with dimension 2, i.e.
+ *   @f$ x_1 y_1 + x_2 y_2 @f$ */
+#define REAL_DOT2(x,y) (x[0] * y[0] + x[1] * y[1])
+
+/** @brief Compute dot product of vectors of reals with dimension 3, i.e.
+ *   @f$ x_1 y_1 + x_2 y_2 + x_3 y_3 @f$ */
+#define REAL_DOT3(x,y) (x[0] * y[0] + x[1] * y[1] + x[2] * y[2])
+
+/** @brief Compute squared 2-norm of a vector of reals with dimension 2, i.e.
+ *   @f$ x^2 + y^2 @f$*/
+#define REAL_NORMSQR2(x,y) (REAL_SQR(x) + REAL_SQR(y))
+
+/** @brief Compute squared 2-norm of a vector of reals with dimension 3, i.e.
+ *   @f$ x^2 + y^2 +z^2 @f$*/
+#define REAL_NORMSQR3(x,y,z) (REAL_SQR(x) + REAL_SQR(y) + REAL_SQR(z))
+
+/** @brief Compute 2-norm of a vector of reals with dimension 2, i.e.
+ *   @f$ \sqrt{x^2 + y^2} @f$*/
+#define REAL_NORM2(x,y) REAL_SQRT(REAL_SQR(x) + REAL_SQR(y))
+
+/** @brief Compute 2-norm of a vector of reals with dimension 3, i.e.
+ *   @f$ \sqrt{x^2 + y^2 + z^2} @f$*/
+#define REAL_NORM3(x,y,z) REAL_SQRT(REAL_SQR(x) + REAL_SQR(y) + REAL_SQR(z))
 
 /** @brief Compute the maximum @f$\max\{x,y\}@f$ of two real numbers @f$x@f$ and @f$y@f$. */
 #define REAL_MAX(x, y) _h2_realmax(x, y)
@@ -151,47 +273,95 @@ uninit_h2lib();
 #define UINT_MIN3(x, y, z) _h2_uintmin3(x, y, z)
 
 #ifdef __GNUC__
+INLINE_PREFIX real _h2_rsqrt(real x) __attribute__((unused,const));
 INLINE_PREFIX real _h2_abssqr(field x) __attribute__((unused,const));
 INLINE_PREFIX field _h2_sgn(field x) __attribute__((unused,const));
+INLINE_PREFIX field _h2_fieldrand() __attribute__((unused,const));
 INLINE_PREFIX real _h2_real_sqr(real x) __attribute__((unused,const));
 INLINE_PREFIX real _h2_realmax(real a, real b) __attribute__((unused,const));
 INLINE_PREFIX real _h2_realmax3(real a, real b, real c) __attribute__((unused,const));
 INLINE_PREFIX real _h2_realmin(real a, real b) __attribute__((unused,const));
 INLINE_PREFIX real _h2_realmin3(real a, real b, real c) __attribute__((unused,const));
+INLINE_PREFIX real _h2_realrand() __attribute__((unused,const));
 INLINE_PREFIX uint _h2_uintmax(uint a, uint b) __attribute__((unused,const));
 INLINE_PREFIX uint _h2_uintmax3(uint a, uint b, uint c) __attribute__((unused,const));
 INLINE_PREFIX uint _h2_uintmin(uint a, uint b) __attribute__((unused,const));
 INLINE_PREFIX uint _h2_uintmin3(uint a, uint b, uint c) __attribute__((unused,const));
+#else
+INLINE_PREFIX real _h2_realrand();
 #endif
+
+/** @brief Compute the reciprocal square root @f$1.0/\sqrt{x}@f$ of a
+ *  non-negative real nunber @f$x@f$. 
+ *  @param x Input value
+ */
+INLINE_PREFIX real _h2_rsqrt(real x) {
+  return r_one / REAL_SQRT(x);
+}
 
 /** @brief Compute the square of the absolute value @f$|x|^2@f$ of a field element @f$x@f$.
  *
  *  @param x Real number @f$x@f$.
  *  @returns Square @f$|x|^2@f$. */
-INLINE_PREFIX real
-_h2_abssqr(field x)
-{
-  return x*x;
+#ifdef USE_COMPLEX
+INLINE_PREFIX real _h2_abssqr(field x) {
+  real rx = REAL(x);
+  real ix = IMAG(x);
+
+  return rx * rx + ix * ix;
 }
+#else
+INLINE_PREFIX real _h2_abssqr(field x) {
+  return x * x;
+}
+#endif
 
 /** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$.
  *
  *  @param x Field element @f$x@f$.
  *  @returns Sign of @f$x@f$, i.e., @f$x/|x|@f$ if @f$x\neq 0@f$ and @f$1@f$ if @f$x=0@f$. */
+#ifdef USE_COMPLEX
+INLINE_PREFIX field _h2_sgn(field x) {
+  real norm, rx, ix;
+
+  if (x == f_zero) {
+    return x;
+  } else {
+    rx = REAL(x);
+    ix = IMAG(x);
+    norm = REAL_RSQRT(rx * rx + ix * ix);
+    return rx * norm + ix * norm * I;
+  }
+}
+#else
+INLINE_PREFIX field _h2_sgn(field x) {
+  return (x < f_zero ? f_minusone : f_one);
+}
+#endif
+
+/** @brief Compute a (pseudo-)random number.
+ *
+ *  @returns Random number with real and imaginary part in
+ *    @f$[-1,1]@f$. */
 INLINE_PREFIX field
-_h2_sgn(field x)
+_h2_fieldrand()
 {
-  return (x < 0.0 ? -1.0 : 1.0);
+  field x;
+
+  x = _h2_realrand();
+#ifdef USE_COMPLEX
+  x += f_i * _h2_realrand();
+#endif
+
+  return x;
 }
 
 /** @brief Compute the square @f$x^2@f$ of a real number @f$x@f$.
  *
  *  @param x Real number @f$x@f$.
  *  @returns Square @f$x^2@f$. */
-INLINE_PREFIX real
-_h2_real_sqr(real x)
-{
-  return x*x;
+INLINE_PREFIX real _h2_real_sqr(real x) {
+  return x * x;
 }
 
 /** @brief Compute the maximum @f$\max\{x,y\}@f$ of two real numbers @f$x@f$ and @f$y@f$.
@@ -199,9 +369,7 @@ _h2_real_sqr(real x)
  *  @param x First number.
  *  @param y Second number.
  *  @returns Maximum of @f$x@f$ and @f$y@f$. */
-INLINE_PREFIX real
-_h2_realmax(real x, real y)
-{
+INLINE_PREFIX real _h2_realmax(real x, real y) {
   return (x < y ? y : x);
 }
 
@@ -211,12 +379,8 @@ _h2_realmax(real x, real y)
  *  @param y Second number.
  *  @param z Third number.
  *  @returns Maximum of @f$x@f$, @f$y@f$, and @f$z@f$. */
-INLINE_PREFIX real
-_h2_realmax3(real x, real y, real z)
-{
-  return (x < y ?
-	  (y < z ? z : y) :
-	  (x < z ? z : x));
+INLINE_PREFIX real _h2_realmax3(real x, real y, real z) {
+  return (x < y ? (y < z ? z : y) : (x < z ? z : x));
 }
 
 /** @brief Compute the minimum @f$\min\{x,y\}@f$ of two real numbers @f$x@f$ and @f$y@f$.
@@ -224,9 +388,7 @@ _h2_realmax3(real x, real y, real z)
  *  @param x First number.
  *  @param y Second number.
  *  @returns Minimum of @f$x@f$ and @f$y@f$. */
-INLINE_PREFIX real
-_h2_realmin(real a, real b)
-{
+INLINE_PREFIX real _h2_realmin(real a, real b) {
   return (a < b ? a : b);
 }
 
@@ -236,12 +398,17 @@ _h2_realmin(real a, real b)
  *  @param y Second number.
  *  @param z Third number.
  *  @returns Minimum of @f$x@f$, @f$y@f$ and @f$z@f$. */
+INLINE_PREFIX real _h2_realmin3(real x, real y, real z) {
+  return (x < y ? (z < x ? z : x) : (z < y ? z : y));
+}
+
+/** @brief Compute a (pseudo-)random number.
+ *
+ *  @returns Random number in @f$[-1,1]@f$. */
 INLINE_PREFIX real
-_h2_realmin3(real x, real y, real z)
+_h2_realrand()
 {
-  return (x < y ?
-	  (z < x ? z : x) :
-	  (z < y ? z : y));
+  return 2.0 * rand() / RAND_MAX - 1.0;
 }
 
 /** @brief Compute the maximum @f$\max\{x,y\}@f$ of two unsigned integers @f$x@f$ and @f$y@f$.
@@ -249,9 +416,7 @@ _h2_realmin3(real x, real y, real z)
  *  @param x First number.
  *  @param y Second number.
  *  @returns Maximum of @f$x@f$ and @f$y@f$. */
-INLINE_PREFIX uint
-_h2_uintmax(uint x, uint y)
-{
+INLINE_PREFIX uint _h2_uintmax(uint x, uint y) {
   return (x < y ? y : x);
 }
 
@@ -261,12 +426,8 @@ _h2_uintmax(uint x, uint y)
  *  @param y Second number.
  *  @param z Third number.
  *  @returns Maximum of @f$x@f$, @f$y@f$ and @f$z@f$. */
-INLINE_PREFIX uint
-_h2_uintmax3(uint x, uint y, uint z)
-{
-  return (x < y ?
-	  (y < z ? z : y) :
-	  (x < z ? z : x));
+INLINE_PREFIX uint _h2_uintmax3(uint x, uint y, uint z) {
+  return (x < y ? (y < z ? z : y) : (x < z ? z : x));
 }
 
 /** @brief Compute the minimum @f$\min\{x,y,z\}@f$ of two unsigned integers @f$x,y@f$ and @f$z@f$.
@@ -274,9 +435,7 @@ _h2_uintmax3(uint x, uint y, uint z)
  *  @param x First number.
  *  @param y Second number.
  *  @returns Minimum of @f$x@f$ and @f$y@f$. */
-INLINE_PREFIX uint
-_h2_uintmin(uint x, uint y)
-{
+INLINE_PREFIX uint _h2_uintmin(uint x, uint y) {
   return (x < y ? x : y);
 }
 
@@ -286,17 +445,13 @@ _h2_uintmin(uint x, uint y)
  *  @param y Second number.
  *  @param z Third number.
  *  @returns Minimum of @f$x@f$, @f$y@f$ and @f$z@f$. */
-INLINE_PREFIX uint
-_h2_uintmin3(uint x, uint y, uint z)
-{
-  return (x < y ?
-	  (z < x ? z : x) :
-	  (z < y ? z : y));
+INLINE_PREFIX uint _h2_uintmin3(uint x, uint y, uint z) {
+  return (x < y ? (z < x ? z : x) : (z < y ? z : y));
 }
 
 /* ------------------------------------------------------------
-   Memory management
-   ------------------------------------------------------------ */
+ * Memory management
+ * ------------------------------------------------------------ */
 
 /** @brief Allocate heap storage.
  *
@@ -382,9 +537,21 @@ void
 freemem(void *ptr);
 
 /* ------------------------------------------------------------
-   Sorting
-   ------------------------------------------------------------ */
+ * Sorting
+ * ------------------------------------------------------------ */
 
+/** @brief Heapsort algorithm.
+ *
+ *  This function permutes the given array to put it into increasing
+ *  order.
+ *
+ *  @param n Number of array elements.
+ *  @param leq Return <tt>true</tt> if the array element corresponding
+ *  to the first index is less than or equal to the one corresponding to
+ *  the second index.
+ *  @param swap Swap the array elements corresponding to the first and
+ *  second index.
+ *  @param data Array to be sorted. */
 #define heapsort(n,leq,swap,data) _h2_heapsort(n,leq,swap,data)
 
 /** @brief Heapsort algorithm.
@@ -400,12 +567,12 @@ freemem(void *ptr);
  *  second index.
  *  @param data Array to be sorted. */
 HEADER_PREFIX void
-_h2_heapsort(uint n, uint leq(uint, uint, void *), void swap(uint, uint, void *),
-	     void *data);
+_h2_heapsort(uint n, bool leq(uint, uint, void *),
+    void swap(uint, uint, void *), void *data);
 
 /* ------------------------------------------------------------
-   Timing
-   ------------------------------------------------------------ */
+ * Timing
+ * ------------------------------------------------------------ */
 
 /** @brief Create a @ref stopwatch object.
  *
@@ -441,8 +608,8 @@ HEADER_PREFIX real
 stop_stopwatch(pstopwatch sw);
 
 /* ------------------------------------------------------------
-   Drawing
-   ------------------------------------------------------------ */
+ *  Drawing
+ * ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
 /** @brief Create a PDF canvas for Cairo drawing.
