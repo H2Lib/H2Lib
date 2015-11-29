@@ -128,7 +128,9 @@ uninit_h2lib();
 /** @brief Compute the absolute value @f$|x|@f$ of a field element @f$x@f$. */
 #define ABS(x) REAL_SQRT(ABSSQR(x))
 
-/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$. */
+/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$.
+ *
+ *  Note that @f$|\mathop{\rm sgn}(x)|=1@f$ even if @f$x=0@f$. */
 #define SIGN(x) _h2_sgn(x)
 
 /** @brief Compute a (pseudo-)random field element */
@@ -325,7 +327,7 @@ INLINE_PREFIX field _h2_sgn(field x) {
   real norm, rx, ix;
 
   if (x == f_zero) {
-    return x;
+    return 1.0;
   } else {
     rx = REAL(x);
     ix = IMAG(x);
