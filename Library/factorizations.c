@@ -1838,7 +1838,7 @@ qrdecomp_amatrix(pamatrix a, pavector tau)
     else {
       /* Determine reflection vector v */
       diag = aa[k + k * lda];
-      alpha = -SIGN(diag) * norm;
+      alpha = -SIGN1(diag) * norm;
 
       /* Compute norm of v */
       beta = 1.0 / (norm2 - CONJ(alpha) * diag);
@@ -1935,7 +1935,7 @@ qrdecomp_pivot_amatrix(pamatrix a, pavector tau, uint * colpiv)
     else {
       /* Determine reflection vector v */
       diag = aa[k + k * lda];
-      alpha = -SIGN(diag) * norm;
+      alpha = -SIGN1(diag) * norm;
 
       /* Compute norm of v */
       beta = 1.0 / (norm2 - CONJ(alpha) * diag);
@@ -2051,7 +2051,7 @@ qrdecomp_rank_amatrix(pamatrix a, pavector tau, pctruncmode tm, real eps,
     else {
       /* Determine reflection vector v */
       diag = aa[k + k * lda];
-      alpha = -SIGN(diag) * norm;
+      alpha = -SIGN1(diag) * norm;
 
       /* Compute norm of v */
       beta = 1.0 / (norm2 - CONJ(alpha) * diag);
@@ -2158,7 +2158,7 @@ qrdecomp_pivot_amatrix(pamatrix a, pavector tau, uint * colpiv)
     else {
       /* Determine reflection vector v */
       diag = aa[k + k * lda];
-      alpha = -SIGN(diag) * norm;
+      alpha = -SIGN1(diag) * norm;
 
       /* Compute norm of v */
       beta = 1.0 / (norm2 - CONJ(alpha) * diag);
@@ -2280,7 +2280,7 @@ qrdecomp_rank_amatrix(pamatrix a, pavector tau, pctruncmode tm, real eps,
     else {
       /* Determine reflection vector v */
       diag = aa[k + k * lda];
-      alpha = -SIGN(diag) * norm;
+      alpha = -SIGN1(diag) * norm;
 
       /* Compute norm of v */
       beta = 1.0 / (norm2 - CONJ(alpha) * diag);
