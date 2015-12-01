@@ -1632,7 +1632,7 @@ ssyev_(const char *jobz, const char *uplo, const unsigned *n, float *a,
     const unsigned *lda, const float *w, float *work, const unsigned *lwork,
     int *info);
 /** @endcond */
-#define h2_heev(jobz, uplo, n, a, lda, w, work, lwork rwork, info) ssyev_(jobz, uplo, n, a, lda, w, work, lwork, info)
+#define h2_heev(jobz, uplo, n, a, lda, w, work, lwork, rwork, info) ssyev_(jobz, uplo, n, a, lda, w, work, lwork, info)
 #endif
 #else
 #ifdef USE_COMPLEX
