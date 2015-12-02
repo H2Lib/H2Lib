@@ -1,0 +1,8 @@
+*.o
+*.d
+libh2.a
+Tests/test_*
+Doc/html/
+Tests/hmatrix.pdf
+make.inc
+build*

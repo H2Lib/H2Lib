@@ -3276,7 +3276,6 @@ assemble_bem3d_greenhybrid_mixed_rkmatrix(pccluster rc, uint rname,
 #endif
   {
     grc = par->grcn[rname];
-
     if (grc == NULL) {
       grc = par->grcn[rname] = new_greencluster3d(rc);
       assemble_row_greencluster3d(bem, grc);
@@ -3288,7 +3287,6 @@ assemble_bem3d_greenhybrid_mixed_rkmatrix(pccluster rc, uint rname,
 #endif
   {
     gcc = par->gccn[cname];
-
     if (gcc == NULL) {
       gcc = par->gccn[cname] = new_greencluster3d(cc);
       assemble_col_greencluster3d(bem, gcc);
