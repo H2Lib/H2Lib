@@ -387,19 +387,16 @@ main(int argc, char **argv)
 		"  Rank sum %u\n"
 		"  Rank branch sum %u\n", sz / 1024.0, sz / 1024.0 / n,
 		G6->rb->ktree, G6->rb->kbranch);
-  (void) printf("----------------------------------------\n");
 
   sz = getsize_clusterbasis(G6->cb);
   (void) printf("  %.2f KB (%.2f KB/DoF) for column cluster basis\n"
 		"  Rank sum %u\n"
 		"  Rank branch sum %u\n", sz / 1024.0, sz / 1024.0 / n,
 		G6->cb->ktree, G6->cb->kbranch);
-  (void) printf("----------------------------------------\n");
 
   sz = getsize_h2matrix(G6);
   (void) printf("  %.2f KB (%.2f KB/DoF) for new H^2-matrix\n"
 		"  %.2f seconds\n", sz / 1024.0, sz / 1024.0 / n, t_run);
-  (void) printf("----------------------------------------\n");
 
   (void) printf("Rel. spectral error bound by power iteration\n");
   error = norm2diff_hmatrix_h2matrix(G6, Gh) / normG;

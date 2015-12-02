@@ -52,7 +52,7 @@ endif
 # OpenMP parallelization
 #
 ifdef USE_OPENMP
-  CFLAGS += -fopenmp
+  CFLAGS += -DUSE_OPENMP -fopenmp
   LDFLAGS += -fopenmp
 endif
 

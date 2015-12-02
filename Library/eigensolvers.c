@@ -816,7 +816,7 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
     else {
       /* Determine Householder reflection vector */
       first = aa[(k + 1) + k * lda];
-      alpha = -SIGN(first) * norm;
+      alpha = -SIGN1(first) * norm;
       gamma = first - alpha;
 
       /* Compute 2 / |v|^2 */
@@ -828,7 +828,7 @@ sb_tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
       beta *= ABSSQR(gamma);
 
       /* Compute k-th column */
-      nsign = SIGN(alpha);
+      nsign = SIGN1(alpha);
       d[k] = REAL(aa[k + k * lda]);
       l[k] = u[k] = ABS(alpha);
 
@@ -939,7 +939,7 @@ tridiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix Q)
     h2_larfg(&n1, &alpha, aa + (k + 2) + k * lda, &u_one, &beta);
 
     /* Compute k-th column */
-    nsign = SIGN(alpha);
+    nsign = SIGN1(alpha);
     d[k] = REAL(aa[k + k * lda]);
     l[k] = u[k] = ABS(alpha);
 
@@ -1592,7 +1592,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
-	alpha = -SIGN(diag) * norm;
+	alpha = -SIGN1(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute norm of v */
@@ -1665,7 +1665,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       else {
 	/* Determine Householder reflection vector v */
 	diag = a[k + k * lda];
-	alpha = -SIGN(diag) * norm;
+	alpha = -SIGN1(diag) * norm;
 	gamma = diag - alpha;
 
 	/* Compute norm of v */
@@ -1741,7 +1741,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
     else {
       /* Determine Householder reflection vector v */
       diag = a[k + k * lda];
-      nsign = -SIGN(diag);
+      nsign = -SIGN1(diag);
       alpha = nsign * norm;
       gamma = diag - alpha;
 
@@ -1800,7 +1800,7 @@ sb_bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       else {
 	/* Determine Householder reflection vector v */
 	diag = a[(k + 1) + k * lda];
-	nsign = -SIGN(diag);
+	nsign = -SIGN1(diag);
 	alpha = nsign * norm;
 	gamma = diag - alpha;
 
@@ -2023,7 +2023,7 @@ bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
     h2_larfg(&cols1, &alpha, a + k + (k + 1) * lda, &lda, &beta);
 
     /* Store diagonal element */
-    nsign = SIGN(CONJ(alpha));
+    nsign = SIGN1(CONJ(alpha));
     d[k] = ABS(alpha);
 
     /* dlarf/zlarf expects the full Householder vector */
@@ -2059,7 +2059,7 @@ bidiagonalize_amatrix(pamatrix A, ptridiag T, pamatrix U, pamatrix Vt)
       h2_larfg(&rows1, &alpha, a + (k + 2) + k * lda, &u_one, &beta);
 
       /* Store subdiagonal element */
-      nsign = SIGN(alpha);
+      nsign = SIGN1(alpha);
       l[k] = ABS(alpha);
 
       /* dlarf/zlarf expects the full Householder vector */

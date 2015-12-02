@@ -128,8 +128,10 @@ uninit_h2lib();
 /** @brief Compute the absolute value @f$|x|@f$ of a field element @f$x@f$. */
 #define ABS(x) REAL_SQRT(ABSSQR(x))
 
-/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$. */
-#define SIGN(x) _h2_sgn(x)
+/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$.
+ *
+ *  Note that @f$|\mathop{\rm sgn}(x)|=1@f$ even if @f$x=0@f$. */
+#define SIGN1(x) _h2_sgn1(x)
 
 /** @brief Compute a (pseudo-)random field element */
 #define FIELD_RAND() _h2_fieldrand()
@@ -275,7 +277,7 @@ uninit_h2lib();
 #ifdef __GNUC__
 INLINE_PREFIX real _h2_rsqrt(real x) __attribute__((unused,const));
 INLINE_PREFIX real _h2_abssqr(field x) __attribute__((unused,const));
-INLINE_PREFIX field _h2_sgn(field x) __attribute__((unused,const));
+INLINE_PREFIX field _h2_sgn1(field x) __attribute__((unused,const));
 INLINE_PREFIX field _h2_fieldrand() __attribute__((unused,const));
 INLINE_PREFIX real _h2_real_sqr(real x) __attribute__((unused,const));
 INLINE_PREFIX real _h2_realmax(real a, real b) __attribute__((unused,const));
@@ -321,11 +323,11 @@ INLINE_PREFIX real _h2_abssqr(field x) {
  *  @param x Field element @f$x@f$.
  *  @returns Sign of @f$x@f$, i.e., @f$x/|x|@f$ if @f$x\neq 0@f$ and @f$1@f$ if @f$x=0@f$. */
 #ifdef USE_COMPLEX
-INLINE_PREFIX field _h2_sgn(field x) {
+INLINE_PREFIX field _h2_sgn1(field x) {
   real norm, rx, ix;
 
   if (x == f_zero) {
-    return x;
+    return 1.0;
   } else {
     rx = REAL(x);
     ix = IMAG(x);
@@ -334,7 +336,7 @@ INLINE_PREFIX field _h2_sgn(field x) {
   }
 }
 #else
-INLINE_PREFIX field _h2_sgn(field x) {
+INLINE_PREFIX field _h2_sgn1(field x) {
   return (x < f_zero ? f_minusone : f_one);
 }
 #endif
