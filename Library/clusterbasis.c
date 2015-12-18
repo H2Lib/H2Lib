@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "clusterbasis.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ * This is the file "clusterbasis.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 #include "clusterbasis.h"
 
@@ -18,8 +18,8 @@
 static uint active_clusterbasis = 0;
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 static void
 init_raw_clusterbasis(pclusterbasis cb, pccluster t)
@@ -153,8 +153,8 @@ del_clusterbasis(pclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Reference counting
-   ------------------------------------------------------------ */
+ * Reference counting
+ * ------------------------------------------------------------ */
 
 void
 ref_clusterbasis(pclusterbasis * ptr, pclusterbasis cb)
@@ -180,8 +180,8 @@ unref_clusterbasis(pclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Low-level management
-   ------------------------------------------------------------ */
+ * Low-level management
+ * ------------------------------------------------------------ */
 
 void
 update_clusterbasis(pclusterbasis cb)
@@ -236,8 +236,8 @@ resize_clusterbasis(pclusterbasis cb, int k)
 }
 
 /* ------------------------------------------------------------
-   Build clusterbasis based on cluster
-   ------------------------------------------------------------ */
+ * Build clusterbasis based on cluster
+ * ------------------------------------------------------------ */
 
 pclusterbasis
 build_from_cluster_clusterbasis(pccluster t)
@@ -260,8 +260,8 @@ build_from_cluster_clusterbasis(pccluster t)
 }
 
 /* ------------------------------------------------------------
-   Clone a cluster basis
-   ------------------------------------------------------------ */
+ * Clone a cluster basis
+ * ------------------------------------------------------------ */
 
 pclusterbasis
 clone_clusterbasis(pcclusterbasis cb)
@@ -325,8 +325,8 @@ clonestructure_clusterbasis(pcclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 uint
 getactives_clusterbasis()
@@ -355,8 +355,8 @@ getsize_clusterbasis(pcclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 void
 clear_weight_clusterbasis(pclusterbasis cb)
@@ -375,8 +375,8 @@ clear_weight_clusterbasis(pclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Hierarchical iterator
-   ------------------------------------------------------------ */
+ * Hierarchical iterator
+ * ------------------------------------------------------------ */
 
 void
 iterate_clusterbasis(pcclusterbasis cb, uint cbname,
@@ -453,8 +453,8 @@ iterate_parallel_clusterbasis(pcclusterbasis cb, uint cbname,
 }
 
 /* ------------------------------------------------------------
-   Enumeration
-   ------------------------------------------------------------ */
+ * Enumeration
+ * ------------------------------------------------------------ */
 
 static void
 enumerate(pccluster t, uint tname, pclusterbasis cb, pclusterbasis * cbn)
@@ -499,8 +499,8 @@ enumerate_clusterbasis(pccluster t, pclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Forward and backward transformation
-   ------------------------------------------------------------ */
+ * Forward and backward transformation
+ * ------------------------------------------------------------ */
 
 pavector
 new_coeffs_clusterbasis_avector(pcclusterbasis cb)
@@ -957,8 +957,8 @@ backward_notransfer_clusterbasis_avector(pcclusterbasis cb, pavector yt,
 }
 
 /* ------------------------------------------------------------
-   Forward and backward transformation for the root only
-   ------------------------------------------------------------ */
+ * Forward and backward transformation for the root only
+ * ------------------------------------------------------------ */
 
 void
 compress_clusterbasis_avector(pcclusterbasis cb, pcavector xp, pavector xt)
@@ -1144,8 +1144,8 @@ compress_parallel_clusterbasis_amatrix(pcclusterbasis cb, pcamatrix Xp,
 }
 
 /* ------------------------------------------------------------
-   Forward and backward transformation for matrices
-   ------------------------------------------------------------ */
+ * Forward and backward transformation for matrices
+ * ------------------------------------------------------------ */
 
 void
 forward_clusterbasis_amatrix(pcclusterbasis cb, pcamatrix Xp, pamatrix Xt)
@@ -1356,8 +1356,8 @@ backward_clusterbasis_trans_amatrix(pcclusterbasis cb, pamatrix Yt,
 }
 
 /* ------------------------------------------------------------
-   Simple computations
-   ------------------------------------------------------------ */
+ * Simple computations
+ * ------------------------------------------------------------ */
 
 void
 addeval_clusterbasis_avector(field alpha, pcclusterbasis cb,
@@ -1457,8 +1457,8 @@ addevaltrans_clusterbasis_avector(field alpha, pcclusterbasis cb,
 }
 
 /* ------------------------------------------------------------
-   Orthogonalization
-   ------------------------------------------------------------ */
+ * Orthogonalization
+ * ------------------------------------------------------------ */
 
 pclusterbasis
 ortho_clusterbasis(pclusterbasis cb, pclusteroperator co)
@@ -1793,8 +1793,8 @@ write_count(pcclusterbasis cb, size_t * clusters, size_t * coeffs)
     /* Handle sons (and check that their transfer matrices are of
      * the expected size */
     for (i = 0; i < sons; i++) {
-      assert(cb->son[i]->E.rows == cb->k);
-      assert(cb->son[i]->E.cols == cb->son[i]->k);
+      assert(cb->son[i]->E.rows == cb->son[i]->k);
+      assert(cb->son[i]->E.cols == cb->k);
 
       write_count(cb->son[i], clusters, coeffs);
     }
