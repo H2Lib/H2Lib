@@ -1,8 +1,8 @@
-*.o
-*.d
+Doc/html
 libh2.a
+Library/*.o
+Library/*.d
 Tests/test_*
-Doc/html/
-Tests/hmatrix.pdf
-make.inc
-build*
+Tests/*.o
+Tests/*.d
+Tests/*.pdf
