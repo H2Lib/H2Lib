@@ -148,7 +148,7 @@ hilbert_rec_curve2d(pcurve2d gr, uint n, real lengthx,
   uint(*e)[2] = gr->e;
 
   real      c[8], d[8];
-  HORSESHOE cases[4];
+  HORSESHOE cases[4] = {LEFT};
   uint      j = 0;
   real      phi;
 
