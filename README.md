@@ -42,12 +42,16 @@ Configuration on Windows may be easier with cmake.
 
 ### gnu make
 
-To set up H2Lib using gnu make files, you have to create a "make.inc"
-file setting the parameters for the build process. Usually you will be
-able to simply copy one of the files "make.inc.*" contained in the
-repository, e.g., "make.inc.unix_opt".
+The build process is controlled by the files "system.inc" and
+"options.inc".
+The first file describes the properties of your system, e.g.,
+which compiler to use and where certain libraries can be found.
+The second file describes build options, e.g., whether you want
+to use real or complex numbers.
+The repository includes examples of both files for standard Linux
+systems.
 
-Once "make.inc" is complete, just enter
+Once the configuration files are prepared, just enter
 
     make
 
