@@ -2,7 +2,7 @@
 # --- Build options configuration
 
 # Brief output during build process
-#BRIEF_OUTPUT=1
+BRIEF_OUTPUT=1
 
 # Build for debugging
 #DEBUG=1
@@ -11,7 +11,7 @@
 OPT=1
 
 # Use complex numbers
-USE_COMPLEX=1
+#USE_COMPLEX=1
 
 # Use BLAS/LAPACK for linear algebra
 USE_BLAS=1
