@@ -1,14 +1,24 @@
 
 # --- System configuration file for Linux with gcc
 
+#
+# Archiver
+#
 AR = ar
 ARFLAGS = cru
+
+#
+# Delete files
+#
 RM = rm
+
+#
+# Compilers, GCC is used to create dependencies
+#
 CC = gcc
 GCC = gcc
-
 CFLAGS = -Wall
-LDFLAGS = -Wl,-L,.,-R,.
+LDFLAGS = -Wl,-L,.
 LIBS =
 
 #

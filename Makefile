@@ -41,7 +41,7 @@ H2LIB_CORE3 = \
 	Library/h2arith.c \
 	Library/aca.c
 
-H2LIB_SIMPLE = 
+H2LIB_SIMPLE =
 
 H2LIB_FEM = \
 	Library/tri2d.c \
@@ -49,7 +49,6 @@ H2LIB_FEM = \
 	Library/tet3d.c \
 	Library/tet3dp1.c\
 	Library/ddcluster.c
-
 
 H2LIB_BEM = \
 	Library/curve2d.c \
@@ -71,6 +70,7 @@ SOURCES_libh2 := \
 	$(H2LIB_CORE1) \
 	$(H2LIB_CORE2) \
 	$(H2LIB_CORE3) \
+	$(H2LIB_DIRECTIONAL) \
 	$(H2LIB_SIMPLE) \
 	$(H2LIB_FEM) \
 	$(H2LIB_BEM)
@@ -144,15 +144,25 @@ all: programs
 # Build configuration
 # ------------------------------------------------------------
 
+ifeq ($(wildcard options.inc),)
+$(OBJECTS): options.inc.default
+include options.inc.default
+else
 $(OBJECTS): options.inc
 include options.inc
+endif
 
 # ------------------------------------------------------------
 # System-dependent parameters (e.g., name of compiler)
 # ------------------------------------------------------------
 
+ifeq ($(wildcard system.inc),)
+$(OBJECTS): system.inc.linux
+include system.inc.linux
+else
 $(OBJECTS): system.inc
 include system.inc
+endif
 
 # ------------------------------------------------------------
 # System-independent configuration (e.g., variants of algorithms)
@@ -175,9 +185,9 @@ programs: $(PROGRAMS_tests)
 $(PROGRAMS_tests): %: %.o
 ifdef BRIEF_OUTPUT
 	@echo Linking $@
-	@$(CC) $(LDFLAGS) -Wl,-L,.,-R,. $< -o $@ -lh2 -lm $(LIBS) 
+	@$(CC) $(LDFLAGS) $< -o $@ -lh2 -lm $(LIBS) 
 else
-	$(CC) $(LDFLAGS) -Wl,-L,.,-R,. $< -o $@ -lh2 -lm $(LIBS)
+	$(CC) $(LDFLAGS) $< -o $@ -lh2 -lm $(LIBS) 
 endif
 
 $(PROGRAMS_tests) $(PROGRAMS_tools): libh2.a

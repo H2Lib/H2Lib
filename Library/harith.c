@@ -1,3 +1,4 @@
+
 /* ------------------------------------------------------------
  * This is the file "harith.c" of the H2Lib package.
  * All rights reserved, Steffen Boerm 2014
@@ -340,9 +341,9 @@ void
 add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
 		     real eps, prkmatrix b)
 {
-  amatrix   tmp1, tmp2, tmp3;
-  realavector tmp4;
-  pamatrix  z, u, vt;
+  amatrix   tmp1, tmp2, tmp3, tmp4;
+  realavector tmp5;
+  pamatrix  z, u, vt, u1, vt1;
   prealavector sigma;
   uint      rows, cols, k, knew;
 
@@ -370,13 +371,17 @@ add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
     copy_amatrix(true, a, z);
   else
     copy_amatrix(false, a, z);
-  addmul_amatrix(alpha, false, &b->A, true, &b->B, z);
+
+  if(alpha != 1.0)
+    scale_amatrix(alpha, z);
+
+  addmul_amatrix(1.0, false, &b->A, true, &b->B, z);
 
   /* Find singular value decomposition of Z */
   k = UINT_MIN(rows, cols);
   u = init_amatrix(&tmp2, rows, k);
   vt = init_amatrix(&tmp3, k, cols);
-  sigma = init_realavector(&tmp4, k);
+  sigma = init_realavector(&tmp5, k);
   svd_amatrix(z, sigma, u, vt);
 
   /* Determine rank */
@@ -390,9 +395,14 @@ add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
 
   /* Copy singular vectors */
   clear_amatrix(&b->A);
-  copy_amatrix(false, u, &b->A);
+  u1 = init_sub_amatrix(&tmp4, u, rows, 0, knew, 0);
+  copy_amatrix(false, u1, &b->A);
+  uninit_amatrix(u1);
+
   clear_amatrix(&b->B);
-  copy_amatrix(true, vt, &b->B);
+  vt1 = init_sub_amatrix(&tmp4, vt, knew, 0, cols, 0);
+  copy_amatrix(true, vt1, &b->B);
+  uninit_amatrix(vt1);
 
   /* Clean up */
   uninit_realavector(sigma);
