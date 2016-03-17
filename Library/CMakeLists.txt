@@ -26,6 +26,7 @@ set(H2LIB_SRCS
    laplacebem3d.c
    macrosurface3d.c
    parameters.c
+   realavector.c
    rkmatrix.c
    settings.c
    singquad1d.c
@@ -64,6 +65,7 @@ set(H2LIB_HDRS
    laplacebem3d.h
    macrosurface3d.h
    parameters.h
+   realavector.h
    rkmatrix.h
    settings.h
    singquad1d.h
