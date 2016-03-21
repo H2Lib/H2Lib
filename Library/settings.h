@@ -49,14 +49,7 @@
  * Types
  * ------------------------------------------------------------ */
 
-/** @brief Boolean type. */
-typedef unsigned short bool;
-
-/** @brief Boolean constant <tt>true</tt>. */
-extern const bool true;
-
-/** @brief Boolean constant <tt>false</tt>. */
-extern const bool false;
+#include<stdbool.h>
 
 /** @brief Unsigned integer type.
  *
