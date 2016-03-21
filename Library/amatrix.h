@@ -465,7 +465,7 @@ random_spd_amatrix(pamatrix a, real alpha);
  *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
  *  @param a Source matrix.
  *  @param b Target matrix. */
-void
+HEADER_PREFIX void
 copy_amatrix(bool atrans, pcamatrix a, pamatrix b);
 
 /** @brief Create a duplicate of an existing @ref amatrix.
