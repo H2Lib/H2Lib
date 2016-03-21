@@ -26,7 +26,7 @@
 
 /** @brief Prefix for inline functions. */
 #ifdef __cplusplus
-#define INLINE_PREFIX static extern "C"
+#define INLINE_PREFIX extern "C" inline
 #else
 #define INLINE_PREFIX static
 #endif
