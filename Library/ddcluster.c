@@ -142,7 +142,8 @@ build_dd_cluster(pclustergeometry cg, uint size, uint * idx, uint clf,
 {
 
   pcluster  c;
-  uint      i, j, newd, tmp, bool;
+  uint      i, j, newd, tmp;
+  bool      bool_var;
   uint      size0, size1, size2;	/*sizes of sons */
   real      a, b, m;		/*left, right and midpoint of the bounding box in direction direction */
   real      h, diam_max, diam;
@@ -181,10 +182,10 @@ build_dd_cluster(pclustergeometry cg, uint size, uint * idx, uint clf,
 
       for (i = 0; i < size0; i++)
 	flag[idx[i]] = 1;
-      bool = 0;
+      bool_var = false;
       i = size0;
       while (i < size0 + size1) {
-	bool = 0;
+	bool_var = false;
 	for (j = sp->row[idx[i]]; j < sp->row[idx[i] + 1]; j++) {
 	  if (flag[sp->col[j]] == 1) {
 	    tmp = idx[i];
@@ -194,11 +195,11 @@ build_dd_cluster(pclustergeometry cg, uint size, uint * idx, uint clf,
 	    size1--;
 	  }
 	  if (flag[sp->col[j]] == 1) {
-	    bool = 1;
+	    bool_var = true;
 	    break;
 	  }
 	}
-	if (bool == 0) {
+	if (!bool_var) {
 	  i++;
 	}
       }
