@@ -1,11 +1,18 @@
 set(TESTS
    amatrix
+   ddcluster
    eigen
    h2compression
    h2matrix
+   helmholtzbem3d
+   helmholtzbem3d_ocl
    hmatrix
+   krylov
    laplacebem2d
    laplacebem3d
+   laplacebem3d_ocl
+   tet3d
+   tri2d
    )
 
 include_directories(${PROJECT_SOURCE_DIR}/Library)

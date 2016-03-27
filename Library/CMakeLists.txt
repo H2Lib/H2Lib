@@ -11,6 +11,7 @@ set(H2LIB_SRCS
    clustergeometry.c
    clusteroperator.c
    curve2d.c
+   ddcluster.c
    eigensolvers.c
    factorizations.c
    gaussquad.c
@@ -19,12 +20,18 @@ set(H2LIB_SRCS
    h2matrix.c
    h2update.c
    harith.c
+   harith2.c
    hcoarsen.c
+   helmholtzbem3d.c
+   helmholtzoclbem3d.c
    hmatrix.c
    krylov.c
    laplacebem2d.c
    laplacebem3d.c
+   laplaceoclbem3d.c
    macrosurface3d.c
+   oclbem3d.c
+   opencl.c
    parameters.c
    realavector.c
    rkmatrix.c
@@ -34,6 +41,10 @@ set(H2LIB_SRCS
    sparsematrix.c
    sparsepattern.c
    surface3d.c
+   tet3d.c
+   tet3dp1.c
+   tri2d.c
+   tri2dp1.c
    truncation.c
    uniform.c
    )
@@ -44,12 +55,15 @@ set(H2LIB_HDRS
    basic.h
    bem2d.h
    bem3d.h
+   blas.h
    block.h
+   clsettings.h
    clusterbasis.h
    clustergeometry.h
    cluster.h
    clusteroperator.h
    curve2d.h
+   ddcluster.h
    eigensolvers.h
    factorizations.h
    gaussquad.h
@@ -57,13 +71,19 @@ set(H2LIB_HDRS
    h2compression.h
    h2matrix.h
    h2update.h
+   harith2.h
    harith.h
    hcoarsen.h
+   helmholtzbem3d.h
+   helmholtzoclbem3d.h
    hmatrix.h
    krylov.h
    laplacebem2d.h
    laplacebem3d.h
+   laplaceoclbem3d.h
    macrosurface3d.h
+   oclbem3d.h
+   opencl.h
    parameters.h
    realavector.h
    rkmatrix.h
@@ -73,6 +93,10 @@ set(H2LIB_HDRS
    sparsematrix.h
    sparsepattern.h
    surface3d.h
+   tet3d.h
+   tet3dp1.h
+   tri2d.h
+   tri2dp1.h
    truncation.h
    uniform.h
    )
