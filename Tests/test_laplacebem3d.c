@@ -65,8 +65,8 @@ L2gamma_c_diff_norm2(pbem3d bem, pavector x, boundary_func3d rhs, void *data)
 real
 L2gamma_l_diff_norm2(pbem3d bem, pavector x, boundary_func3d rhs, void *data)
 {
-  uint      n = x->dim;
   pcsurface3d gr = bem->gr;
+  uint triangles = gr->triangles;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
@@ -84,8 +84,10 @@ L2gamma_l_diff_norm2(pbem3d bem, pavector x, boundary_func3d rhs, void *data)
 
   real      norm;
 
+  assert(x->dim == gr->vertices);
+
   norm = 0.0;
-  for (t = 0; t < n; ++t) {
+  for (t = 0; t < triangles; ++t) {
     A = gr_x[gr_t[t][0]];
     B = gr_x[gr_t[t][1]];
     C = gr_x[gr_t[t][2]];
@@ -608,7 +610,7 @@ main(int argc, char **argv)
   printf("----------------------------------------\n\n");
 
   test_suite(gr, q, clf, eta, BASIS_LINEAR_BEM3D, BASIS_LINEAR_BEM3D, false,
-	     6.0e-2, 7.0e-2);
+	     6.5e-2, 7.5e-2);
 
   printf("----------------------------------------\n");
   printf("Testing outer Boundary integral equations:\n");
