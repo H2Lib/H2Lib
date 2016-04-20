@@ -209,11 +209,11 @@ test_system(matrixtype mattype, const char *apprxtype,
     assert(mattype == H2MATRIX);
     assemble_bem3d_h2matrix_row_clusterbasis(bem_slp, ((ph2matrix) V)->rb);
     assemble_bem3d_h2matrix_col_clusterbasis(bem_slp, ((ph2matrix) V)->cb);
-    assemble_bem3d_h2matrix(bem_slp, (ph2matrix) V);
+    assemble_bem3d_h2matrix(bem_slp, brootV, (ph2matrix) V);
 
     assemble_bem3d_h2matrix_row_clusterbasis(bem_dlp, ((ph2matrix) KM)->rb);
     assemble_bem3d_h2matrix_col_clusterbasis(bem_dlp, ((ph2matrix) KM)->cb);
-    assemble_bem3d_h2matrix(bem_dlp, (ph2matrix) KM);
+    assemble_bem3d_h2matrix(bem_dlp, brootKM, (ph2matrix) KM);
 
     errorV = norm2diff_amatrix_h2matrix((ph2matrix) V, Vfull)
       / norm2_amatrix(Vfull);

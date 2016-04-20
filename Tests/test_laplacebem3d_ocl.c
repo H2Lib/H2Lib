@@ -294,11 +294,11 @@ test_h2matrix_system(const char *apprxtype, pcamatrix Vfull,
 
   assemble_bem3d_h2matrix_row_clusterbasis(bem_slp, V->rb);
   assemble_bem3d_h2matrix_col_clusterbasis(bem_slp, V->cb);
-  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_slp, V);
+  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_slp, block, V);
 
   assemble_bem3d_h2matrix_row_clusterbasis(bem_dlp, KM->rb);
   assemble_bem3d_h2matrix_col_clusterbasis(bem_dlp, KM->cb);
-  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_dlp, KM);
+  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_dlp, block, KM);
 
   errorV = norm2diff_amatrix_h2matrix(V, Vfull) / norm2_amatrix(Vfull);
   printf("rel. error V       : %.5e\n", errorV);
