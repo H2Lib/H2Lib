@@ -454,13 +454,13 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
 	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
 	      error_min, error_max);
   setup_hmatrix_aprx_paca_bem3d(bem_slp, rootn, rootn, brootV, eps_aca);
-  setup_hmatrix_aprx_paca_bem3d(bem_slp, rootn, rootd, brootKM, eps_aca);
+  setup_hmatrix_aprx_paca_bem3d(bem_dlp, rootn, rootd, brootKM, eps_aca);
   test_system(HMATRIX, "ACA partial pivoting", Vfull, KMfull, brootV, bem_slp,
 	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
 	      exterior, error_min, error_max);
 
   setup_hmatrix_aprx_hca_bem3d(bem_slp, rootn, rootn, brootV, m, eps_aca);
-  setup_hmatrix_aprx_hca_bem3d(bem_slp, rootn, rootd, brootKM, m, eps_aca);
+  setup_hmatrix_aprx_hca_bem3d(bem_dlp, rootn, rootd, brootKM, m, eps_aca);
   test_system(HMATRIX, "HCA2", Vfull, KMfull, brootV, bem_slp, V, brootKM,
 	      bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
 	      error_min, error_max);
