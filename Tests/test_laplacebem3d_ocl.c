@@ -540,11 +540,11 @@ main(int argc, char **argv)
 //      bem_dlp, KM, false, false, 7.0e-2, 7.5e-2);
 //
 //  setup_hmatrix_aprx_paca_bem3d(bem_slp, root, root, block, eps_aca);
-//  setup_hmatrix_aprx_paca_bem3d(bem_slp, root, root, block, eps_aca);
+//  setup_hmatrix_aprx_paca_bem3d(bem_dlp, root, root, block, eps_aca);
 //  test_hmatrix_system("ACA partial pivoting", Vfull, KMfull, block, bem_slp, V,
 //      bem_dlp, KM, false, true, 7.0e-2, 7.5e-2);
   setup_hmatrix_aprx_hca_bem3d(bem_slp, root, root, block, m, eps_aca);
-  setup_hmatrix_aprx_hca_bem3d(bem_slp, root, root, block, m, eps_aca);
+  setup_hmatrix_aprx_hca_bem3d(bem_dlp, root, root, block, m, eps_aca);
   test_hmatrix_system("HCA2", Vfull, KMfull, block, bem_slp, V, bem_dlp, KM,
 		      false, false, 7.0e-2, 7.5e-2);
 
