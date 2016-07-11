@@ -646,62 +646,75 @@ norml2_tet3dp1(pctet3dp1 dc,
 }
 
 pclustergeometry
-build_tet3dp1_clustergeometry(pctet3dp1 p1, uint *idx)
+build_tet3dp1_clustergeometry(pctet3dp1 p1, uint * idx)
 {
 
   pclustergeometry cg;
-  uint      i, j, k, l, m, c;
-  uint      nidx = p1->ndof;
+  uint      i, j, k, c;
+  uint      ndof = p1->ndof;
   pctet3d   t3 = p1->gr;
-  uint      edges = t3->edges;
   uint      vertices = t3->vertices;
+  uint tetrahedra = t3->tetrahedra;
   const bool *is_dof = p1->is_dof;
   const uint *idx2dof = p1->idx2dof;
   const     real(*x)[3] = (const real(*)[3]) p1->gr->x;
+  uint v[4];
+  real min[3], max[3];
 
-  cg = new_clustergeometry(3, nidx);
+  cg = new_clustergeometry(3, ndof);
 
   /* Copying characteristic vertices into clustergeometry structure and 
    *computing initial values of smin and smax */
-  c = 0;
   for (i = 0; i < vertices; i++) {
     if (is_dof[i]) {
+      c = idx2dof[i];
+
       cg->x[c][0] = x[i][0];
       cg->x[c][1] = x[i][1];
       cg->x[c][2] = x[i][2];
+
       cg->smin[c][0] = x[i][0];
       cg->smin[c][1] = x[i][1];
       cg->smin[c][2] = x[i][2];
       cg->smax[c][0] = x[i][0];
       cg->smax[c][1] = x[i][1];
       cg->smax[c][2] = x[i][2];
-      c++;
+
+      idx[c] = c;
     }
   }
-  /* Updating values of smin and smax */
-  for (i = 0; i < edges; i++) {
-    if (t3->eb[i] == 0) {
-      for (j = 0; j <= 1; j++) {
-	k = t3->e[i][j];
-	if (is_dof[k]) {
-	  l = t3->e[i][(j + 1) % 2];
-	  m = idx2dof[k];
-	  if (cg->smin[m][0] > t3->x[l][0])
-	    cg->smin[m][0] = t3->x[l][0];
-	  if (cg->smax[m][0] < t3->x[l][0])
-	    cg->smax[m][0] = t3->x[l][0];
-	  if (cg->smin[m][1] > t3->x[l][1])
-	    cg->smin[m][1] = t3->x[l][1];
-	  if (cg->smax[m][1] < t3->x[l][1])
-	    cg->smax[m][1] = t3->x[l][1];
-	  if (cg->smin[m][2] > t3->x[l][2])
-	    cg->smin[m][2] = t3->x[l][2];
-	  if (cg->smax[m][2] < t3->x[l][2])
-	    cg->smax[m][2] = t3->x[l][2];
-	}
+ 
+  for(i=0;i<tetrahedra;i++){ /* all tetrahedra */
+    getvertices_tet3d(t3, i, v); /* get all vertices of tetrahedron i */
+
+    min[0] = REAL_MIN(REAL_MIN(x[v[0]][0], x[v[1]][0]),
+		      REAL_MIN(x[v[2]][0], x[v[3]][0]));
+    min[1] = REAL_MIN(REAL_MIN(x[v[0]][1], x[v[1]][1]),
+		      REAL_MIN(x[v[2]][1], x[v[3]][1]));
+    min[2] = REAL_MIN(REAL_MIN(x[v[0]][2], x[v[1]][2]),
+		      REAL_MIN(x[v[2]][2], x[v[3]][2]));
+    max[0] = REAL_MAX(REAL_MAX(x[v[0]][0], x[v[1]][0]),
+		      REAL_MAX(x[v[2]][0], x[v[3]][0]));
+    max[1] = REAL_MAX(REAL_MAX(x[v[0]][1], x[v[1]][1]),
+		      REAL_MAX(x[v[2]][1], x[v[3]][1]));
+    max[2] = REAL_MAX(REAL_MAX(x[v[0]][2], x[v[1]][2]),
+		      REAL_MAX(x[v[2]][2], x[v[3]][2]));
+
+    for (j = 0; j < 4; j++) { /* all vertices */
+      if(is_dof[v[j]]){ /* vertex is degree of freedom */
+	k = idx2dof[v[j]];
+
+        cg->smin[k][0] = REAL_MIN(cg->smin[k][0], min[0]);
+        cg->smin[k][1] = REAL_MIN(cg->smin[k][1], min[1]);
+	cg->smin[k][2] = REAL_MIN(cg->smin[k][2], min[2]);
+	cg->smax[k][0] = REAL_MAX(cg->smax[k][0], max[0]);
+        cg->smax[k][1] = REAL_MAX(cg->smax[k][1], max[1]);
+	cg->smax[k][2] = REAL_MAX(cg->smax[k][2], max[2]);
       }
     }
   }
-  update_point_bbox_clustergeometry(cg, nidx, idx);
+
+  update_point_bbox_clustergeometry(cg, ndof, idx);
+
   return cg;
 }

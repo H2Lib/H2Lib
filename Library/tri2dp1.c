@@ -570,7 +570,7 @@ norml2_tri2dp1(pctri2dp1 dc,
       xm[0] = 0.5 * x[i][0];
       xm[1] = 0.5 * x[i][1];
 
-      /* Evaluate in start point */
+      /* Evaluate in end point */
       i = e[t[k][j]][1];
       if (is_dof[i]) {
 	if (b) {
@@ -612,51 +612,58 @@ build_tri2dp1_clustergeometry(pctri2dp1 p1, uint * idx)
 {
 
   pclustergeometry cg;
-  uint      i, j, k, l, m, c;
-  uint      nidx = p1->ndof;
+  uint      i, j, k, c;
+  uint      ndof = p1->ndof;
   pctri2d   t2 = p1->t2;
   uint      vertices = t2->vertices;
-  uint      edges = t2->edges;
+  uint triangles = t2->triangles;
   const bool *is_dof = p1->is_dof;
   const uint *idx2dof = p1->idx2dof;
   const     real(*x)[2] = (const real(*)[2]) t2->x;
+  uint v[3];
+  real min[2], max[2];
+  
+  cg = new_clustergeometry(2, ndof);
 
-  cg = new_clustergeometry(2, nidx);
-
-  /* Copying characteristic vertices into clustergeometry structure and computing initial values of smin and smax */
-  c = 0;
+  /* Copy characteristic vertices into clustergeometry structure and
+   * compute initial values of smin and smax */
   for (i = 0; i < vertices; i++) {
     if (is_dof[i]) {
+      c = idx2dof[i];
+
       cg->x[c][0] = x[i][0];
       cg->x[c][1] = x[i][1];
+
       cg->smin[c][0] = x[i][0];
       cg->smin[c][1] = x[i][1];
       cg->smax[c][0] = x[i][0];
       cg->smax[c][1] = x[i][1];
-      c++;
+
+      idx[c] = c;
     }
   }
+  
+  for(i=0;i<triangles;i++){ /* all triangles */
+    getvertices_tri2d(t2, i, v); /* get all vertices of triangle i */
 
-  /* Updating values of smin and smax */
-  for (i = 0; i < edges; i++) {
-    if (t2->eb[i] == 0) {
-      for (j = 0; j <= 1; j++) {
-	k = t2->e[i][j];
-	if (is_dof[k]) {
-	  l = t2->e[i][(j + 1) % 2];
-	  m = idx2dof[k];
-	  if (cg->smin[m][0] > t2->x[l][0])
-	    cg->smin[m][0] = t2->x[l][0];
-	  if (cg->smax[m][0] < t2->x[l][0]);
-	  cg->smax[m][0] = t2->x[l][0];
-	  if (cg->smin[m][1] > t2->x[l][1])
-	    cg->smin[m][1] = t2->x[l][1];
-	  if (cg->smax[m][1] < t2->x[l][1])
-	    cg->smax[m][1] = t2->x[l][1];
-	}
+    min[0] = REAL_MIN3(x[v[0]][0], x[v[1]][0], x[v[2]][0]);
+    min[1] = REAL_MIN3(x[v[0]][1], x[v[1]][1], x[v[2]][1]);
+    max[0] = REAL_MAX3(x[v[0]][0], x[v[1]][0], x[v[2]][0]);
+    max[1] = REAL_MAX3(x[v[0]][1], x[v[1]][1], x[v[2]][1]);
+
+    for (j = 0; j < 3; j++) { /* all vertices */
+      if(is_dof[v[j]]){ /* vertex is degree of freedom */
+	k = idx2dof[v[j]];
+
+        cg->smin[k][0] = REAL_MIN(cg->smin[k][0], min[0]);
+        cg->smin[k][1] = REAL_MIN(cg->smin[k][1], min[1]);
+	cg->smax[k][0] = REAL_MAX(cg->smax[k][0], max[0]);
+        cg->smax[k][1] = REAL_MAX(cg->smax[k][1], max[1]);
       }
     }
-  }
-  update_point_bbox_clustergeometry(cg, nidx, idx);
+  }  
+
+  update_point_bbox_clustergeometry(cg, ndof, idx);
+
   return cg;
 }
