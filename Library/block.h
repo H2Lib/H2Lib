@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "block.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "block.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file block.h
  *  @author Steffen B&ouml;rm
@@ -11,12 +12,12 @@
 #define BLOCK_H
 
 /** @defgroup block block
- *  @brief Representation of a block cluster tree.
+ *  @brief Representation of a block tree.
  * 
- * The @ref block class is used to represent block cluster trees.
+ * The @ref block class is used to represent block trees.
  * @{*/
 
-/** @brief Representation of a block cluster tree.*/
+/** @brief Representation of a block tree.*/
 typedef struct _block block;
 
 /** @brief Pointer to @ref block object.*/
@@ -32,12 +33,12 @@ typedef const block *pcblock;
 #include "cluster.h"
 #include "settings.h"
 
-/** @brief Representation of block cluster trees.
+/** @brief Representation of block trees.
  * 
- * A block cluster tree @f$\mathcal{T}_{I \times J}@f$ is a labeled tree
+ * A block tree @f$\mathcal{T}_{I \times J}@f$ is a labeled tree
  * for two @ref cluster trees @f$\mathcal{T}_{I}@f$ and
  * @f$\mathcal{T}_{J}@f$ and stored recursively.
- * The block cluster tree is described by a row @ref cluster tree <tt> rc</tt> 
+ * The block tree is described by a row @ref cluster tree <tt> rc</tt> 
  * and a column @ref cluster tree <tt> cc </tt>. The admissibility flag 
  * <tt>a</tt> can be used to distinguish admissible (farfield) blocks from 
  * inadmissible (nearfield) blocks. If the block is subdivided, pointers to the 
@@ -68,8 +69,8 @@ struct _block {
 };
 
 /* ------------------------------------------------------------
- admissibility condition
- ------------------------------------------------------------ */
+ * Admissibility condition
+ * ------------------------------------------------------------ */
 
 /** @brief Callback function for an admissibility condition*/
 typedef bool (*admissible)(pcluster rc, pcluster cc, void *data);
@@ -165,12 +166,12 @@ admissible_2_min_cluster(pcluster rc, pcluster cc, void* data);
  * @param a Admissibility flag.
  * @param rsons Number of sons of the row cluster.
  * @param csons Number of sons of the column cluster.
- * @returns Returns a new @ref block cluster tree.
+ * @returns Returns a new @ref block tree.
  */
 HEADER_PREFIX pblock
 new_block(pcluster rc, pcluster cc, bool a, uint rsons, uint csons);
 
-/** @brief Delete a @ref block cluster tree.
+/** @brief Delete a @ref block tree.
  * 
  * Releases the storage corresponding to the object, including the storage of
  * all its descendants.
@@ -182,11 +183,11 @@ del_block(pblock b);
 
 /** @brief Complete initialization of a @ref block object.
  * 
- * Completes initialization of a @ref block cluster tree object after all sons
+ * Completes initialization of a @ref block tree object after all sons
  * have been initialized. This function computes the number of descendants of
- * the block cluster tree @f$ b @f$.
+ * the block tree @f$ b @f$.
  * 
- * @remark Should be called after all sons of the block cluster tree have been 
+ * @remark Should be called after all sons of the block tree have been 
  * initialized. 
  * 
  * @param b Object to be updated.
@@ -198,26 +199,42 @@ update_block(pblock b);
  Block clustering strategies
  ------------------------------------------------------------ */
 
-/** @brief Build a non strict @ref block cluster tree.
+/** @brief Build a non strict @ref block tree.
  * 
- * Builds a non strict block cluster tree from the row @ref cluster tree 
- * @f$ rc @f$ and the column @ref cluster tree @f$ cc @f$. A block cluster tree
- * is non strict, if all leaves @f$ (t,s) @f$ are admissible or @f$ t @f$ or
+ * Builds a non strict block tree from the row @ref cluster tree 
+ * @f$ rc @f$ and the column @ref cluster tree @f$ cc @f$. A block tree
+ * is non-strict if all leaves @f$ (t,s) @f$ are admissible or @f$ t @f$ or
  * @f$ s @f$ have no sons.
  * 
  * @param rc Row cluster.
  * @param cc Col cluster.
  * @param data Necessary data for the admissibility condition.
  * @param admis Admissibility condition.
- * @returns Returns a non strict block cluster tree.
+ * @returns Returns a non strict block tree.
  */
 HEADER_PREFIX pblock
 build_nonstrict_block(pcluster rc, pcluster cc, void *data, admissible admis);
 
-/** @brief Build a strict @ref block cluster tree.
+/** @brief Build a non strict lower triangular @ref block tree.
+ *
+ * Builds a non strict lower triangular block tree from the row @ref cluster tree
+ * @f$ rc @f$ and the column @ref cluster tree @f$ cc @f$. A block tree
+ * is non-strict if all leaves @f$ (t,s) @f$ are admissible or @f$ t @f$ or
+ * @f$ s @f$ have no sons.
+ *
+ * @param rc Row cluster.
+ * @param cc Col cluster.
+ * @param data Necessary data for the admissibility condition.
+ * @param admis Admissibility condition.
+ * @returns Returns a non strict lower triangular block tree.
+ */
+HEADER_PREFIX pblock
+build_nonstrict_lower_block(pcluster rc, pcluster cc, void *data, admissible admis);
+
+/** @brief Build a strict @ref block tree.
  * 
- * Builds a strict block cluster tree from the row @ref cluster tree @f$ rc @f$
- * and the column @ref cluster tree @f$ cc @f$. A block cluster tree is called 
+ * Builds a strict block tree from the row @ref cluster tree @f$ rc @f$
+ * and the column @ref cluster tree @f$ cc @f$. A block tree is called 
  * strict, if all leaves @f$ (t,s) @f$ are admissible or @f$ t @f$ and @f$ s @f$
  * are leave cluster. 
  * 
@@ -225,32 +242,32 @@ build_nonstrict_block(pcluster rc, pcluster cc, void *data, admissible admis);
  * @param cc Col Cluster.
  * @param data Necessary data for the admissibility condition.
  * @param admis Admissibility condition.
- * @returns Returns a strict block cluster tree.
+ * @returns Returns a strict block tree.
  */
 HEADER_PREFIX pblock
 build_strict_block(pcluster rc, pcluster cc, void *data, admissible admis);
 
-/** @brief Build a strict lower triangular @ref block cluster tree.
+/** @brief Build a strict lower triangular @ref block tree.
  *
- * Builds a strict lower triangular block cluster tree from the row
+ * Builds a strict lower triangular block tree from the row
  * @ref cluster tree @f$ rc @f$ and the column @ref cluster tree @f$ cc @f$.
- * A block cluster tree is called  strict, if all leaves @f$ (t,s) @f$ are
+ * A block tree is called  strict, if all leaves @f$ (t,s) @f$ are
  * admissible or @f$ t @f$ and @f$ s @f$ are leave cluster.
  *
  * @param rc Row cluster.
  * @param cc Col Cluster.
  * @param data Necessary data for the admissibility condition.
  * @param admis Admissibility condition.
- * @returns Returns a strict lower triangular block cluster tree.
+ * @returns Returns a strict lower triangular block tree.
  */
 HEADER_PREFIX pblock
 build_strict_lower_block(pcluster rc, pcluster cc, void *data, admissible admis);
 
 /* ------------------------------------------------------------
- Drawing block cluster trees
- ------------------------------------------------------------ */
+ * Drawing block trees
+ * ------------------------------------------------------------ */
 
-/** @brief Draw a block cluster tree.
+/** @brief Draw a block tree.
  * 
  */
 #ifdef USE_CAIRO
@@ -267,8 +284,8 @@ draw_cairo_block(cairo_t *cr, pcblock b, int levels);
 #endif
 
 /* ------------------------------------------------------------
- Interactive visualization
- ------------------------------------------------------------ */
+ * Interactive visualization
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Visualize a block tree in OpenGL.
@@ -279,8 +296,8 @@ HEADER_PREFIX void
 view_block(pcblock b);
 
 /* ------------------------------------------------------------
- Hierarchical iterators
- ------------------------------------------------------------ */
+ * Hierarchical iterators
+ * ------------------------------------------------------------ */
 
 /** @brief Representation of a @ref blockentry object.*/
 typedef struct _blockentry blockentry;
@@ -294,9 +311,9 @@ typedef const blockentry *pcblockentry;
 /** @brief Auxiliary structure for hierarchical iterators for a @ref block
  *         cluster tree. */
 struct _blockentry {
-  /** @brief Block cluster tree.*/
+  /** @brief block tree.*/
   pcblock b;
-  /** @brief Number of the block cluster tree.*/
+  /** @brief Number of the block tree.*/
   uint bname;
   /** @brief Number of the row cluster of <tt>b</tt>.*/
   uint rname;
@@ -308,9 +325,9 @@ struct _blockentry {
   pblockentry next;
 };
 
-/** @brief Hierarchical iterator for a @ref block cluster tree.
+/** @brief Hierarchical iterator for a @ref block tree.
  * 
- * Iterate over the block clustertree and all its descendants.
+ * Iterate over the blocktree and all its descendants.
  * The <tt>pre</tt> function is called for each element before its descendants
  * are processed, the <tt>post</tt> function is called afterwards
  * 
@@ -319,8 +336,8 @@ struct _blockentry {
  * the root, while the indices of the first son start at <tt>tname+1,</tt> the
  * indices of the second start at <tt>tname+1+1t->son[0]->desc,</tt> and so on.
  * 
- * @param b Block cluster tree.
- * @param bname Number of the block cluster tree .
+ * @param b Block tree.
+ * @param bname Number of the block tree .
  * @param rname Number of the row cluster tree in <tt>b</tt>.
  * @param cname Number of the column cluster tree in <tt>b</tt>.  .
  * @param pre Function to be called before the descendants of <tt>b</tt> are
@@ -336,13 +353,13 @@ iterate_block(pcblock b, uint bname, uint rname, uint cname,
     void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
         void *data), void *data);
 
-/** @brief Iterate through all subblocks of a @ref block cluster tree, rowwise.
+/** @brief Iterate through all subblocks of a @ref block tree, rowwise.
  * 
- * Iterate through all subblocks of a @ref block cluster tree and collect all 
+ * Iterate through all subblocks of a @ref block tree and collect all 
  * row blocks in an @ref h2matrixlist object.
  * 
- * @param b Block cluster tree.
- * @param bname Number of the block cluster tree.
+ * @param b Block tree.
+ * @param bname Number of the block tree.
  * @param rname Number of the row cluster tree in <tt>b</tt>.
  * @param cname Number of the column cluster tree in <tt>b</tt>.
  * @param pardepth Parallelization depth.
@@ -355,14 +372,14 @@ iterate_rowlist_block(pcblock b, uint bname, uint rname, uint cname,
     uint pardepth, void (*pre)(pcblockentry pb, uint pardepth, void *data),
     void (*post)(pcblockentry pb, uint pardepth, void *data), void *data);
 
-/** @brief Iterate through all subblocks of a @ref block cluster tree, 
+/** @brief Iterate through all subblocks of a @ref block tree, 
  * columnwise.
  * 
- * Iterate through all subblocks of a @ref block cluster tree and collect all 
+ * Iterate through all subblocks of a @ref block tree and collect all 
  * column blocks in an @ref blockentry object.
  * 
- * @param b Block cluster tree.
- * @param bname Number of the block cluster tree.
+ * @param b Block tree.
+ * @param bname Number of the block tree.
  * @param rname Number of the row cluster tree  in <tt>b</tt>.
  * @param cname Number of the column cluster tree in <tt>b</tt>.
  * @param pre Function to be called before the sons of <tt>b</tt> are processed.
@@ -375,14 +392,14 @@ iterate_collist_block(pcblock b, uint bname, uint rname, uint cname,
     uint pardepth, void (*pre)(pcblockentry pb, uint pardepth, void *data),
     void (*post)(pcblockentry pb, uint pardepth, void *data), void *data);
 
-/** @brief Iterate through all subblocks of a @ref block cluster tree.
+/** @brief Iterate through all subblocks of a @ref block tree.
  * 
  * If the iterator works with multiple threads, it guarantees that
  * threads running in parallel call the <tt>pre</tt> and <tt>post</tt>
  * functions with different row clusters.
  * 
- * @param b Block cluster tree.
- * @param bname Number of the block cluster tree.
+ * @param b Block tree.
+ * @param bname Number of the block tree.
  * @param rname Number of the row cluster tree in <tt>b</tt> .
  * @param cname Number of the column cluster tree in <tt>b</tt>.
  * @param pardepth Parallelization depth.
@@ -400,14 +417,14 @@ iterate_byrow_block(pcblock b, uint bname, uint rname, uint cname,
     void (*post)(pcblock b, uint bname, uint rname, uint cname, uint pardepth,
         void *data), void *data);
 
-/** @brief Iterate through all subblocks of a @ref block cluster tree.
+/** @brief Iterate through all subblocks of a @ref block tree.
  * 
  * If the iterator works with multiple threads, it guarantees that
  * threads running in parallel call the <tt>pre</tt> and <tt>post</tt>
  * functions with different column clusters.
  * 
- * @param b Block cluster tree.
- * @param bname Number of the block cluster tree.
+ * @param b Block tree.
+ * @param bname Number of the block tree.
  * @param rname Number of the row cluster tree in <tt>b</tt>.
  * @param cname Number of the column cluster tree in <tt>b</tt>.
  * @param pardepth Parallelization depth.
@@ -426,33 +443,34 @@ iterate_bycol_block(pcblock b, uint bname, uint rname, uint cname,
         void *data), void *data);
 
 /* ------------------------------------------------------------
- Enumeration
- ------------------------------------------------------------ */
-/** @brief Enumerate a block cluster tree.
+ * Enumeration
+ * ------------------------------------------------------------ */
+
+/** @brief Enumerate a block tree.
  * 
- * Enumerates the @ref block cluster tree @f$ t @f$ in an array  of size 
+ * Enumerates the @ref block tree @f$ t @f$ in an array  of size 
  * @f$ t->desc @f$ by passing through all descendants and ordering them in a 
- * pointer to a @ref block cluster tree object.
+ * pointer to a @ref block tree object.
  * The enumeration starts with @f$ 0 @f$ assigned to the root and then proceeds
  * with depth-first search.
  * 
- * @param t Block cluster tree to be enumerated.
- * @returns Returns a pointer, length @f$ t->desc @f$, to a block cluster tree
+ * @param t block tree to be enumerated.
+ * @returns Returns a pointer, length @f$ t->desc @f$, to a block tree
  * enumerating all descendants. 
  */
 HEADER_PREFIX pblock *
 enumerate_block(pblock t);
 
-/** @brief Enumerate the levels of a block cluster tree.
+/** @brief Enumerate the levels of a block tree.
  * 
- * Enumerates the @ref block cluster tree @f$ t @f$ in an array of size 
+ * Enumerates the @ref block tree @f$ t @f$ in an array of size 
  * @f$ t->desc @f$ by passing through all descendants, ordering them and filling
  * an array with information of the level of each descendant in the block 
  * cluster tree.
  * The array includes at position @f$ i @f$ the level of the descendant 
- * @f$ i @f$ of the block cluster tree.
+ * @f$ i @f$ of the block tree.
  * 
- * @param t Block cluster tree to be enumerated.
+ * @param t block tree to be enumerated.
  * @returns Returns a pointer to unsigned int, length @f$ t->desc @f$, with the 
  * level of each descendant.  
  */
@@ -460,14 +478,14 @@ HEADER_PREFIX uint*
 enumerate_level_block(pblock t);
 
 /* ------------------------------------------------------------
- Utility functions
- ------------------------------------------------------------ */
+ * Utility functions
+ * ------------------------------------------------------------ */
 
-/** @brief Compute the depth of a @ref block cluster tree object
+/** @brief Compute the depth of a @ref block tree object
  *
- * Compute the maximal depth of a block cluster tree.
+ * Compute the maximal depth of a block tree.
  * 
- * @param b Block cluster object
+ * @param b block object
  * @return Returns the maximal depth of @p b.
  */
 HEADER_PREFIX uint
@@ -475,11 +493,11 @@ getdepth_block(pcblock b);
 
 /** @brief Compute the sparsity of a @ref block object
  * 
- * Computes the @f$ C_{sp}@f$-sparsity of the block cluster tree @f$ b @f$.
- * The @ref block cluster tree is called @f$ C_{sp}@f$-sparse, if the number
+ * Computes the @f$ C_{sp}@f$-sparsity of the block tree @f$ b @f$.
+ * The @ref block tree is called @f$ C_{sp}@f$-sparse, if the number
  * of its block rows and block columns is at most @f$ C_{sp}@f$.
  * 
- * @param b Block cluster tree.
+ * @param b Block tree.
  * @returns Returns the @f$C_{sp} @f$-spars of the blcok cluster tree.
  */
 HEADER_PREFIX uint

@@ -339,6 +339,12 @@ fill_avector(pavector v, field x);
 HEADER_PREFIX void
 random_avector(pavector v);
 
+/** @brief Fill a vector with real valued random values.
+ *
+ *  @param v Target vector. */
+HEADER_PREFIX void
+random_real_avector(pavector v);
+
 /** @brief Copy a vector into another vector, @f$w \gets v@f$.
  *
  *  Both vectors have to be of the same dimension.

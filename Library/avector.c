@@ -1,4 +1,3 @@
-
 /* ------------------------------------------------------------
  * This is the file "avector.c" of the H2Lib package.
  * All rights reserved, Steffen Boerm 2009
@@ -258,6 +257,20 @@ random_avector(pavector v)
 
   for (i = 0; i < v->dim; i++) {
     v->v[i] = FIELD_RAND();
+  }
+}
+
+void
+random_real_avector(pavector v)
+{
+  uint      i;
+
+  for (i = 0; i < v->dim; i++) {
+#ifdef USE_COMPLEX
+    v->v[i] = REAL_RAND() + 0.0 * I;
+#else
+    v->v[i] = REAL_RAND();
+#endif
   }
 }
 

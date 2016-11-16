@@ -1,4 +1,3 @@
-
 /* ------------------------------------------------------------
  * This is the file "cluster.c" of the H2Lib package.
  * All rights reserved, Knut Reimer 2009
@@ -28,6 +27,7 @@ new_cluster(uint size, uint * idx, uint sons, uint dim)
   uint      i;
 
   t = (pcluster) allocmem((size_t) sizeof(cluster));
+  t->type = 0;
   t->size = size;
   t->dim = dim;
   t->idx = idx;
@@ -45,7 +45,6 @@ new_cluster(uint size, uint * idx, uint sons, uint dim)
   return t;
 }
 
-
 void
 del_cluster(pcluster t)
 {
@@ -61,7 +60,6 @@ del_cluster(pcluster t)
   freemem(t);
 }
 
-
 void
 update_cluster(pcluster t)
 {
@@ -73,7 +71,6 @@ update_cluster(pcluster t)
 
   t->desc = desc;
 }
-
 
 /* ------------------------------------------------------------
  Clustering strategies
@@ -88,6 +85,8 @@ build_adaptive_cluster(pclustergeometry cf, uint size, uint * idx, uint clf)
   uint      size0, size1;
   uint      i, j;
   real      a, m;
+
+  assert(size > 0);
 
   if (size > clf) {
 
@@ -122,12 +121,34 @@ build_adaptive_cluster(pclustergeometry cf, uint size, uint * idx, uint clf)
 	  size1++;
 	}
       }
-      t = new_cluster(size, idx, 2, cf->dim);
 
-      t->son[0] = build_adaptive_cluster(cf, size0, idx, clf);
-      t->son[1] = build_adaptive_cluster(cf, size1, idx + size0, clf);
+      /* build sons */
+      if (size0 > 0) {
+	if (size1 > 0) {
+	  /* both sons are not empty */
+	  t = new_cluster(size, idx, 2, cf->dim);
 
-      update_bbox_cluster(t);
+	  t->son[0] = build_adaptive_cluster(cf, size0, idx, clf);
+	  t->son[1] = build_adaptive_cluster(cf, size1, idx + size0, clf);
+
+	  update_bbox_cluster(t);
+	}
+	else {
+	  /* only the first son is not empty */
+	  assert(size0 == size);
+
+	  t = new_cluster(size, idx, 0, cf->dim);
+	  update_bbox_cluster(t);
+	}
+      }
+      else {
+	/* only the second son is not empty */
+	assert(size1 > 0);
+	assert(size1 == size);
+
+	t = new_cluster(size, idx, 0, cf->dim);
+	update_bbox_cluster(t);
+      }
     }
     else {
       assert(a == 0.0);
@@ -155,6 +176,8 @@ build_regular_cluster(pclustergeometry cf, uint size, uint * idx,
   uint      size0, size1;
   uint      i, j;
   real      a, b, m;
+
+  assert(size > 0);
 
   if (size > clf) {
     size0 = 0;
@@ -223,7 +246,8 @@ build_regular_cluster(pclustergeometry cf, uint size, uint * idx,
 	}
       }
       else {
-	/* only the second son is not empty */ assert(size1 > 0);
+	/* only the second son is not empty */
+	assert(size1 > 0);
 
 	t = new_cluster(size, idx, 1, cf->dim);
 
@@ -381,6 +405,8 @@ build_simsub_cluster(pclustergeometry cf, uint size, uint * idx, uint clf)
   uint      leaves;
   pcluster  s;
 
+  assert(size > 0);
+
   leaves = 0;
 
   if (size > clf) {
@@ -415,6 +441,8 @@ build_pca_cluster(pclustergeometry cf, uint size, uint * idx, uint clf)
   uint      i, j, k, size0, size1;
 
   pcluster  t;
+
+  assert(size > 0);
 
   size0 = 0;
   size1 = 0;
@@ -562,7 +590,6 @@ build_cluster(pclustergeometry cf, uint size, uint * idx, uint clf,
 
   return t;
 }
-
 
 /* ------------------------------------------------------------
  * Statistics
@@ -726,7 +753,6 @@ getdiam_2_cluster(pccluster t)
   return REAL_SQRT(diam2);
 }
 
-
 real
 getdist_2_cluster(pccluster t, pccluster s)
 {
@@ -851,8 +877,8 @@ iterate_parallel_cluster(pccluster t, uint tname, uint pardepth,
 #endif
     for (i = 0; i < t->sons; i++)
       iterate_parallel_cluster(t->son[i], tname1[i],
-			       (pardepth > 0 ? pardepth - 1 : 0),
-			       pre, post, data);
+			       (pardepth > 0 ? pardepth - 1 : 0), pre, post,
+			       data);
 
     freemem(tname1);
   }

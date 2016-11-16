@@ -3,12 +3,13 @@
  All rights reserved, Steffen Boerm 2010
  ------------------------------------------------------------ */
 
-#include <assert.h>
-#include <math.h>
-#include <stdio.h>
-
 #include "macrosurface3d.h"
-#include "surface3d.h"
+
+#include <assert.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "basic.h"
 
 /* ------------------------------------------------------------
@@ -197,6 +198,198 @@ new_sphere_macrosurface3d()
   mg->phidata = mg;
 
   return mg;
+}
+
+static void
+parabolic_mirror_parametrization(uint i, real xr1, real xr2,
+				 void *data, real xt[3])
+{
+  pcmacrosurface3d mg = (pcmacrosurface3d) data;
+  const     real(*x)[3] = (const real(*)[3]) mg->x;
+  const     uint(*t)[3] = (const uint(*)[3]) mg->t;
+  real      norm;
+
+  assert(i < mg->triangles);
+  assert(t[i][0] < mg->vertices);
+  assert(t[i][1] < mg->vertices);
+  assert(t[i][2] < mg->vertices);
+
+  xt[0] = (x[t[i][0]][0] * (1.0 - xr1 - xr2) + x[t[i][1]][0] * xr1
+	   + x[t[i][2]][0] * xr2);
+  xt[1] = (x[t[i][0]][1] * (1.0 - xr1 - xr2) + x[t[i][1]][1] * xr1
+	   + x[t[i][2]][1] * xr2);
+  xt[2] = (x[t[i][0]][2] * (1.0 - xr1 - xr2) + x[t[i][1]][2] * xr1
+	   + x[t[i][2]][2] * xr2);
+
+  norm = REAL_NORM3(xt[0], xt[1], xt[2]);
+  xt[0] /= norm;
+  xt[0] = xt[0] < 0.0 ? xt[0] * xt[0] : xt[0];
+  xt[1] /= norm;
+  xt[2] /= norm;
+}
+
+pmacrosurface3d
+new_parabolic_mirror_macrosurface3d()
+{
+  pmacrosurface3d mg;
+
+  mg = new_sphere_macrosurface3d();
+  mg->phi = parabolic_mirror_parametrization;
+
+  return mg;
+}
+
+static void
+cube_parametrization(uint i, real xr1, real xr2, void *data, real xt[3])
+{
+  pcmacrosurface3d mg = (pcmacrosurface3d) data;
+  const     real(*x)[3] = (const real(*)[3]) mg->x;
+  const     uint(*t)[3] = (const uint(*)[3]) mg->t;
+
+  assert(i < mg->triangles);
+  assert(t[i][0] < mg->vertices);
+  assert(t[i][1] < mg->vertices);
+  assert(t[i][2] < mg->vertices);
+
+  xt[0] = (x[t[i][0]][0] * (1.0 - xr1 - xr2) + x[t[i][1]][0] * xr1
+	   + x[t[i][2]][0] * xr2);
+  xt[1] = (x[t[i][0]][1] * (1.0 - xr1 - xr2) + x[t[i][1]][1] * xr1
+	   + x[t[i][2]][1] * xr2);
+  xt[2] = (x[t[i][0]][2] * (1.0 - xr1 - xr2) + x[t[i][1]][2] * xr1
+	   + x[t[i][2]][2] * xr2);
+}
+
+pmacrosurface3d
+new_cuboid_macrosurface3d(real ax, real bx, real ay, real by,
+			  real az, real bz)
+{
+  real(*x)[3];
+  uint(*e)[2];
+  uint(*t)[3];
+  uint(*s)[3];
+  uint      nx, ne, nt;
+
+  pmacrosurface3d mg;
+
+  mg = new_macrosurface3d(8, 18, 12);
+
+  x = mg->x;
+  e = mg->e;
+  t = mg->t;
+  s = mg->s;
+
+  /****************************************************
+   * vertices
+   ****************************************************/
+
+  nx = 0;
+
+  /* left */
+  x[nx][0] = ax, x[nx][1] = ay, x[nx++][2] = az;
+  x[nx][0] = ax, x[nx][1] = by, x[nx++][2] = az;
+  x[nx][0] = ax, x[nx][1] = ay, x[nx++][2] = bz;
+  x[nx][0] = ax, x[nx][1] = by, x[nx++][2] = bz;
+
+  /* right */
+  x[nx][0] = bx, x[nx][1] = ay, x[nx++][2] = az;
+  x[nx][0] = bx, x[nx][1] = by, x[nx++][2] = az;
+  x[nx][0] = bx, x[nx][1] = ay, x[nx++][2] = bz;
+  x[nx][0] = bx, x[nx][1] = by, x[nx++][2] = bz;
+
+  /****************************************************
+   * edges
+   ****************************************************/
+
+  ne = 0;
+
+  /* left */
+  e[ne][0] = 1, e[ne++][1] = 0;
+  e[ne][0] = 0, e[ne++][1] = 3;
+  e[ne][0] = 3, e[ne++][1] = 1;
+  e[ne][0] = 2, e[ne++][1] = 0;
+  e[ne][0] = 3, e[ne++][1] = 2;
+
+  /* right */
+  e[ne][0] = 5, e[ne++][1] = 7;
+  e[ne][0] = 7, e[ne++][1] = 4;
+  e[ne][0] = 4, e[ne++][1] = 5;
+  e[ne][0] = 4, e[ne++][1] = 6;
+  e[ne][0] = 6, e[ne++][1] = 7;
+
+  /* front */
+  e[ne][0] = 2, e[ne++][1] = 6;
+  e[ne][0] = 6, e[ne++][1] = 3;
+  e[ne][0] = 3, e[ne++][1] = 7;
+
+  /* back */
+  e[ne][0] = 5, e[ne++][1] = 1;
+  e[ne][0] = 1, e[ne++][1] = 4;
+  e[ne][0] = 4, e[ne++][1] = 0;
+
+  /* top */
+  e[ne][0] = 1, e[ne++][1] = 7;
+
+  /* bottom */
+  e[ne][0] = 0, e[ne++][1] = 6;
+
+  /****************************************************
+   * triangles
+   ****************************************************/
+
+  nt = 0;
+
+  /* left */
+  t[nt][0] = 1, t[nt][1] = 0, t[nt][2] = 3;
+  s[nt][0] = 1, s[nt][1] = 2, s[nt++][2] = 0;
+
+  t[nt][0] = 3, t[nt][1] = 0, t[nt][2] = 2;
+  s[nt][0] = 3, s[nt][1] = 4, s[nt++][2] = 1;
+
+  /* right */
+  t[nt][0] = 4, t[nt][1] = 5, t[nt][2] = 7;
+  s[nt][0] = 5, s[nt][1] = 6, s[nt++][2] = 7;
+
+  t[nt][0] = 4, t[nt][1] = 7, t[nt][2] = 6;
+  s[nt][0] = 9, s[nt][1] = 8, s[nt++][2] = 6;
+
+  /* front */
+  t[nt][0] = 3, t[nt][1] = 2, t[nt][2] = 6;
+  s[nt][0] = 10, s[nt][1] = 11, s[nt++][2] = 4;
+
+  t[nt][0] = 3, t[nt][1] = 6, t[nt][2] = 7;
+  s[nt][0] = 9, s[nt][1] = 12, s[nt++][2] = 11;
+
+  /* back */
+  t[nt][0] = 4, t[nt][1] = 0, t[nt][2] = 1;
+  s[nt][0] = 0, s[nt][1] = 14, s[nt++][2] = 15;
+
+  t[nt][0] = 4, t[nt][1] = 1, t[nt][2] = 5;
+  s[nt][0] = 13, s[nt][1] = 7, s[nt++][2] = 14;
+
+  /* bottom */
+  t[nt][0] = 0, t[nt][1] = 6, t[nt][2] = 2;
+  s[nt][0] = 10, s[nt][1] = 3, s[nt++][2] = 17;
+
+  t[nt][0] = 4, t[nt][1] = 6, t[nt][2] = 0;
+  s[nt][0] = 17, s[nt][1] = 15, s[nt++][2] = 8;
+
+  /* top */
+  t[nt][0] = 1, t[nt][1] = 3, t[nt][2] = 7;
+  s[nt][0] = 12, s[nt][1] = 16, s[nt++][2] = 2;
+
+  t[nt][0] = 1, t[nt][1] = 7, t[nt][2] = 5;
+  s[nt][0] = 5, s[nt][1] = 13, s[nt++][2] = 16;
+
+  mg->phi = cube_parametrization;
+  mg->phidata = mg;
+
+  return mg;
+}
+
+pmacrosurface3d
+new_cube_macrosurface3d()
+{
+  return new_cuboid_macrosurface3d(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 }
 
 static void
@@ -832,7 +1025,7 @@ build_interactive_surface3d()
 {
   psurface3d gr;
   pmacrosurface3d mg;
-  char      buf[100], *c;
+  char      buf[100], *c, *res;
   FILE     *grid;
   uint      r;
 
@@ -841,7 +1034,8 @@ build_interactive_surface3d()
   do {
     (void) printf("Name of grid? (file name or built-in)\n");
     buf[0] = '\0';
-    (void) fgets(buf, 100, stdin);
+    res = fgets(buf, 100, stdin);
+    assert(res != NULL);
 
     for (c = buf; *c != '\n' && *c != '\r' && *c != '\0'; c++);
     *c = '\0';
@@ -862,12 +1056,47 @@ build_interactive_surface3d()
 	  del_macrosurface3d(mg);
 	}
 	break;
+      case 'c':
+	switch (buf[1]) {
+	case 'u':
+	  if (sscanf(buf + 2, "%u", &r) == 1) {
+	    (void) printf("Creating cube geometry with %u subdivisions\n", r);
+	    mg = new_cube_macrosurface3d();
+	    gr = build_from_macrosurface3d_surface3d(mg, r);
+	    del_macrosurface3d(mg);
+	  }
+	  break;
+	case 'y':
+	  if (sscanf(buf + 2, "%u", &r) == 1) {
+	    (void) printf("Creating cylinder geometry with %u subdivisions\n",
+			  r);
+	    mg = new_cylinder_macrosurface3d();
+	    gr = build_from_macrosurface3d_surface3d(mg, r);
+	    del_macrosurface3d(mg);
+	  }
+	  break;
+	default:
+	  gr = NULL;
+	  break;
+	}
+
+	break;
+      case 'p':
+	if (sscanf(buf + 1, "%u", &r) == 1) {
+	  (void)
+	    printf
+	    ("Creating parabolic mirror geometry with %u subdivisions\n", r);
+	  mg = new_parabolic_mirror_macrosurface3d();
+	  gr = build_from_macrosurface3d_surface3d(mg, r);
+	  del_macrosurface3d(mg);
+	}
+	break;
       default:
-	gr = 0;
+	gr = NULL;
 	break;
       }
     }
-  } while (gr == 0);
+  } while (gr == NULL);
 
   prepare_surface3d(gr);
 

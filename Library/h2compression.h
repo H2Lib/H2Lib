@@ -45,7 +45,7 @@ typedef truncblock *ptruncblock;
  *  @param tm Truncation mode.
  *  @param eps Truncation accuracy.
  *  @returns @f$\mathcal{H}^2@f$-matrix approximation of @f$G@f$. */
-ph2matrix
+HEADER_PREFIX ph2matrix
 compress_amatrix_h2matrix(pcamatrix G, pcblock b, pctruncmode tm, real eps);
 
 /** @brief Approximate a hierarchical matrix, represented by an
@@ -55,7 +55,7 @@ compress_amatrix_h2matrix(pcamatrix G, pcblock b, pctruncmode tm, real eps);
  *  @param tm Truncation mode.
  *  @param eps Truncation accuracy.
  *  @returns @f$\mathcal{H}^2@f$-matrix approximation of @f$G@f$. */
-ph2matrix
+HEADER_PREFIX ph2matrix
 compress_hmatrix_h2matrix(pchmatrix G, pctruncmode tm, real eps);
 
 /** @brief Approximate an @f$\mathcal{H}^2@f$-matrix, represented by an
@@ -69,8 +69,24 @@ compress_hmatrix_h2matrix(pchmatrix G, pctruncmode tm, real eps);
  *  @param tm Truncation mode.
  *  @param eps Truncation accuracy.
  *  @returns @f$\mathcal{H}^2@f$-matrix approximation of @f$G@f$. */
-ph2matrix
+HEADER_PREFIX ph2matrix
 compress_h2matrix_h2matrix(pch2matrix G, bool rbortho, bool cbortho,
+    pctruncmode tm, real eps);
+
+/** @brief Approximate a symmetric @f$\mathcal{H}^2@f$-matrix, represented
+ *  by an @ref h2matrix object, by a recompressed @f$\mathcal{H}^2@f$-matrix.
+ *
+ *  Since the matrix is symmetric, we assume the row and column cluster basis
+ *  are identical, i.e., <tt>G->rb==G->cb</tt>.
+ *
+ *  @param G Source matrix @f$G@f$.
+ *  @param rbortho Set if the original row and column basis is orthogonal,
+ *    this allows the algorithm to avoid computing row weights.
+ *  @param tm Truncation mode.
+ *  @param eps Truncation accuracy.
+ *  @returns @f$\mathcal{H}^2@f$-matrix approximation of @f$G@f$. */
+HEADER_PREFIX ph2matrix
+compress_symmetric_h2matrix_h2matrix(pch2matrix G, bool rbortho,
     pctruncmode tm, real eps);
 
 /* ------------------------------------------------------------

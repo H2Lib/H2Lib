@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "sparsematrix.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2012
-   ------------------------------------------------------------ */
+ * This is the file "sparsematrix.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2012
+ * ------------------------------------------------------------ */
 
 /** @file sparsematrix.h
  *  @author Steffen B&ouml;rm
@@ -33,9 +33,10 @@ typedef sparsematrix *psparsematrix;
 /** @brief Pointer to constant @ref sparsematrix object. */
 typedef const sparsematrix *pcsparsematrix;
 
+#include "basic.h"
 #include "avector.h"
-#include "settings.h"
 #include "sparsepattern.h"
+#include "krylov.h"
 
 /** @brief Representation of a sparse matrix in compressed row format. */
 struct _sparsematrix {
@@ -71,13 +72,24 @@ struct _sparsematrix {
 HEADER_PREFIX psparsematrix
 new_raw_sparsematrix(uint rows, uint cols, uint nz);
 
+/**
+ * @brief Creates a new @ref _sparsematrix "sparsematrix" object and
+ * initializes it to the idenity matrix @f$I \in \mathbb R^{n \times m}@f$.
+ *
+ * @param rows Number of rows is equal to @f$n@f$
+ * @param cols Number of columns is equal to @f$m@f$
+ * @return New identity sparsematrix
+ */
+HEADER_PREFIX psparsematrix
+new_identity_sparsematrix(uint rows, uint cols);
+
 /** @brief Create a sparsematrix based on a sparsepattern.
  *
  *  @remark Should always be matched by a call to @ref del_sparsematrix.
  *
  *  @param sp Description of matrix graph in a @ref sparsepattern object.
  *  @returns Fully initialized @ref sparsematrix object with given
- *     sparsity pattern and zero coefficients. */   
+ *     sparsity pattern and zero coefficients. */
 HEADER_PREFIX psparsematrix
 new_zero_sparsematrix(psparsepattern sp);
 
@@ -168,8 +180,7 @@ print_sparsematrix(pcsparsematrix a);
  *  @param offset Offset added to all coordinates, e.g., to avoid
  *     boundary clipping with some printers. */
 HEADER_PREFIX void
-print_eps_sparsematrix(pcsparsematrix a,
-			const char *filename, uint offset);
+print_eps_sparsematrix(pcsparsematrix a, const char *filename, uint offset);
 
 /* ------------------------------------------------------------
  * Basic linear algebra
@@ -186,9 +197,9 @@ print_eps_sparsematrix(pcsparsematrix a,
  *  @param a Matrix @f$A@f$.
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
-HEADER_PREFIX void 
-addeval_sparsematrix_avector(field alpha, pcsparsematrix a,
-		     pcavector x, pavector y);
+HEADER_PREFIX void
+addeval_sparsematrix_avector(field alpha, pcsparsematrix a, pcavector x,
+    pavector y);
 
 /** @brief Multiply the adjoint of a matrix @f$A@f$ by a vector @f$x@f$,
  *  @f$y \gets y + \alpha A^* x@f$.
@@ -202,8 +213,8 @@ addeval_sparsematrix_avector(field alpha, pcsparsematrix a,
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-addevaltrans_sparsematrix_avector(field alpha, pcsparsematrix a,
-			  pcavector x, pavector y);
+addevaltrans_sparsematrix_avector(field alpha, pcsparsematrix a, pcavector x,
+    pavector y);
 
 /** @brief Multiply a matrix @f$A@f$ or its adjoint @f$A^*@f$ by a
  *  vector, @f$y \gets y + \alpha A x@f$ or @f$y \gets y + \alpha A^* x@f$.
@@ -218,19 +229,32 @@ addevaltrans_sparsematrix_avector(field alpha, pcsparsematrix a,
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
 HEADER_PREFIX void
-mvm_sparsematrix_avector(field alpha, bool trans, pcsparsematrix a,
-		 pcavector x, pavector y);
+mvm_sparsematrix_avector(field alpha, bool trans, pcsparsematrix a, pcavector x,
+    pavector y);
 
-/** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
+/** @brief Approximate the spectral norm @f$\|S\|_2@f$ of a matrix @f$S@f$.
  *
  *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$A^* A@f$ and computing the square root of
+ *  iteration to the matrix @f$S^* S@f$ and computing the square root of
  *  the resulting eigenvalue approximation.
  *
- *  @param a Matrix @f$A@f$.
- *  @returns Approximation of @f$\|A\|_2@f$. */
+ *  @param S Sparse matrix @f$S@f$.
+ *  @returns Approximation of @f$\|S\|_2@f$. */
 HEADER_PREFIX real
-norm2_sparsematrix(pcsparsematrix a);
+norm2_sparsematrix(pcsparsematrix S);
+
+/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
+ *  of two matrices @f$A@f$ and @f$B@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
+ *  of the resulting eigenvalue approximation.
+ *
+ *  @param a Sparse matrix @f$A@f$.
+ *  @param b Sparse matrix @f$B@f$.
+ *  @returns Approximation of @f$\|A-B\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_sparsematrix(pcsparsematrix a, pcsparsematrix b);
 
 /** @brief Add a @ref sparsematrix to an @ref amatrix,
  *  @f$B \gets B + \alpha A@f$ or @f$B \gets B + \alpha^* A@f$.
@@ -240,8 +264,7 @@ norm2_sparsematrix(pcsparsematrix a);
  *  @param a Source matrix @f$A@f$.
  *  @param b Target matrix @f$B@f$. */
 HEADER_PREFIX void
-add_sparsematrix_amatrix(field alpha, bool atrans, pcsparsematrix a,
-			 pamatrix b);
+add_sparsematrix_amatrix(field alpha, bool atrans, pcsparsematrix a, pamatrix b);
 
 /** @} */
 

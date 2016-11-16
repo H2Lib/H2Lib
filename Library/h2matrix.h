@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
- This is the file "h2matrix.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "h2matrix.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file h2matrix.h
  *  @author Steffen B&ouml;rm
@@ -32,6 +32,7 @@ typedef const h2matrix *pch2matrix;
 #endif
 
 #include "amatrix.h"
+#include "krylov.h"
 #include "block.h"
 #include "hmatrix.h"
 #include "uniform.h"
@@ -70,8 +71,8 @@ struct _h2matrix {
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /** @brief Create a new @ref h2matrix object.
  *
@@ -206,8 +207,8 @@ HEADER_PREFIX void
 del_h2matrix(ph2matrix h2);
 
 /* ------------------------------------------------------------
- Reference counting
- ------------------------------------------------------------ */
+ * Reference counting
+ * ------------------------------------------------------------ */
 
 /** @brief Set a pointer to an @ref h2matrix object, increase its
  *  reference counter, and decrease reference counter of original
@@ -230,8 +231,8 @@ HEADER_PREFIX void
 unref_h2matrix(ph2matrix h2);
 
 /* ------------------------------------------------------------
- Statistics
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 /** @brief Get size of a given @ref h2matrix object.
  *
@@ -239,6 +240,14 @@ unref_h2matrix(ph2matrix h2);
  *  @returns Size of allocated storage in bytes. */
 HEADER_PREFIX size_t
 getsize_h2matrix(pch2matrix h2);
+
+/** @brief Get total size of a given @ref h2matrix object, including
+ *  cluster bases.
+ *
+ *  @param h2 @f$\mathcal{H}^2@f$-matrix object.
+ *  @returns Size of allocated storage in bytes. */
+HEADER_PREFIX size_t
+gettotalsize_h2matrix(pch2matrix h2);
 
 /** @brief Get size of the nearfield part of a given @ref h2matrix object.
  *
@@ -255,8 +264,8 @@ HEADER_PREFIX size_t
 getfarsize_h2matrix(pch2matrix h2);
 
 /* ------------------------------------------------------------
- Simple utility functions
- ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 /** @brief Set an @ref h2matrix to zero by clearing all far- and nearfield
  *  matrices.
@@ -265,9 +274,22 @@ getfarsize_h2matrix(pch2matrix h2);
 HEADER_PREFIX void
 clear_h2matrix(ph2matrix h2);
 
+/** @brief Scale an @ref h2matrix by a factor.
+ *
+ * @param alpha Scaling factor @f$\alpha@f$.
+ * @param h2 Target matrix @f$G@f$, will be overwritten by @f$\alpha G@f$. */
+void
+scale_h2matrix(field alpha, ph2matrix h2);
+
+/** @brief Fill an @ref h2matrix with random coefficients.
+ *
+ * @param h2 Target matrix @f$G@f$. */
+void
+random_h2matrix(ph2matrix h2);
+
 /* ------------------------------------------------------------
- Build H^2-matrix based on block tree
- ------------------------------------------------------------ */
+ * Build H^2-matrix based on block tree
+ * ------------------------------------------------------------ */
 
 /** @brief Build an @ref h2matrix object from a @ref block tree using
  *  given cluster bases.
@@ -283,8 +305,8 @@ HEADER_PREFIX ph2matrix
 build_from_block_h2matrix(pcblock b, pclusterbasis rb, pclusterbasis cb);
 
 /* ------------------------------------------------------------
- Build block tree from H^2-matrix
- ------------------------------------------------------------ */
+ * Build block tree from H^2-matrix
+ * ------------------------------------------------------------ */
 
 /** @brief Build an @ref block tree from an @ref h2matrix.
  *
@@ -295,28 +317,27 @@ HEADER_PREFIX pblock
 build_from_h2matrix_block(pch2matrix G);
 
 /* ------------------------------------------------------------
- Enumeration by block number
- ------------------------------------------------------------ */
+ * Enumeration by block number
+ * ------------------------------------------------------------ */
 
 /** @brief Enumerate @ref h2matrix according to block tree.
  *
  *  The @ref h2matrix submatrices are enumerated in an array of
- *  size <tt>b->desc</tt>. The enumeration starts with <tt>0</tt> assigned to
+ *  size <tt>h2->desc</tt>. The enumeration starts with <tt>0</tt> assigned to
  *  the root and then proceeds column-wise starting with <tt>b->sons[0]</tt>
- *  corresponding to the entries <tt>1</tt> to <tt>b->sons[0]->desc</tt>
- *  in the array and ending with <tt>b->sons[rsons*csons-1]</tt> corresponding
+ *  corresponding to the entries <tt>1</tt> to <tt>h2->sons[0]->desc</tt>
+ *  in the array and ending with <tt>h2->sons[rsons*csons-1]</tt> corresponding
  *  to the last <tt>b->sons[rsons*csons-1]->desc</tt> entries.
  *
- *  @param b Block tree.
  *  @param h2 Matrix matching the block structure given by <tt>b</tt>.
- *  @returns Array of size <tt>b->desc</tt> containing pointers to the
+ *  @returns Array of size <tt>h2->desc</tt> containing pointers to the
  *         @ref h2matrix objects corresponding to descendants of <tt>h2</tt>. */
 HEADER_PREFIX ph2matrix *
-enumerate_h2matrix(pcblock b, ph2matrix h2);
+enumerate_h2matrix( ph2matrix h2);
 
 /* ------------------------------------------------------------
- Hierarchical iterators
- ------------------------------------------------------------ */
+ * Hierarchical iterators
+ * ------------------------------------------------------------ */
 
 /** @brief List of @ref h2matrix objects. */
 typedef struct _h2matrixlist h2matrixlist;
@@ -468,8 +489,8 @@ iterate_bycol_h2matrix(ph2matrix G, uint mname, uint rname, uint cname,
 		       void *data);
 
 /* ------------------------------------------------------------
- Matrix-vector multiplication
- ------------------------------------------------------------ */
+ * Matrix-vector multiplication
+ * ------------------------------------------------------------ */
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$ or @f$y \gets y + \alpha A^* x@f$.
@@ -575,8 +596,8 @@ addevalsymm_h2matrix_avector(field alpha, pch2matrix h2, pcavector x,
     pavector y);
 
 /* ------------------------------------------------------------
- Addmul H2-Matrices and Amatrix
- ------------------------------------------------------------ */
+ * Addmul H2-Matrices and Amatrix
+ * ------------------------------------------------------------ */
 
 /** @brief Interaction phase of the @ref h2matrix - @ref amatrix multiplication.
  *
@@ -654,8 +675,8 @@ addmul_amatrix_h2matrix_amatrix(field alpha, bool atrans, pcamatrix A,
     bool btrans, pch2matrix B, pamatrix C);
 
 /* ------------------------------------------------------------
- Orthogonal projection
- ------------------------------------------------------------ */
+ * Orthogonal projection
+ * ------------------------------------------------------------ */
 
 /** @brief Compute @f$S \gets V_t^* A W_s@f$.
  *
@@ -708,19 +729,19 @@ HEADER_PREFIX void
 project_hmatrix_h2matrix(ph2matrix h2, phmatrix h);
 
 /* ------------------------------------------------------------
- Spectral norm
- ------------------------------------------------------------ */
+ * Spectral norm
+ * ------------------------------------------------------------ */
 
-/** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
+/** @brief Approximate the spectral norm @f$\|H\|_2@f$ of a matrix @f$H@f$.
  *
  *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$A^* A@f$ and computing the square root of
+ *  iteration to the matrix @f$H^* H@f$ and computing the square root of
  *  the resulting eigenvalue approximation.
  *
- *  @param a Matrix @f$A@f$.
- *  @returns Approximation of @f$\|A\|_2@f$. */
+ *  @param H2 @f$\mathcal H^2@f$ matrix @f$H@f$.
+ *  @returns Approximation of @f$\|H\|_2@f$. */
 HEADER_PREFIX real
-norm2_h2matrix(pch2matrix a);
+norm2_h2matrix(pch2matrix H2);
 
 /** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
  *  of two matrices @f$A@f$ and @f$B@f$.
@@ -729,34 +750,8 @@ norm2_h2matrix(pch2matrix a);
  *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
  *  of the resulting eigenvalue approximation.
  *
- *  @param a Matrix @f$A@f$.
- *  @param b Matrix @f$B@f$.
- *  @returns Approximation of @f$\|A-B\|_2@f$. */
-HEADER_PREFIX real
-norm2diff_amatrix_h2matrix(pch2matrix a, pcamatrix b);
-
-/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
- *  of two matrices @f$A@f$ and @f$B@f$.
- *
- *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
- *  of the resulting eigenvalue approximation.
- *
- *  @param a Matrix @f$A@f$.
- *  @param b Matrix @f$B@f$.
- *  @returns Approximation of @f$\|A-B\|_2@f$. */
-HEADER_PREFIX real
-norm2diff_hmatrix_h2matrix(pch2matrix a, pchmatrix b);
-
-/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
- *  of two matrices @f$A@f$ and @f$B@f$.
- *
- *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
- *  of the resulting eigenvalue approximation.
- *
- *  @param a Matrix @f$A@f$.
- *  @param b Matrix @f$B@f$.
+ *  @param a @f$\mathcal H^2@f$ matrix @f$A@f$.
+ *  @param b @f$\mathcal H^2@f$ matrix @f$B@f$.
  *  @returns Approximation of @f$\|A-B\|_2@f$. */
 HEADER_PREFIX real
 norm2diff_h2matrix(pch2matrix a, pch2matrix b);
@@ -819,8 +814,8 @@ read_cdfcomplete_h2matrix(const char *name);
 #endif
 
 /* ------------------------------------------------------------
- Drawing
- ------------------------------------------------------------ */
+ * Drawing
+ * ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
 /**
@@ -837,6 +832,42 @@ HEADER_PREFIX void
 draw_cairo_h2matrix(cairo_t *cr, pch2matrix G, bool storage, uint levels);
 #endif
 
-/** @} */
+#endif
+
+/* ------------------------------------------------------------
+ * Access methods
+ * ------------------------------------------------------------ */
+
+#ifndef H2MATRIX_COMPLETE
+#define H2MATRIX_COMPLETE
+
+#ifdef __GNUC__
+INLINE_PREFIX uint
+getrows_h2matrix(pch2matrix) __attribute__ ((const,unused));
+INLINE_PREFIX uint
+getcols_h2matrix(pch2matrix) __attribute__ ((const,unused));
+#endif
+
+/** @brief Get the number of rows of an @ref h2matrix @f$G@f$.
+ *
+ *  @param h2 Matrix @f$G@f$.
+ *  @return Number of rows of @f$G@f$. */
+INLINE_PREFIX uint
+getrows_h2matrix(pch2matrix h2)
+{
+  return h2->rb->t->size;
+}
+
+/** @brief Get the number of columns of an @ref h2matrix @f$G@f$.
+ *
+ *  @param h2 Matrix @f$G@f$.
+ *  @returns Number of columns of @f$G@f$. */
+INLINE_PREFIX uint
+getcols_h2matrix(pch2matrix h2)
+{
+  return h2->cb->t->size;
+}
 
 #endif
+
+/** @} */

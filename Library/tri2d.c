@@ -480,276 +480,6 @@ new_ushape_tri2d()
   return t2;
 }
 
-ptri2d
-new_bridge_tri2d(bool fixed)
-{
-  ptri2d    t2;
-
-  t2 = new_tri2d(10, 17, 8);
-
-  t2->x[0][0] = -2.0;
-  t2->x[0][1] = 0.0;
-  t2->xb[0] = 1;
-  t2->x[1][0] = -1.0;
-  t2->x[1][1] = 0.0;
-  t2->xb[1] = (fixed ? 1 : 2);
-  t2->x[2][0] = 0.0;
-  t2->x[2][1] = 0.0;
-  t2->xb[2] = (fixed ? 1 : 2);
-  t2->x[3][0] = 1.0;
-  t2->x[3][1] = 0.0;
-  t2->xb[3] = (fixed ? 1 : 2);
-  t2->x[4][0] = 2.0;
-  t2->x[4][1] = 0.0;
-  t2->xb[4] = 1;
-
-  t2->x[5][0] = -2.0;
-  t2->x[5][1] = 1.0;
-  t2->xb[5] = 1;
-  t2->x[6][0] = -1.0;
-  t2->x[6][1] = 1.0;
-  t2->xb[6] = (fixed ? 1 : 2);
-  t2->x[7][0] = 0.0;
-  t2->x[7][1] = 1.0;
-  t2->xb[7] = (fixed ? 1 : 2);
-  t2->x[8][0] = 1.0;
-  t2->x[8][1] = 1.0;
-  t2->xb[8] = (fixed ? 1 : 2);
-  t2->x[9][0] = 2.0;
-  t2->x[9][1] = 1.0;
-  t2->xb[9] = 1;
-
-  t2->e[0][0] = 0;
-  t2->e[0][1] = 1;
-  t2->eb[0] = (fixed ? 1 : 2);
-  t2->e[1][0] = 1;
-  t2->e[1][1] = 2;
-  t2->eb[1] = (fixed ? 1 : 2);
-  t2->e[2][0] = 2;
-  t2->e[2][1] = 3;
-  t2->eb[2] = (fixed ? 1 : 2);
-  t2->e[3][0] = 3;
-  t2->e[3][1] = 4;
-  t2->eb[3] = (fixed ? 1 : 2);
-
-  t2->e[4][0] = 5;
-  t2->e[4][1] = 6;
-  t2->eb[4] = (fixed ? 1 : 2);
-  t2->e[5][0] = 6;
-  t2->e[5][1] = 7;
-  t2->eb[5] = (fixed ? 1 : 2);
-  t2->e[6][0] = 7;
-  t2->e[6][1] = 8;
-  t2->eb[6] = (fixed ? 1 : 2);
-  t2->e[7][0] = 8;
-  t2->e[7][1] = 9;
-  t2->eb[7] = (fixed ? 1 : 2);
-
-  t2->e[8][0] = 0;
-  t2->e[8][1] = 6;
-  t2->eb[8] = 0;
-  t2->e[9][0] = 6;
-  t2->e[9][1] = 2;
-  t2->eb[9] = 0;
-  t2->e[10][0] = 2;
-  t2->e[10][1] = 8;
-  t2->eb[10] = 0;
-  t2->e[11][0] = 8;
-  t2->e[11][1] = 4;
-  t2->eb[11] = 0;
-
-  t2->e[12][0] = 0;
-  t2->e[12][1] = 5;
-  t2->eb[12] = 1;
-  t2->e[13][0] = 1;
-  t2->e[13][1] = 6;
-  t2->eb[13] = 0;
-  t2->e[14][0] = 2;
-  t2->e[14][1] = 7;
-  t2->eb[14] = 0;
-  t2->e[15][0] = 3;
-  t2->e[15][1] = 8;
-  t2->eb[15] = 0;
-  t2->e[16][0] = 4;
-  t2->e[16][1] = 9;
-  t2->eb[16] = 1;
-
-  t2->t[0][0] = 4;
-  t2->t[0][1] = 12;
-  t2->t[0][2] = 8;
-  t2->t[1][0] = 8;
-  t2->t[1][1] = 0;
-  t2->t[1][2] = 13;
-  t2->t[2][0] = 13;
-  t2->t[2][1] = 1;
-  t2->t[2][2] = 9;
-  t2->t[3][0] = 9;
-  t2->t[3][1] = 14;
-  t2->t[3][2] = 5;
-  t2->t[4][0] = 6;
-  t2->t[4][1] = 14;
-  t2->t[4][2] = 10;
-  t2->t[5][0] = 10;
-  t2->t[5][1] = 2;
-  t2->t[5][2] = 15;
-  t2->t[6][0] = 15;
-  t2->t[6][1] = 3;
-  t2->t[6][2] = 11;
-  t2->t[7][0] = 11;
-  t2->t[7][1] = 16;
-  t2->t[7][2] = 7;
-
-  return t2;
-}
-
-ptri2d
-new_tee_tri2d(bool fixed)
-{
-  ptri2d    t2;
-
-  t2 = new_tri2d(12, 21, 10);
-
-  t2->x[0][0] = -2.0;
-  t2->x[0][1] = 0.0;
-  t2->xb[0] = (fixed ? 1 : 2);
-  t2->x[1][0] = -1.0;
-  t2->x[1][1] = 0.0;
-  t2->xb[1] = (fixed ? 1 : 2);
-  t2->x[2][0] = 0.0;
-  t2->x[2][1] = 0.0;
-  t2->xb[2] = (fixed ? 1 : 2);
-  t2->x[3][0] = 1.0;
-  t2->x[3][1] = 0.0;
-  t2->xb[3] = (fixed ? 1 : 2);
-  t2->x[4][0] = 2.0;
-  t2->x[4][1] = 0.0;
-  t2->xb[4] = (fixed ? 1 : 2);
-
-  t2->x[5][0] = -2.0;
-  t2->x[5][1] = 1.0;
-  t2->xb[5] = (fixed ? 1 : 2);
-  t2->x[6][0] = -1.0;
-  t2->x[6][1] = 1.0;
-  t2->xb[6] = (fixed ? 1 : 2);
-  t2->x[7][0] = 0.0;
-  t2->x[7][1] = 1.0;
-  t2->xb[7] = (fixed ? 1 : 2);
-  t2->x[8][0] = 1.0;
-  t2->x[8][1] = 1.0;
-  t2->xb[8] = (fixed ? 1 : 2);
-  t2->x[9][0] = 2.0;
-  t2->x[9][1] = 1.0;
-  t2->xb[9] = (fixed ? 1 : 2);
-
-  t2->x[10][0] = -1.0;
-  t2->x[10][1] = -1.0;
-  t2->xb[10] = 1;
-  t2->x[11][0] = 0.0;
-  t2->x[11][1] = -1.0;
-  t2->xb[11] = 1;
-
-  t2->e[0][0] = 0;
-  t2->e[0][1] = 1;
-  t2->eb[0] = (fixed ? 1 : 2);
-  t2->e[1][0] = 1;
-  t2->e[1][1] = 2;
-  t2->eb[1] = 0;
-  t2->e[2][0] = 2;
-  t2->e[2][1] = 3;
-  t2->eb[2] = (fixed ? 1 : 2);
-  t2->e[3][0] = 3;
-  t2->e[3][1] = 4;
-  t2->eb[3] = (fixed ? 1 : 2);
-
-  t2->e[4][0] = 5;
-  t2->e[4][1] = 6;
-  t2->eb[4] = (fixed ? 1 : 2);
-  t2->e[5][0] = 6;
-  t2->e[5][1] = 7;
-  t2->eb[5] = (fixed ? 1 : 2);
-  t2->e[6][0] = 7;
-  t2->e[6][1] = 8;
-  t2->eb[6] = (fixed ? 1 : 2);
-  t2->e[7][0] = 8;
-  t2->e[7][1] = 9;
-  t2->eb[7] = (fixed ? 1 : 2);
-
-  t2->e[8][0] = 0;
-  t2->e[8][1] = 6;
-  t2->eb[8] = 0;
-  t2->e[9][0] = 6;
-  t2->e[9][1] = 2;
-  t2->eb[9] = 0;
-  t2->e[10][0] = 2;
-  t2->e[10][1] = 8;
-  t2->eb[10] = 0;
-  t2->e[11][0] = 8;
-  t2->e[11][1] = 4;
-  t2->eb[11] = 0;
-
-  t2->e[12][0] = 0;
-  t2->e[12][1] = 5;
-  t2->eb[12] = (fixed ? 1 : 2);
-  t2->e[13][0] = 1;
-  t2->e[13][1] = 6;
-  t2->eb[13] = 0;
-  t2->e[14][0] = 2;
-  t2->e[14][1] = 7;
-  t2->eb[14] = 0;
-  t2->e[15][0] = 3;
-  t2->e[15][1] = 8;
-  t2->eb[15] = 0;
-  t2->e[16][0] = 4;
-  t2->e[16][1] = 9;
-  t2->eb[16] = (fixed ? 1 : 2);
-
-  t2->e[17][0] = 10;
-  t2->e[17][1] = 11;
-  t2->eb[17] = 1;
-  t2->e[18][0] = 10;
-  t2->e[18][1] = 1;
-  t2->eb[18] = (fixed ? 1 : 2);
-  t2->e[19][0] = 11;
-  t2->e[19][1] = 2;
-  t2->eb[19] = (fixed ? 1 : 2);
-  t2->e[20][0] = 10;
-  t2->e[20][1] = 2;
-  t2->eb[20] = 0;
-
-  t2->t[0][0] = 4;
-  t2->t[0][1] = 12;
-  t2->t[0][2] = 8;
-  t2->t[1][0] = 8;
-  t2->t[1][1] = 0;
-  t2->t[1][2] = 13;
-  t2->t[2][0] = 13;
-  t2->t[2][1] = 1;
-  t2->t[2][2] = 9;
-  t2->t[3][0] = 9;
-  t2->t[3][1] = 14;
-  t2->t[3][2] = 5;
-  t2->t[4][0] = 6;
-  t2->t[4][1] = 14;
-  t2->t[4][2] = 10;
-  t2->t[5][0] = 10;
-  t2->t[5][1] = 2;
-  t2->t[5][2] = 15;
-  t2->t[6][0] = 15;
-  t2->t[6][1] = 3;
-  t2->t[6][2] = 11;
-  t2->t[7][0] = 11;
-  t2->t[7][1] = 16;
-  t2->t[7][2] = 7;
-  t2->t[8][0] = 18;
-  t2->t[8][1] = 20;
-  t2->t[8][2] = 1;
-  t2->t[9][0] = 17;
-  t2->t[9][1] = 19;
-  t2->t[9][2] = 20;
-
-  return t2;
-}
-
 void
 fixnormals_tri2d(ptri2d gr)
 {
@@ -982,7 +712,7 @@ read_tri2d(const char *name)
 
   uint      vertices, edges, triangles;
   uint      items;
-  char      buf[80];
+  char      buf[80], *res;
 
   in = fopen(name, "r");
   if (!in) {
@@ -990,9 +720,12 @@ read_tri2d(const char *name)
     return 0;
   }
 
-  fgets(buf, BUFSIZE, in);
-  while (!feof(in) && buf[0] == '#')
-    fgets(buf, 80, in);
+  res = fgets(buf, BUFSIZE, in);
+  assert(res != NULL);
+  while (!feof(in) && buf[0] == '#') {
+    res = fgets(buf, 80, in);
+    assert(res != NULL);
+  }
   items = sscanf(buf, "%u %u %u", &vertices, &edges, &triangles);
   if (items != 3) {
     (void) fprintf(stderr, "Could not get sizes from file \"%s\"\n", name);
@@ -1009,12 +742,14 @@ read_tri2d(const char *name)
 
   /*vertices */
   for (i = 0; i < vertices; i++) {
-    fgets(buf, 80, in);
-    while (!feof(in) && buf[0] == '#')
-      fgets(buf, 80, in);
-    items =
-      sscanf(buf, "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %u", x[i], x[i] + 1,
-	     xb + i);
+    res = fgets(buf, 80, in);
+    assert(res != NULL);
+    while (!feof(in) && buf[0] == '#') {
+      res = fgets(buf, 80, in);
+      assert(res != NULL);
+    }
+    items = sscanf(buf, "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %u", x[i],
+		   x[i] + 1, xb + i);
     if (items != 3) {
       (void) fprintf(stderr, "Could not read vertex %u from file \"%s\"\n", i,
 		     name);
@@ -1025,9 +760,12 @@ read_tri2d(const char *name)
   }
   /*edges */
   for (i = 0; i < edges; i++) {
-    fgets(buf, 80, in);
-    while (!feof(in) && buf[0] == '#')
-      fgets(buf, 80, in);
+    res = fgets(buf, 80, in);
+    assert(res != NULL);
+    while (!feof(in) && buf[0] == '#') {
+      res = fgets(buf, 80, in);
+      assert(res != NULL);
+    }
     items = sscanf(buf, "%u %u %u", e[i], e[i] + 1, eb + i);
     if (items != 3) {
       (void) fprintf(stderr, "Could not read edge %u from file \"%s\"\n", i,
@@ -1039,9 +777,12 @@ read_tri2d(const char *name)
   }
   /*triangles */
   for (i = 0; i < triangles; i++) {
-    fgets(buf, 80, in);
-    while (!feof(in) && buf[0] == '#')
-      fgets(buf, 80, in);
+    res = fgets(buf, 80, in);
+    assert(res != NULL);
+    while (!feof(in) && buf[0] == '#') {
+      res = fgets(buf, 80, in);
+      assert(res != NULL);
+    }
     items = sscanf(buf, "%u %u %u", t[i], t[i] + 1, t[i] + 2);
     if (items != 3) {
       (void) fprintf(stderr, "Could not read triangle %u from file \"%s\"\n",

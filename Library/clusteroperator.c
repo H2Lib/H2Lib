@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "clusteroperator.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2009
-   ------------------------------------------------------------ */
+ * This is the file "clusteroperator.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 #include <stdio.h>
 
@@ -12,8 +12,8 @@
 static uint active_clusteroperator = 0;
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 pclusteroperator
 init_clusteroperator(pclusteroperator co, pccluster t)
@@ -127,8 +127,8 @@ removesons_clusteroperator(pclusteroperator co)
 }
 
 /* ------------------------------------------------------------
-   Reference counting
-   ------------------------------------------------------------ */
+ * Reference counting
+ * ------------------------------------------------------------ */
 
 void
 ref_clusteroperator(pclusteroperator * ptr, pclusteroperator co)
@@ -160,8 +160,8 @@ unref_clusteroperator(pclusteroperator co)
 }
 
 /* ------------------------------------------------------------
-   Low-level management
-   ------------------------------------------------------------ */
+ * Low-level management
+ * ------------------------------------------------------------ */
 
 void
 update_clusteroperator(pclusteroperator co)
@@ -204,8 +204,8 @@ identify_son_clusterweight_clusteroperator(pcclusteroperator cwf, pccluster t)
 }
 
 /* ------------------------------------------------------------
-   Build empty clusteroperators
-   ------------------------------------------------------------ */
+ * Build empty clusteroperators
+ * ------------------------------------------------------------ */
 
 pclusteroperator
 build_from_cluster_clusteroperator(pccluster t)
@@ -249,8 +249,8 @@ build_from_clusterbasis_clusteroperator(pcclusterbasis cb)
 }
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 uint
 getactives_clusteroperator()
@@ -277,8 +277,8 @@ getsize_clusteroperator(pcclusteroperator co)
 }
 
 /* ------------------------------------------------------------
-   Debugging
-   ------------------------------------------------------------ */
+ * Debugging
+ * ------------------------------------------------------------ */
 
 static void
 print_tree(pcclusteroperator co, uint level)
@@ -372,8 +372,8 @@ compareweights_clusteroperator(pcclusteroperator co1, pcclusteroperator co2)
 }
 
 /* ------------------------------------------------------------
-   Enumeration
-   ------------------------------------------------------------ */
+ * Enumeration
+ * ------------------------------------------------------------ */
 
 static void
 enumerate(pccluster t, uint tname, pclusteroperator co,
@@ -419,8 +419,8 @@ enumerate_clusteroperator(pccluster t, pclusteroperator co)
 }
 
 /* ------------------------------------------------------------
-   Cluster basis product
-   ------------------------------------------------------------ */
+ * Cluster basis product
+ * ------------------------------------------------------------ */
 
 void
 basisproduct_clusteroperator(pcclusterbasis cb1, pcclusterbasis cb2,

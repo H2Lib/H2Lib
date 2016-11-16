@@ -5,6 +5,7 @@
 #include "basic.h"
 #include "krylov.h"
 #include "helmholtzoclbem3d.h"
+#include "matrixnorms.h"
 
 #ifdef USE_CAIRO
 #include <cairo.h>
@@ -64,61 +65,6 @@ addeval_A(field alpha, void *matrix, pcavector x, pavector y)
   }
 }
 
-/* Simple convenience wrapper for GMRES solver */
-static void
-solve_gmres_bem3d(matrixtype type, void *A, pavector b, pavector x,
-		  real accuracy, uint steps)
-{
-  addeval_t addevalA;
-  pavector  rhat, q, tau;
-  pamatrix  qr;
-  uint      i, j, n, kk, kmax;
-  real      norm;
-
-  addevalA = (addeval_t) addeval_A;
-
-  kmax = 500;
-
-  n = b->dim;
-  assert(x->dim == n);
-
-  qr = new_zero_amatrix(n, kmax);
-  rhat = new_avector(n);
-  q = new_avector(n);
-  tau = new_avector(kmax);
-  clear_avector(x);
-
-  init_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-
-  for (i = 0; i < steps; i += kmax) {
-    for (j = 0; j < kmax && i + j < steps; ++j) {
-      step_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-      norm = residualnorm_gmres(rhat, kk);
-#ifndef NDEBUG
-      printf("  Residual: %.5e\t Iterations: %u\r", norm, j + i);
-      fflush(stdout);
-#endif
-      if (norm <= accuracy) {
-	finish_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-	break;
-      }
-    }
-    if (norm <= accuracy) {
-      break;
-    }
-    else {
-      finish_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-    }
-  }
-
-  printf("\n");
-  del_avector(rhat);
-  del_avector(q);
-  del_avector(tau);
-  del_amatrix(qr);
-
-}
-
 field
 eval_brakhage_werner_c(pcbem3d bem, pcavector w, field eta, real * x)
 {
@@ -128,12 +74,12 @@ eval_brakhage_werner_c(pcbem3d bem, pcavector w, field eta, real * x)
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
   const uint rows = gr->triangles;
-  const field *kvec = bem->kvec;
 
   uint      nq = bem->sq->n_single;
+  uint      vnq = ROUNDUP(nq, VREAL);
   real     *xx = bem->sq->x_single;
   real     *yy = bem->sq->y_single;
-  real     *ww = bem->sq->w_single + 3 * nq;
+  real     *ww = bem->sq->w_single + 3 * vnq;
 
   const real *A, *B, *C, *ns;
   uint      s, ss, q;
@@ -142,17 +88,13 @@ eval_brakhage_werner_c(pcbem3d bem, pcavector w, field eta, real * x)
 
   field     res;
 
-  k = REAL_SQRT(ABSSQR(kvec[0]) + ABSSQR(kvec[1]) + ABSSQR(kvec[2]));
-
-  /*
-   *  integrate kernel function over first variable with constant basisfunctions
-   */
+  k = bem->k;
 
   res = 0.0;
 
   for (s = 0; s < rows; ++s) {
     ss = s;
-    gs_fac = gr_g[ss] * 0.0795774715459476679;
+    gs_fac = gr_g[ss] * bem->kernel_const;
     ns = gr_n[ss];
     A = gr_x[gr_t[ss][0]];
     B = gr_x[gr_t[ss][1]];
@@ -198,9 +140,7 @@ max_rel_outer_error(pcbem3d bem, helmholtz_data * hdata, pcavector x,
   field    *ydata;
   uint      i, j;
   real      error, maxerror;
-  real      eta_bw =
-    REAL_SQRT(ABSSQR(bem->kvec[0]) + ABSSQR(bem->kvec[1]) +
-	      ABSSQR(bem->kvec[2]));
+  real      eta_bw = ABS(bem->k);
 
   nx = 20;
   nz = 20;
@@ -253,9 +193,7 @@ max_rel_inner_error(pcbem3d bem, helmholtz_data * hdata, pcavector x,
   field    *ydata;
   uint      i, j;
   real      error, maxerror;
-  real      eta_bw =
-    REAL_SQRT(ABSSQR(bem->kvec[0]) + ABSSQR(bem->kvec[1]) +
-	      ABSSQR(bem->kvec[2]));
+  real      eta_bw = ABS(bem->k);
 
   nx = 20;
   nz = 20;
@@ -309,7 +247,7 @@ test_hmatrix_system(const char *apprxtype, pcamatrix Vfull,
   helmholtz_data hdata;
   pavector  x, b;
   real      errorV, errorKM, error_solve, eps_solve;
-  uint      steps;
+  uint      steps, iter;
   boundary_func3d rhs = (boundary_func3d) rhs_dirichlet_point_helmholtzbem3d;
 
   eps_solve = 1.0e-12;
@@ -332,11 +270,12 @@ test_hmatrix_system(const char *apprxtype, pcamatrix Vfull,
   eval.Vtype = HMATRIX;
   eval.KM = KM;
   eval.KMtype = HMATRIX;
-  eval.eta =
-    REAL_SQRT(ABSSQR(bem_slp->kvec[0]) + ABSSQR(bem_slp->kvec[1]) +
-	      ABSSQR(bem_slp->kvec[2]));
+  eval.eta = ABS(bem_slp->k);
 
-  hdata.kvec = bem_slp->kvec;
+  hdata.kvec = allocreal(3);
+  hdata.kvec[0] = ABS(bem_slp->k);
+  hdata.kvec[1] = 0.0;
+  hdata.kvec[2] = 0.0;
   hdata.source = allocreal(3);
   if (exterior) {
     hdata.source[0] = 0.0, hdata.source[1] = 0.0, hdata.source[2] = 0.2;
@@ -350,9 +289,11 @@ test_hmatrix_system(const char *apprxtype, pcamatrix Vfull,
 
   printf("Solving Dirichlet problem:\n");
 
-  integrate_bem3d_const_avector(bem_dlp, rhs, b, (void *) &hdata);
+  integrate_bem3d_c_avector(bem_dlp, rhs, b, (void *) &hdata);
 
-  solve_gmres_bem3d(HMATRIX, &eval, b, x, eps_solve, steps);
+  iter = solve_gmres_avector(&eval, addeval_A, b, x, eps_solve, steps, 50);
+  printf("GMRES iterations:\n");
+  printf("  %d\n", iter);
 
   if (exterior) {
     error_solve = max_rel_outer_error(bem_slp, &hdata, x, rhs);
@@ -372,6 +313,7 @@ test_hmatrix_system(const char *apprxtype, pcamatrix Vfull,
   del_avector(x);
   del_avector(b);
   freemem(hdata.source);
+  freemem(hdata.kvec);
 }
 
 static void
@@ -384,7 +326,7 @@ test_h2matrix_system(const char *apprxtype, pcamatrix Vfull,
   helmholtz_data hdata;
   pavector  x, b;
   real      errorV, errorKM, error_solve, eps_solve;
-  uint      steps;
+  uint      steps, iter;
   boundary_func3d rhs = (boundary_func3d) rhs_dirichlet_point_helmholtzbem3d;
 
   eps_solve = 1.0e-12;
@@ -396,21 +338,22 @@ test_h2matrix_system(const char *apprxtype, pcamatrix Vfull,
 
   assemble_bem3d_h2matrix_row_clusterbasis(bem_slp, V->rb);
   assemble_bem3d_h2matrix_col_clusterbasis(bem_slp, V->cb);
-  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_slp, block, V);
+  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_slp, V);
 
   assemble_bem3d_h2matrix_row_clusterbasis(bem_dlp, KM->rb);
   assemble_bem3d_h2matrix_col_clusterbasis(bem_dlp, KM->cb);
-  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_dlp, block, KM);
+  SCHEDULE_OPENCL(0, 1, assemble_bem3d_h2matrix, bem_dlp, KM);
 
   eval.V = V;
   eval.Vtype = H2MATRIX;
   eval.KM = KM;
   eval.KMtype = H2MATRIX;
-  eval.eta =
-    REAL_SQRT(ABSSQR(bem_slp->kvec[0]) + ABSSQR(bem_slp->kvec[1]) +
-	      ABSSQR(bem_slp->kvec[2]));
+  eval.eta = ABS(bem_slp->k);
 
-  hdata.kvec = bem_slp->kvec;
+  hdata.kvec = allocreal(3);
+  hdata.kvec[0] = ABS(bem_slp->k);
+  hdata.kvec[1] = 0.0;
+  hdata.kvec[2] = 0.0;
   hdata.source = allocreal(3);
   if (exterior) {
     hdata.source[0] = 0.0, hdata.source[1] = 0.0, hdata.source[2] = 0.2;
@@ -430,9 +373,11 @@ test_h2matrix_system(const char *apprxtype, pcamatrix Vfull,
 
   printf("Solving Dirichlet problem:\n");
 
-  integrate_bem3d_const_avector(bem_dlp, rhs, b, (void *) &hdata);
+  integrate_bem3d_c_avector(bem_dlp, rhs, b, (void *) &hdata);
 
-  solve_gmres_bem3d(HMATRIX, &eval, b, x, eps_solve, steps);
+  iter = solve_gmres_avector(&eval, addeval_A, b, x, eps_solve, steps, 50);
+  printf("GMRES iterations:\n");
+  printf("  %d\n", iter);
 
   error_solve = max_rel_outer_error(bem_slp, &hdata, x, rhs);
 
@@ -463,7 +408,7 @@ main(int argc, char **argv)
   ph2matrix V2, KM2;
   uint      n, q, clf, m, l;
   real      eta, delta, eps_aca;
-  field     kvec[3];
+  field     k;
   cl_device_id *devices;
   cl_uint   ndevices;
   uint     *idx;
@@ -475,7 +420,7 @@ main(int argc, char **argv)
   ndevices = 1;
   set_opencl_devices(devices, ndevices, 2);
 
-  kvec[0] = 2.0, kvec[1] = 0.0, kvec[2] = 0.0;
+  k = 2.0;
   n = 512;
   q = 2;
   clf = 16;
@@ -487,10 +432,9 @@ main(int argc, char **argv)
 
   printf("Testing unit sphere with %d triangles\n", n);
 
-  bem_slp = new_slp_helmholtz_ocl_bem3d(kvec, gr, q, q + 2,
+  bem_slp = new_slp_helmholtz_ocl_bem3d(k, gr, q, q + 2, BASIS_CONSTANT_BEM3D,
 					BASIS_CONSTANT_BEM3D);
-  bem_dlp = new_dlp_helmholtz_ocl_bem3d(kvec, gr, q, q + 2,
-					BASIS_CONSTANT_BEM3D,
+  bem_dlp = new_dlp_helmholtz_ocl_bem3d(k, gr, q, q + 2, BASIS_CONSTANT_BEM3D,
 					BASIS_CONSTANT_BEM3D, 0.5);
   root = build_bem3d_cluster(bem_slp, clf, BASIS_CONSTANT_BEM3D);
   block = build_nonstrict_block(root, root, &eta, admissible_max_cluster);
@@ -603,7 +547,7 @@ main(int argc, char **argv)
    * Test ACA / PACA / HCA
    */
 
-  m = 2;
+  m = 3;
   eps_aca = 1.0e-2;
 
   /* Nearfield computation on GPU not applicable here yet! */

@@ -214,6 +214,18 @@ getvertices_tet3d(pctet3d gr, uint tn, uint v[]);
 HEADER_PREFIX void
 getedges_tet3d(pctet3d gr, uint tn, uint e[]);
 
+/** @brief Find the vertices of a face.
+ * 
+ *  Due to the hierarchical representation of geometric objects,
+ *  we cannot access the vertices of a face directly.
+ *  This function finds the vertices and returns them.
+ * 
+ *  @param t3 Mesh.
+ *  @param nf Global number of the face.
+ *  @param v will be filled with the vertex numbers.                    */ 
+HEADER_PREFIX void
+getvertices_face_tet3d(pctet3d t3, uint nf, uint v[]);
+
 /* ------------------------------------------------------------
    Check structure for inconsistencies
    ------------------------------------------------------------ */

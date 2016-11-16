@@ -14,52 +14,10 @@
 #include "tri2dp1.h"
 #include "ddcluster.h"
 #include "hmatrix.h"
+#include "matrixnorms.h"
 
 static uint problems = 0;
 #define IS_IN_RANGE(a, b, c) (((a) <= (b)) && ((b) <= (c)))
-
-/* now in "hmatrix" module
-real
-norm2diff_sparsematrix_hmatrix(pcsparsematrix G2, pchmatrix G1)
-{
-  avector tmp1, tmp2;
-  uint rows = G1->rc->size;
-  uint cols = G1->cc->size;
- 
-  pavector x, y;
-  real norm;
-  uint i;
-
-  assert(G2->rows == rows);
-  assert(G2->cols == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  //printf("start norm2diff n\n");
-  for(i=0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_hmatrix_avector(1.0, G1, x, y);
-    addeval_sparsematrix_avector(-1.0, G2, x, y);
-
-    clear_avector(x);
-    addevaltrans_hmatrix_avector(1.0, G1, y, x);
-    addevaltrans_sparsematrix_avector(-1.0, G2, y, x);
-
-    norm = norm2_avector(x);
-    //printf("norm = %16.12f,  i = %u\n", norm,i);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
-}  
-*/
 
 int
 main(int argc, char **argv)
@@ -69,15 +27,15 @@ main(int argc, char **argv)
   uint      clf;		/* Maximum leaf size */
   real      eta;		/* Admissibility parameter */
   ptri2d   *gr;			/* Grids */
-  ptri2dp1  p1;			/* P1 elemts on grid gr[L] */
+  ptri2dp1  p1;			/* P1 elements on grid gr[L] */
   pclustergeometry cg;		/* Clustergeometry structure for clustering */
   uint     *idx;		/* Index array for cluster */
   pcluster  root;		/* Cluster tree (for rows and columns) */
   pblock    broot;		/* Block tree */
   psparsematrix sp;		/* Sparsematrix */
-  uint      dim;		/*dimension for splitting ddcluster */
-  uint     *flag;		/*Auxiliary array for dd-cluster */
-  phmatrix  hm;			/*hierarchical matrix */
+  uint      dim;		/* Dimension for splitting ddcluster */
+  uint     *flag;		/* Auxiliary array for dd-cluster */
+  phmatrix  hm;			/* Hierarchical matrix */
   real      error;
 
   init_h2lib(&argc, &argv);
@@ -86,7 +44,8 @@ main(int argc, char **argv)
   eta = 2.0;
   clf = 16;
   dim = 2;
-
+  printf("========================================\n"
+         "Testing ddcluster\n");
   printf("========================================\n"
 	 "  Creating grid hierarchy\n");
   gr = (ptri2d *) allocmem((size_t) sizeof(ptri2d) * (L + 1));
@@ -140,11 +99,11 @@ main(int argc, char **argv)
 #ifdef USE_CAIRO
   cairo_t  *cr;
   printf("  Drawing block tree to \"block.pdf\"\n");
-  cr = new_cairopdf("block.pdf", 512.0, 512.0);
+  cr = new_cairopdf("../block.pdf", 512.0, 512.0);
   draw_cairo_block(cr, broot, 0);
   cairo_destroy(cr);
   printf("  Drawing grid to \"grid.pdf\"\n");
-  draw_cairo_tri2d(gr[L], "grid.pdf", false, -1);
+  draw_cairo_tri2d(gr[L], "../grid.pdf", false, -1);
 
 #endif
 
@@ -153,7 +112,7 @@ main(int argc, char **argv)
 
   hm = build_from_block_hmatrix(broot, 0);
   copy_sparsematrix_hmatrix(sp, hm);
-  error = norm2diff_sparsematrix_hmatrix(sp, hm);
+  error = norm2diff_sparsematrix_hmatrix(hm, sp);
   printf("error = %g\n", error);
 
   if (!IS_IN_RANGE(0.0, error, 1.0e-16))

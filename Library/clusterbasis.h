@@ -70,6 +70,9 @@ struct _clusterbasis {
   puniform clist;
 };
 
+/* Now the "clusterbasis" type is completely defined */
+#define CLUSTERBASIS_TYPE_COMPLETE
+
 /* ------------------------------------------------------------
  * Constructors and destructors
  * ------------------------------------------------------------ */
@@ -233,7 +236,18 @@ update_tree_clusterbasis(pclusterbasis cb);
  *  @param cb Cluster basis that will be changed.
  *  @param k New rank, i.e., number of columns of <tt>V</tt> or <tt>cb->son[i]->E</tt>. */
 HEADER_PREFIX void
-resize_clusterbasis(pclusterbasis cb, int k);
+resize_clusterbasis(pclusterbasis cb, uint k);
+
+/** @brief Change the rank of a cluster basis and resize
+ *  <tt>cb->V</tt>, while <tt>cb->son[i]->E</tt> is resized for all sons.
+ *
+ *  @remark <tt>cb->E</tt> is not resized, since this is in most standard
+ *  algorithms a task for the father cluster.
+ *
+ *  @param cb Cluster basis that will be changed.
+ *  @param k New rank, i.e., number of columns of <tt>V</tt> or <tt>cb->son[i]->E</tt>. */
+HEADER_PREFIX void
+setrank_clusterbasis(pclusterbasis cb, uint k);
 
 /* ------------------------------------------------------------
  * Build clusterbasis based on cluster
@@ -589,7 +603,7 @@ compress_clusterbasis_avector(pcclusterbasis cb, pcavector xp, pavector xt);
 
 /** @brief Add @f$V_t \hat y_t@f$ to target vector @f$y@f$.
  *
- *  Similar to @ref backward_nopermutation_clusterbasis_avector , this function
+ *  Similar to @ref backward_nopermutation_clusterbasis_avector, this function
  *  computes @f$y \gets y + V_t \hat y_t@f$ using the transfer matrices
  *  @f$E_t@f$ and the leaf matrices @f$V_t@f$.
  *
@@ -741,23 +755,22 @@ addevaltrans_clusterbasis_avector(field alpha, pcclusterbasis cb,
  * Orthogonalization
  * ------------------------------------------------------------ */
 
-/** @brief Create an orthogonal cluster basis.
+/** @brief Orthogonalize a cluster basis.
  *
- *  Compute an orthogonal cluster basis
- *  @f$(Q_t)_{t\in{\mathcal T}_{\mathcal I}}@f$ and factors
- *  @f$(R_t)_{t\in{\mathcal T}_{\mathcal I}}@f$ such that
- *  @f$V_t = Q_t R_t@f$ holds for all clusters @f$t@f$.
+ *  Replace a given cluster basis @f$(V_t)_{t\in\ct}@f$ by an
+ *  orthogonal clusterbasis @f$(Q_t)_{t\in\ct}@f$ such that
+ *  @f$V_t = Q_t R_t@f$ holds for suitable matrices @f$(R_t)_{t\in\ct}@f$.
  *
- *  @param cb Original cluster basis
- *         @f$(V_t)_{t\in{\mathcal T}_{\mathcal I}}@f$.
- *  @param co @ref clusteroperator structure matching the
- *         tree of <tt>cb</tt>, will be overwritten with basis
- *         change matrices.
- *         A simple way to set up this @ref clusteroperator is
- *         to use @ref build_from_clusterbasis_clusteroperator.
- *  @returns Orthogonal cluster basis
- *         @f$(Q_t)_{t\in\mathcal{T}_{\mathcal{I}}}@f$. */
-HEADER_PREFIX pclusterbasis
+ *  @param cb Original cluster basis @f$(V_t)_{t\in\ct}@f$.
+ *         Will be overwritten by the orthogonal basis
+ *         @f$(Q_t)_{t\in\ct}@f$.
+ *  @param co If not null, will be filled with the matrices
+ *         @f$(R_t)_{t\in\ct}@f$ describing the basis change
+ *         from the old to the new basis.
+ *         The structure of this cluster operator has to match
+ *         the structure of the cluster basis, you might consider
+ *         using @ref build_from_clusterbasis_clusteroperator */
+HEADER_PREFIX void
 ortho_clusterbasis(pclusterbasis cb, pclusteroperator co);
 
 /** @brief Check whether a cluster basis is orthogonal.
@@ -790,6 +803,21 @@ check_ortho_clusterbasis(pcclusterbasis cb);
 HEADER_PREFIX pclusteroperator
 weight_clusterbasis_clusteroperator(pcclusterbasis cb, pclusteroperator co);
 
+/**
+ * @brief Compute weight matrices for a cluster basis using an iterator over the
+ * cluster tree.
+ *
+ * Computes matrices @f$(R_t)_{t\in\mathcal{T}_{\mathcal{I}}}@f$
+ * for all clusters such that @f$\|V_t \hat x_t\|_2 = \|R_t \hat x_t\|_2@f$
+ * holds for all @f$\hat x_t@f$.
+ *
+ * @param cb Cluster basis @f$(V_t)_{t\in{\mathcal T}_{\mathcal{I}}}@f$.
+ * should be computed.
+ *
+ * @return Returns an array of the weight matrices
+ * @f$(R_t)_{t\in\mathcal{T}_{\mathcal{I}}}@f$ corresponding to an enumeration
+ * of the cluster tree @f$\mathcal{T}_{\mathcal{I}}@f$.
+ */
 HEADER_PREFIX pamatrix
 weight_enum_clusterbasis_clusteroperator(pcclusterbasis cb);
 
@@ -831,6 +859,45 @@ HEADER_PREFIX pclusterbasis
 read_cdfpart_clusterbasis(int nc_file, const char *prefix, pccluster t);
 #endif
 
-/** @} */
+#endif
+
+/* ------------------------------------------------------------
+ * Access methods
+ * ------------------------------------------------------------ */
+
+/* Avoid problems with incomplete type definitions */
+#if defined(CLUSTERBASIS_TYPE_COMPLETE) && !defined(CLUSTERBASIS_COMPLETE)
+#define CLUSTERBASIS_COMPLETE
+
+#ifdef __GNUC__
+INLINE_PREFIX pamatrix
+getE_clusterbasis(pclusterbasis) __attribute__ ((unused));
+INLINE_PREFIX pamatrix
+getV_clusterbasis(pclusterbasis) __attribute__ ((unused));
+#endif
+
+/** @brief Get the transfer matrix @f$E@f$ to the father cluster
+ * of a @ref clusterbasis.
+ *
+ * @param cb Cluster basis.
+ * @returns Transfer matrix @f$E@f$ */
+INLINE_PREFIX pamatrix
+getE_clusterbasis(pclusterbasis cb)
+{
+  return &cb->E;
+}
+
+/** @brief Get the leaf matrix @f$V@f$ of a @ref clusterbasis.
+ *
+ * @param cb Cluster basis.
+ * @returns Leaf matrix @f$V@f$ */
+INLINE_PREFIX pamatrix
+getV_clusterbasis(pclusterbasis cb)
+{
+  return &cb->V;
+}
 
 #endif
+
+/** @} */
+

@@ -115,14 +115,14 @@ HEADER_PREFIX const char *get_error_string(cl_int error);
  * @brief Reads a file specified by @p filename and compiles all OpenCL kernels
  * given by the array @p kernel_names into OpenCL kernels @p kernels.
  *
- * @param filename Source code file that should be read.
+ * @param src_str Source code string.
  * @param num_kernels Number of kernels that should be compiled given by @p
  *        kernel_names.
  * @param kernel_names Array of function names that should be compiled as OpenCL
  *        kernels.
  * @param kernels Resulting array of OpenCL kernels.
  */
-HEADER_PREFIX void setup_kernels(const char *filename, const uint num_kernels,
+HEADER_PREFIX void setup_kernels(const char *src_str, const uint num_kernels,
     const char **kernel_names, cl_kernel **kernels);
 
 /**

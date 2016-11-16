@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------
- This is the file "helmholtzbem3d.h" of the H2Lib package.
- All rights reserved, Sven Christophersen 2015
- ------------------------------------------------------------ */
+ * This is the file "helmholtzbem3d.h" of the H2Lib package.
+ * All rights reserved, Sven Christophersen 2015
+ * ------------------------------------------------------------ */
 
 /**
  * @file helmholtzbem3d.h
@@ -12,8 +12,6 @@
 #ifndef HELMHOLTZBEM3D_H_
 #define HELMHOLTZBEM3D_H_
 
-#ifdef USE_COMPLEX
-
 /* C STD LIBRARY */
 /* CORE 0 */
 /* CORE 1 */
@@ -23,6 +21,8 @@
 /* PARTICLES */
 /* BEM */
 #include "bem3d.h"
+
+#ifdef USE_COMPLEX
 
 /** \defgroup helmholtzbem3d helmholtzbem3d
  *  @brief This module contains functions to setup and solve boundary integral
@@ -40,7 +40,10 @@
  */
 struct _helmholtz_data {
   /** @brief The wavevector @f$\vec \kappa@f$. */
-  field *kvec;
+  real *kvec;
+
+  /** @brief coupling parameter eta. */
+  real eta;
 
   /** @brief Some source point. */
   real *source;
@@ -61,21 +64,23 @@ typedef struct _helmholtz_data helmholtz_data;
  * \mathcal I}@f$ and also @ref _hmatrix "hmatrix"
  * or @ref _h2matrix "h2matrix" approximation of this matrix.
  *
- * @param kvec Three-dimensional vector of field representing the wavevector
- *   @f$\vec \kappa@f$.
+ * @param k Wavenumber @f$\kappa@f$.
  * @param gr Surface mesh
  * @param q_regular Order of gaussian quadrature used within computation of matrix
  *        entries for single integrals and regular double integrals.
  * @param q_singular Order of gaussian quadrature used within computation of matrix
  *        entries singular double integrals.
- * @param basis Type of basis functions used for neumann data.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
  * slp matrices @f$ V @f$ for the helmholtz equation.
  */
 HEADER_PREFIX pbem3d
-new_slp_helmholtz_bem3d(field *kvec, pcsurface3d gr, uint q_regular,
-    uint q_singular, basisfunctionbem3d basis);
+new_slp_helmholtz_bem3d(field k, pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis);
 
 /**
  * @brief Creates a new @ref _bem3d "bem3d"-object for computation of
@@ -84,29 +89,62 @@ new_slp_helmholtz_bem3d(field *kvec, pcsurface3d gr, uint q_regular,
  *
  * After calling this function the resulting @ref _bem3d "bem"-object will
  * provide all functionality that is necessary to build up fully populated
- * double layer potential matrix @f$ K + \frac{1}{2} M \in \mathbb
+ * double layer potential matrix @f$ K + \alpha M \in \mathbb
  * R^{\mathcal I \times \mathcal J}@f$ and also @ref _hmatrix "hmatrix"
  * or @ref _h2matrix "h2matrix"
  * approximation of this matrix.
  *
- * @param kvec Three-dimensional vector of field representing the wavevector
- *   @f$\vec \kappa@f$.
+ * @param k Wavenumber @f$\kappa@f$.
  * @param gr Surface mesh.
  * @param q_regular Order of gaussian quadrature used within computation of matrix
  *        entries for single integrals and regular double integrals.
  * @param q_singular Order of gaussian quadrature used within computation of matrix
  *        entries singular double integrals.
- * @param basis_neumann Type of basis functions used for neumann data.
- * @param basis_dirichlet Type of basis functions used for dirichlet data.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  * @param alpha Double layer operator + @f$\alpha@f$ mass matrix.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
- * dlp matrices @f$ K + \alpha M @f$ for the laplace equation.
+ * dlp matrices @f$ K + \alpha M @f$ for the Helmholtz equation.
  */
 HEADER_PREFIX pbem3d
-new_dlp_helmholtz_bem3d(field * kvec, pcsurface3d gr,
-    uint q_regular, uint q_singular, basisfunctionbem3d basis_neumann,
-    basisfunctionbem3d basis_dirichlet, field alpha);
+new_dlp_helmholtz_bem3d(field k, pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis,
+    field alpha);
+
+/**
+ * @brief Creates a new @ref _bem3d "bem3d"-object for computation of
+ * adjoint double layer potential matrix plus a scalar times the mass matrix
+ * of the Helmholtz equation.
+ *
+ * After calling this function the resulting @ref _bem3d "bem"-object will
+ * provide all functionality that is necessary to build up fully populated
+ * adjoint double layer potential matrix @f$ K' + \alpha M \in \mathbb
+ * R^{\mathcal I \times \mathcal J}@f$ and also @ref _hmatrix "hmatrix"
+ * or @ref _h2matrix "h2matrix"
+ * approximation of this matrix.
+ *
+ * @param k Wavenumber @f$\kappa@f$.
+ * @param gr Surface mesh.
+ * @param q_regular Order of gaussian quadrature used within computation of matrix
+ *        entries for single integrals and regular double integrals.
+ * @param q_singular Order of gaussian quadrature used within computation of matrix
+ *        entries singular double integrals.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param alpha Adjoint double layer operator + @f$\alpha@f$ mass matrix.
+ *
+ * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
+ * adlp matrices @f$ K' + \alpha M @f$ for the Helmholtz equation.
+ */
+HEADER_PREFIX pbem3d
+new_adlp_helmholtz_bem3d(field k, pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis,
+    field alpha);
 
 /**
  * @brief Delete a @ref _bem3d "bem3d" object for the Helmholtz equation
@@ -117,23 +155,24 @@ HEADER_PREFIX void
 del_helmholtz_bem3d(pbem3d bem);
 
 /**
- * @brief A harmonic function based upon the fundamental solution,
- * that will serve as dirichlet values.
+ * @brief A function based upon the fundamental solution,
+ * that will serve as Dirichlet values.
  *
- * When computing the neumann data out of the dirichlet data one can use this
- * function as test data which will generate dirichlet values of with the following
+ * When computing the Neumann data out of the Dirichlet data one can use this
+ * function as test data which will generate Dirichlet values of with the following
  * values:
  * @f[
  * f(\vec x, \, \vec n) = g(\vec x, \vec z)
  * @f]
- * where @f$\vec z@f$ is some arbitrarily chosen source point.
- * Corresponding neumann data can be generated by using
+ * where @f$\vec z@f$ is some arbitrarily chosen source point and can be set
+ * via <tt>data->source</tt>.
+ * Corresponding Neumann data can be generated by using
  * @ref rhs_neumann_point_helmholtzbem3d.
  * <br>
- * To build up an appropriate dirichlet data coefficient vector one needs the
+ * To build up an appropriate Dirichlet data coefficient vector one needs the
  * @f$ L_2@f$-projection. This can be done by passing this function to
- * @ref projectl2_bem3d_const_avector for piecewise constant basis functions or
- * to @ref projectl2_bem3d_linear_avector for piecewise linear basis functions.
+ * @ref projectL2_bem3d_c_avector for piecewise constant basis functions or
+ * to @ref projectL2_bem3d_l_avector for piecewise linear basis functions.
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
@@ -142,27 +181,28 @@ del_helmholtz_bem3d(pbem3d bem);
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field
-rhs_dirichlet_point_helmholtzbem3d(const real *x,
-    const real *n, const void *data);
+rhs_dirichlet_point_helmholtzbem3d(const real *x, const real *n,
+    const void *data);
 
 /**
- * @brief A harmonic function based upon the fundamental solution,
- * that will serve as dirichlet values.
+ * @brief A function based upon the fundamental solution,
+ * that will serve as Neumann values.
  *
- * When computing the dirichlet data out of the neumann data one can use this
- * function as test data which will generate neumann values of with the following
+ * When computing the Neumann data out of the Dirichlet data one can use this
+ * function as test data which will generate Dirichlet values of with the following
  * values:
  * @f[
  * f(\vec x, \, \vec n) = \frac{\partial g}{\partial \vec n}(\vec x, \vec z)
  * @f]
- * where @f$\vec z@f$ is some arbitrarily chosen source point.
- * Corresponding dirichlet data can be generated by using
+ * where @f$\vec z@f$ is some arbitrarily chosen source point and can be set
+ * via <tt>data->source</tt>.
+ * Corresponding Dirichlet data can be generated by using
  * @ref rhs_dirichlet_point_helmholtzbem3d.
  * <br>
- * To build up an appropriate neumann data coefficient vector one needs the
+ * To build up an appropriate Neumann data coefficient vector one needs the
  * @f$ L_2@f$-projection. This can be done by passing this function to
- * @ref projectl2_bem3d_const_avector for piecewise constant basis functions or
- * to @ref projectl2_bem3d_linear_avector for piecewise linear basis functions.
+ * @ref projectL2_bem3d_c_avector for piecewise constant basis functions or
+ * to @ref projectL2_bem3d_l_avector for piecewise linear basis functions.
  *
  * @param x Evaluation point.
  * @param n Normal vector to current evaluation point.
@@ -171,8 +211,128 @@ rhs_dirichlet_point_helmholtzbem3d(const real *x,
  * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
  */
 HEADER_PREFIX field
-rhs_neumann_point_helmholtzbem3d(const real *x,
-    const real *n, const void *data);
+rhs_neumann_point_helmholtzbem3d(const real *x, const real *n, const void *data);
+
+/**
+ * @brief A function based upon the fundamental solution,
+ * that will serve for Robin boundary conditions.
+ *
+ * This function is a linear combination of @ref rhs_dirichlet_point_helmholtzbem3d
+ * and @ref rhs_neumann_point_helmholtzbem3d and serves as Robin boundary
+ * condition.
+ * The function is evaluated as:
+ * @f[
+ * f(\vec x, \, \vec n) = \frac{\partial g}{\partial \vec n}(\vec x, \vec z)
+ *   - i \eta g(\vec x, \vec z)
+ * @f]
+ * where @f$\vec z@f$ is some arbitrarily chosen source point and can be set
+ * via <tt>data->source</tt>.
+ * The coefficient @f$\eta@f$ can be set via <tt>data->eta</tt>.
+ *
+ * To build up an appropriate coefficient vector one needs the some integration
+ * on the boundary. This can be done by passing this function to
+ * @ref integrate_bem3d_c_avector for piecewise constant basis functions or
+ * to @ref integrate_bem3d_l_avector for piecewise linear basis functions.
+ *
+ * @param x Evaluation point.
+ * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional. Here a pointer to
+ *   a @ref helmholtz_data object is expected.
+ * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
+ */
+HEADER_PREFIX field
+rhs_robin_point_helmholtzbem3d(const real *x, const real *n, const void *data);
+
+/**
+ * @brief A function based upon a plane wave,
+ * that will serve as Dirichlet values.
+ *
+ * When computing the Neumann data out of the Dirichlet data one can use this
+ * function as test data which will generate Dirichlet values of with the following
+ * values:
+ * @f[
+ * f(\vec x, \, \vec n) = e^{i \langle \vec c, \vec x - \vec s \rangle}
+ * @f]
+ * where @f$\vec s@f$ is some arbitrarily chosen source point and can be set
+ * via <tt>data->source</tt>.
+ * Corresponding Neumann data can be generated by using
+ * @ref rhs_neumann_plane_helmholtzbem3d.
+ * <br>
+ * To build up an appropriate Dirichlet data coefficient vector one needs the
+ * @f$ L_2@f$-projection. This can be done by passing this function to
+ * @ref projectL2_bem3d_c_avector for piecewise constant basis functions or
+ * to @ref projectL2_bem3d_l_avector for piecewise linear basis functions.
+ *
+ * @param x Evaluation point.
+ * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional. Here a pointer to
+ *   a @ref helmholtz_data object is expected.
+ * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
+ */
+HEADER_PREFIX field
+rhs_dirichlet_plane_helmholtzbem3d(const real *x, const real *n,
+    const void *data);
+
+/**
+ * @brief A function based upon the plane wave,
+ * that will serve as Neumann values.
+ *
+ * When computing the Neumann data out of the Dirichlet data one can use this
+ * function as test data which will generate Dirichlet values of with the following
+ * values:
+ * @f[
+ * f(\vec x, \, \vec n) = \frac{\partial}{\partial \vec n}
+ e^{i \langle \vec c, \vec x - \vec s \rangle}
+ * @f]
+ * where @f$\vec s@f$ is some arbitrarily chosen source point and can be set
+ * via <tt>data->source</tt>.
+ * Corresponding Dirichlet data can be generated by using
+ * @ref rhs_dirichlet_plane_helmholtzbem3d.
+ * <br>
+ * To build up an appropriate Neumann data coefficient vector one needs the
+ * @f$ L_2@f$-projection. This can be done by passing this function to
+ * @ref projectL2_bem3d_c_avector for piecewise constant basis functions or
+ * to @ref projectL2_bem3d_l_avector for piecewise linear basis functions.
+ *
+ * @param x Evaluation point.
+ * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional. Here a pointer to
+ *   a @ref helmholtz_data object is expected.
+ * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
+ */
+HEADER_PREFIX field
+rhs_neumann_plane_helmholtzbem3d(const real *x, const real *n, const void *data);
+
+/**
+ * @brief A function based upon the fundamental solution,
+ * that will serve for Robin boundary conditions.
+ *
+ * This function is a linear combination of @ref rhs_dirichlet_plane_helmholtzbem3d
+ * and @ref rhs_neumann_plane_helmholtzbem3d and serves as Robin boundary
+ * condition.
+ * The function is evaluated as:
+ * @f[
+ * f(\vec x, \, \vec n) = \frac{\partial}{\partial \vec n}
+ *    e^{i \langle \vec c, \vec x - \vec s \rangle}
+ *   - i \eta e^{i \langle \vec c, \vec x - \vec s \rangle}
+ * @f]
+ * where @f$\vec s@f$ is some arbitrarily chosen source point and can be set
+ * via <tt>data->source</tt>.
+ * The coefficient @f$\eta@f$ can be set via <tt>data->eta</tt>.
+ *
+ * To build up an appropriate coefficient vector one needs the some integration
+ * on the boundary. This can be done by passing this function to
+ * @ref integrate_bem3d_c_avector for piecewise constant basis functions or
+ * to @ref integrate_bem3d_l_avector for piecewise linear basis functions.
+ *
+ * @param x Evaluation point.
+ * @param n Normal vector to current evaluation point.
+ * @param data Additional data for evaluating the functional. Here a pointer to
+ *   a @ref helmholtz_data object is expected.
+ * @return returns the function value of @f$ f(\vec x, \, \vec n) @f$.
+ */
+HEADER_PREFIX field
+rhs_robin_plane_helmholtzbem3d(const real *x, const real *n, const void *data);
 
 /**
  * @}

@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "laplacebem2d.h" of the H2Lib package.
- All rights reserved, Sven Christophersen 2011
- ------------------------------------------------------------ */
+ * This is the file "laplacebem2d.h" of the H2Lib package.
+ * All rights reserved, Sven Christophersen 2011
+ * ------------------------------------------------------------ */
 
 /**
  * @file laplacebem2d.h
@@ -30,8 +31,8 @@
  *  @{ */
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Creates a new @ref _bem2d "bem2d"-object for computation of
@@ -172,36 +173,6 @@ eval_dirichlet_quadratic_laplacebem2d(const real *x, const real *n);
  */
 HEADER_PREFIX field
 eval_neumann_quadratic_laplacebem2d(const real *x, const real *n);
-
-/**
- * @brief An interactive convenience function to create @ref _hmatrix "hmatrix"
- * or @ref _h2matrix "h2matrix"
- * approximations of boundary integral operators such as slp or dlp matrices.
- *
- * @param gr 2D polygonal geometry used for current problem.
- * @param op This char specifies the boundary integral operator to be constructed.
- * Valid values are 's' for single layer potential and 'd' for double layer
- * potential plus 0.5 times mass matrix.
- * @param basis_neumann Defines the basis functions used for neumann data.
- * @param basis_dirichlet Defines the basis functions used for dirichlet data.
- * @param q Order of gaussian quadrature used for nearfield entry computation.
- * @param G Pointer to the matrix that will be constructed after calling this
- * routine.
- * @param time Pointer to a real value, that will be filled with the elapsed time
- * for computing the desired matrix.
- * @param filename Name of a file where the parameters that are used to construct
- * the Matrix approximation will be stored in. If <tt>NULL</tt> is passed then
- * this parameter will be neglected.
- *
- * @returns Function will return type of the resulting matrix approximation.
- *
- * @attention Yet only 's' for single layer potential and 'd' for double layer
- * potential are admissible values for parameter <tt>op</tt>.
- */
-HEADER_PREFIX matrixtype
-build_interactive_laplacebem2d(pccurve2d gr, char op,
-    basisfunctionbem2d basis_neumann, basisfunctionbem2d basis_dirichlet,
-    uint q, void **G, real *time, char *filename);
 
 /** @} */
 

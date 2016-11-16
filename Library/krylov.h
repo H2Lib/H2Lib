@@ -1,15 +1,18 @@
-
 /* ------------------------------------------------------------
-   This is the file "krylov.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2010
-   ------------------------------------------------------------ */
+ * This is the file "krylov.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2010
+ * ------------------------------------------------------------ */
 
 /** @file krylov.h
  *  @author Steffen B&ouml;rm
  */
- 
+
 #ifndef KRYLOV_H
 #define KRYLOV_H
+
+#ifndef NDEBUG
+#include <stdio.h>
+#endif
 
 #include "settings.h"
 #include "avector.h"
@@ -19,7 +22,7 @@
  *  @brief Iterative solvers of Krylov type
  *
  *  @{ */
- 
+
 /** @brief Matrix callback.
  *
  *  Used to evaluate the system matrix @f$A@f$ or its adjoint,
@@ -35,8 +38,7 @@
  *  @param matrix Matrix data describing @f$A@f$.
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
-typedef void (*addeval_t)(field alpha, void *matrix,
-			  pcavector x, pavector y);
+typedef void (*addeval_t)(field alpha, void *matrix, pcavector x, pavector y);
 
 /** @brief Matrix callback.
  *
@@ -48,15 +50,15 @@ typedef void (*addeval_t)(field alpha, void *matrix,
  *
  *  Functions like @ref mvm_amatrix_avector,
  *  @ref mvm_hmatrix_avector, @ref mvm_h2matrix_avector, or
- *  @ref addeval_sparsematrix_avector can be cast to <tt>mvm_t</tt>.
+ *  @ref mvm_sparsematrix_avector can be cast to <tt>mvm_t</tt>.
  *
  *  @param alpha Scaling factor @f$\alpha@f$.
  *  @param trans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
  *  @param matrix Matrix data describing @f$A@f$.
  *  @param x Source vector @f$x@f$.
  *  @param y Target vector @f$y@f$. */
-typedef void (*mvm_t)(field alpha, bool trans, void *matrix,
-		      pcavector x, pavector y);
+typedef void (*mvm_t)(field alpha, bool trans, void *matrix, pcavector x,
+    pavector y);
 
 /** @brief Preconditioner callback.
  *
@@ -73,7 +75,88 @@ typedef void (*mvm_t)(field alpha, bool trans, void *matrix,
 typedef void (*prcd_t)(void *pdata, pavector r);
 
 /* ------------------------------------------------------------
- * Conjugate gradients method (cg)
+ * Vector iteration for norm2 and norm2diff estimation
+ * ------------------------------------------------------------ */
+
+/** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$A^* A@f$ and computing the square root of
+ *  the resulting eigenvalue approximation.
+ *
+ *  @param mvm Callback function for evaluating @p A and its adjoint.
+ *  @param A Matrix @f$A@f$.
+ *  @param rows Number of rows of @p A.
+ *  @param cols Number of columns of @p A.
+ *  @returns Approximation of @f$\|A\|_2@f$. */
+HEADER_PREFIX real
+norm2_matrix(mvm_t mvm, void *A, uint rows, uint cols);
+
+/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
+ *  of two matrices @f$A@f$ and @f$B@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
+ *  of the resulting eigenvalue approximation.
+ *
+ *  @param mvmA Callback function for evaluating @p A and its adjoint.
+ *  @param A Matrix @f$A@f$.
+ *  @param mvmB Callback function for evaluating @p B and its adjoint.
+ *  @param B Matrix @f$B@f$.
+ *  @param rows Number of rows of either @p A and @p B.
+ *  @param cols Number of columns of either @p A and @p B.
+ *  @returns Approximation of @f$\|A-B\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_matrix(mvm_t mvmA, void *A, mvm_t mvmB, void *B, uint rows, uint cols);
+
+/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
+ *  of two matrices @f$A@f$ and @f$B@f$. The matrix @f$B@f$ is given as a
+ *  factorization and can be applied to some vector.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
+ *  of the resulting eigenvalue approximation.
+ *  @f$B@f$ is usually given as a LR decomposition or cholesky factorization of
+ *  @f$A@f$.
+ *
+ *  @param mvmA Callback function for evaluating @p A and its adjoint.
+ *  @param A Matrix @f$A@f$.
+ *  @param evalB Callback function for evaluating @p B.
+ *  @param evaltransB Callback function for evaluating the adjoint of @p B.
+ *  @param B Factorized matrix @f$B@f$.
+ *  @param rows Number of rows of either @p A and @p B.
+ *  @param cols Number of columns of either @p A and @p B.
+ *  @returns Approximation of @f$\|A-B\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_pre_matrix(mvm_t mvmA, void *A, prcd_t evalB, prcd_t evaltransB,
+    void *B, uint rows, uint cols);
+
+/** @brief Approximate the spectral norm @f$\|I - B^{-1}A\|_2@f$.
+ *  The matrix @f$B@f$ is given as a factorization and can be applied to some
+ *  vector. Usually @f$B@f$ is an approximation to @f$A@f$ and therefore this
+ *  functions measures the quality of some preconditioner for @f$A@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$(I - B^{-1}A)^* (I - B^{-1}A)@f$ and computing
+ *  the square root of the resulting eigenvalue approximation.
+ *  @f$B@f$ is usually given as a LR decomposition or cholesky factorization of
+ *  @f$A@f$.
+ *
+ *  @param mvmA Callback function for evaluating @p A and its adjoint.
+ *  @param A Matrix @f$A@f$.
+ *  @param solveB Callback function for solving a linear system with @p B.
+ *  @param solvetransB Callback function for solving a linear system with the
+ *         adjoint of @p B.
+ *  @param B Factorized matrix @f$B@f$.
+ *  @param rows Number of rows of either @p A and @p B.
+ *  @param cols Number of columns of either @p A and @p B.
+ *  @returns Approximation of @f$\|I - B^{-1}A\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_id_pre_matrix(mvm_t mvmA, void *A, prcd_t solveB, prcd_t solvetransB,
+    void *B, uint rows, uint cols);
+
+/* ------------------------------------------------------------
+ * Conjugate gradient method (CG)
  * ------------------------------------------------------------ */
 
 /** @brief Initialize a standard conjugate gradient method to
@@ -91,13 +174,11 @@ typedef void (*prcd_t)(void *pdata, pavector r);
  *  @param a Auxiliary vector.
  */
 HEADER_PREFIX void
-init_cg(addeval_t addeval,
-	void *matrix,
-	pcavector b,		/* Right-hand side */
-	pavector x,		/* Approximate solution */
-	pavector r,		/* Residual b-Ax */
-	pavector p,		/* Search direction */
-	pavector a);
+init_cg(addeval_t addeval, void *matrix, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector p, /* Search direction */
+    pavector a);
 
 /** @brief One step of a standard conjugate gradient method
  *
@@ -110,13 +191,11 @@ init_cg(addeval_t addeval,
  *  @param a auxiliary vector
  */
 HEADER_PREFIX void
-step_cg(addeval_t addeval,
-	void *matrix,
-	pcavector b,		/* Right-hand side */
-	pavector x,		/* Approximate solution */
-	pavector r,		/* Residual b-Ax */
-	pavector p,		/* Search direction */
-	pavector a);
+step_cg(addeval_t addeval, void *matrix, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector p, /* Search direction */
+    pavector a);
 
 /** @brief error information of a standard conjugate gradient method
  *
@@ -128,14 +207,11 @@ step_cg(addeval_t addeval,
  *  @returns @f$-<Ax,x>_2/2@f$
  */
 HEADER_PREFIX real
-evalfunctional_cg(addeval_t addeval,
-		  void *matrix,
-		  pcavector b,
-		  pcavector x,
-		  pcavector r);
+evalfunctional_cg(addeval_t addeval, void *matrix, pcavector b, pcavector x,
+    pcavector r);
 
 /* ------------------------------------------------------------
- * Preconditioned conjugate gradients method (pcg)
+ * Preconditioned conjugated gradient method (PCG)
  * ------------------------------------------------------------ */
 
 /** @brief Initialize a preconditioned conjugate gradient method
@@ -158,16 +234,12 @@ evalfunctional_cg(addeval_t addeval,
  *  @param a auxiliary vector
  */
 HEADER_PREFIX void
-init_pcg(addeval_t addeval,
-	 void *matrix,
-	 prcd_t prcd,
-	 void *pdata,
-	 pcavector b,		/* Right-hand side */
-	 pavector x,		/* Approximate solution */
-	 pavector r,		/* Residual b-Ax */
-	 pavector q,		/* Preconditioned residual */
-	 pavector p,		/* Search direction */
-	 pavector a);
+init_pcg(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector q, /* Preconditioned residual */
+    pavector p, /* Search direction */
+    pavector a);
 
 /** @brief One step of a preconditioned conjugate gradient method
  *
@@ -183,16 +255,219 @@ init_pcg(addeval_t addeval,
  *  @param a auxiliary vector
  */
 HEADER_PREFIX void
-step_pcg(addeval_t addeval,
-	 void *matrix,
-	 prcd_t prcd,
-	 void *pdata,
-	 pcavector b,		/* Right-hand side */
-	 pavector x,		/* Approximate solution */
-	 pavector r,		/* Residual b-Ax */
-	 pavector q,		/* Preconditioned residual */
-	 pavector p,		/* Search direction */
-	 pavector a);
+step_pcg(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector q, /* Preconditioned residual */
+    pavector p, /* Search direction */
+    pavector a);
+
+/* ------------------------------------------------------------
+ * Uzawa method
+ * ------------------------------------------------------------ */
+
+/** @brief Initialize the standard Uzawa iteration.
+ *
+ *  The Uzawa iteration solves saddle point systems of the
+ *  form
+ *  @f[ \begin{pmatrix} A_{11} & A_{21}^*\\ A_{21} & \end{pmatrix}
+ *      \begin{pmatrix} x_1\\ x_2 \end{pmatrix}
+ *    = \begin{pmatrix} b_1\\ b_2 \end{pmatrix} @f]
+ *  by applying the conjugate gradient method to the Schur complement.
+ *  The matrix @f$A_{11}@f$ has to be symmetric and positive definite.
+ *  If @f$A_{21}@f$ is not surjective, @f$b_2@f$ will only be determined
+ *  up to an element of the null space of @f$A_{21}^*@f$.
+ *
+ *  @param solve_A11 Callback for solving @f$A_{11} x_1 = b_1@f$
+ *  @param matrix_A11 Data for <tt>solve_A11</tt> callback
+ *  @param mvm_A21 Callback for evaluating @f$A_{21} x_1@f$ or
+ *     @f$A_{21}^* x_2@f$
+ *  @param matrix_A21 Data for <tt>mvm_A21</tt> callback
+ *  @param b1 Right-hand side vector @f$b_1@f$
+ *  @param b2 Right-hand side vector @f$b_2@f$
+ *  @param x1 Approximate solution vector @f$x_1@f$
+ *  @param x2 Approximate solution vector @f$x_2@f$
+ *  @param r2 Residual of the Schur complement system,
+ *     may be useful for a stopping criterion
+ *  @param p2 Search direction for Schur complement system
+ *  @param a1 Auxiliary variable of the same dimension as @f$x_1@f$
+ *  @param s2 Auxiliary variable of the same dimension as @f$x_2@f$ */
+HEADER_PREFIX void
+init_uzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21, void *matrix_A21,
+    pcavector b1, pcavector b2, pavector x1, pavector x2, pavector r2,
+    pavector p2, pavector a1, pavector s2);
+
+/** @brief Perform one step of the standard Uzawa iteration.
+ *
+ *  @param solve_A11 Callback for solving @f$A_{11} x_1 = b_1@f$
+ *  @param matrix_A11 Data for <tt>solve_A11</tt> callback
+ *  @param mvm_A21 Callback for evaluating @f$A_{21} x_1@f$ or
+ *     @f$A_{21}^* x_2@f$
+ *  @param matrix_A21 Data for <tt>mvm_A21</tt> callback
+ *  @param b1 Right-hand side vector @f$b_1@f$
+ *  @param b2 Right-hand side vector @f$b_2@f$
+ *  @param x1 Approximate solution vector @f$x_1@f$
+ *  @param x2 Approximate solution vector @f$x_2@f$
+ *  @param r2 Residual of the Schur complement system,
+ *     may be useful for a stopping criterion
+ *  @param p2 Search direction for Schur complement system
+ *  @param a1 Auxiliary variable of the same dimension as @f$x_1@f$
+ *  @param s2 Auxiliary variable of the same dimension as @f$x_2@f$ */
+HEADER_PREFIX void
+step_uzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21, void *matrix_A21,
+    pcavector b1, pcavector b2, pavector x1, pavector x2, pavector r2,
+    pavector p2, pavector a1, pavector s2);
+
+/** @brief Initialize a preconditioned Uzawa iteration.
+ *
+ *  The preconditioned Uzawa iteration solves saddle point systems of the
+ *  form
+ *  @f[ \begin{pmatrix} A_{11} & A_{21}^*\\ A_{21} & \end{pmatrix}
+ *      \begin{pmatrix} x_1\\ x_2 \end{pmatrix}
+ *    = \begin{pmatrix} b_1\\ b_2 \end{pmatrix} @f]
+ *  by applying the preconditioned conjugate gradient method to the Schur
+ *  complement.
+ *  The matrix @f$A_{11}@f$ has to be symmetric and positive definite.
+ *  If @f$A_{21}@f$ is not surjective, @f$b_2@f$ will only be determined
+ *  up to an element of the null space of @f$A_{21}^*@f$.
+ *
+ *  @param solve_A11 Callback for solving @f$A_{11} x_1 = b_1@f$
+ *  @param matrix_A11 Data for <tt>solve_A11</tt> callback
+ *  @param mvm_A21 Callback for evaluating @f$A_{21} x_1@f$ or
+ *     @f$A_{21}^* x_2@f$
+ *  @param matrix_A21 Data for <tt>mvm_A21</tt> callback
+ *  @param prcd Callback function name
+ *  @param pdata untyped pointer to matrix data
+ *  @param b1 Right-hand side vector @f$b_1@f$
+ *  @param b2 Right-hand side vector @f$b_2@f$
+ *  @param x1 Approximate solution vector @f$x_1@f$
+ *  @param x2 Approximate solution vector @f$x_2@f$
+ *  @param r2 Residual of the Schur complement system,
+ *     may be useful for a stopping criterion
+ *  @param p2 Search direction for Schur complement system
+ *  @param q2 Auxiliary variable of the same dimension as @f$r2@f$
+ *  @param a1 Auxiliary variable of the same dimension as @f$x_1@f$
+ *  @param s2 Auxiliary variable of the same dimension as @f$x_2@f$ */
+HEADER_PREFIX void
+init_puzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21, void *matrix_A21,
+    prcd_t prcd, void *pdata, pcavector b1, pcavector b2, pavector x1,
+    pavector x2, pavector r2, pavector q2, pavector p2, pavector a1,
+    pavector s2);
+
+/** @brief Perform one step of the preconditioned Uzawa iteration.
+ *
+ *  @param solve_A11 Callback for solving @f$A_{11} x_1 = b_1@f$
+ *  @param matrix_A11 Data for <tt>solve_A11</tt> callback
+ *  @param mvm_A21 Callback for evaluating @f$A_{21} x_1@f$ or
+ *     @f$A_{21}^* x_2@f$
+ *  @param matrix_A21 Data for <tt>mvm_A21</tt> callback
+ *  @param prcd Callback function name
+ *  @param pdata untyped pointer to matrix data
+ *  @param b1 Right-hand side vector @f$b_1@f$
+ *  @param b2 Right-hand side vector @f$b_2@f$
+ *  @param x1 Approximate solution vector @f$x_1@f$
+ *  @param x2 Approximate solution vector @f$x_2@f$
+ *  @param r2 Residual of the Schur complement system,
+ *     may be useful for a stopping criterion
+ *  @param q2 Auxiliary variable of the same dimension as @f$r2@f$
+ *  @param p2 Search direction for Schur complement system
+ *  @param a1 Auxiliary variable of the same dimension as @f$x_1@f$
+ *  @param s2 Auxiliary variable of the same dimension as @f$x_2@f$ */
+HEADER_PREFIX void
+step_puzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21, void *matrix_A21,
+    prcd_t prcd, void *pdata, pcavector b1, pcavector b2, pavector x1,
+    pavector x2, pavector r2, pavector q2, pavector p2, pavector a1,
+    pavector s2);
+
+/** @brief Initialize a biconjugate gradient method
+ *
+ *  @param addeval Callback function name
+ *  @param addevaltrans Callback function name
+ *  @param matrix untyped pointer to matrix data
+ *  @param b Right-hand side.
+ *  @param x Approximate solution.
+ *  @param r Residual b-Ax
+ *  @param rt Adjoint residual
+ *  @param p Search direction
+ *  @param pt Adjoint search direction
+ *  @param a auxiliary vector
+ *  @param at auxiliary vector
+ */
+HEADER_PREFIX void
+init_bicg(addeval_t addeval, addeval_t addevaltrans, void *matrix, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector rt, /* Adjoint residual */
+    pavector p, /* Search direction */
+    pavector pt, /* Adjoint search direction */
+    pavector a, pavector at);
+
+/** @brief One step a biconjugate gradient method
+ *
+ *  @param addeval Callback function name
+ *  @param addevaltrans Callback function name
+ *  @param matrix untyped pointer to matrix data
+ *  @param b Right-hand side.
+ *  @param x Approximate solution.
+ *  @param r Residual b-Ax
+ *  @param rt Adjoint residual
+ *  @param p Search direction
+ *  @param pt Adjoint search direction
+ *  @param a auxiliary vector
+ *  @param at auxiliary vector
+ */
+HEADER_PREFIX void
+step_bicg(addeval_t addeval, addeval_t addevaltrans, void *matrix, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector rt, /* Adjoint residual */
+    pavector p, /* Search direction */
+    pavector pt, /* Adjoint search direction */
+    pavector a, pavector at);
+
+/* ------------------------------------------------------------
+ * Stabilized biconjugated gradient method (BiCGstab)
+ * ------------------------------------------------------------ */
+
+/** @brief Initialize a stabilized biconjugate gradient method
+ *
+ *  @param addeval Callback function name
+ *  @param matrix untyped pointer to matrix data
+ *  @param b Right-hand side.
+ *  @param x Approximate solution.
+ *  @param r Residual b-Ax
+ *  @param rt Adjoint residual
+ *  @param p Search direction
+ *  @param a auxiliary vector
+ *  @param as auxiliary vector
+ */
+HEADER_PREFIX void
+init_bicgstab(addeval_t addeval, void *matrix, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector rt, /* Adjoint residual */
+    pavector p, /* Search direction */
+    pavector a, pavector as);
+
+/** @brief One step a stabilized biconjugate gradient method
+ *
+ *  @param addeval Callback function name
+ *  @param matrix untyped pointer to matrix data
+ *  @param b Right-hand side.
+ *  @param x Approximate solution.
+ *  @param r Residual b-Ax
+ *  @param rt Adjoint residual
+ *  @param p Search direction
+ *  @param a auxiliary vector
+ *  @param as auxiliary vector
+ */
+HEADER_PREFIX void
+step_bicgstab(addeval_t addeval, void *matrix, pcavector b, /* Right-hand side */
+    pavector x, /* Approximate solution */
+    pavector r, /* Residual b-Ax */
+    pavector rt, /* Adjoint residual */
+    pavector p, /* Search direction */
+    pavector a, pavector as);
 
 /* ------------------------------------------------------------
  * Generalized minimal residual method (GMRES)
@@ -223,11 +498,8 @@ step_pcg(addeval_t addeval,
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
 HEADER_PREFIX void
-init_gmres(addeval_t addeval,
-	   void *matrix,
-	   pcavector b, pavector x,
-	   pavector rhat, pavector q,
-	   uint *kk, pamatrix qr, pavector tau);
+init_gmres(addeval_t addeval, void *matrix, pcavector b, pavector x,
+    pavector rhat, pavector q, uint *kk, pamatrix qr, pavector tau);
 
 /** @brief One step of the GMRES method.
  *
@@ -259,11 +531,8 @@ init_gmres(addeval_t addeval,
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
 HEADER_PREFIX void
-step_gmres(addeval_t addeval,
-	   void *matrix,
-	   pcavector b, pavector x,
-	   pavector rhat, pavector q,
-	   uint *kk, pamatrix qr, pavector tau);
+step_gmres(addeval_t addeval, void *matrix, pcavector b, pavector x,
+    pavector rhat, pavector q, uint *kk, pamatrix qr, pavector tau);
 
 /** @brief Completes or restarts the GMRES method.
  *
@@ -289,11 +558,8 @@ step_gmres(addeval_t addeval,
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
 HEADER_PREFIX void
-finish_gmres(addeval_t addeval,
-	     void *matrix,
-	     pcavector b, pavector x,
-	     pavector rhat, pavector q,
-	     uint *kk, pamatrix qr, pavector tau);
+finish_gmres(addeval_t addeval, void *matrix, pcavector b, pavector x,
+    pavector rhat, pavector q, uint *kk, pamatrix qr, pavector tau);
 
 /** @brief Returns norm of current residual vector.
  *
@@ -336,13 +602,9 @@ residualnorm_gmres(pcavector rhat, uint k);
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
 HEADER_PREFIX void
-init_pgmres(addeval_t addeval,
-	    void *matrix,
-	    prcd_t prcd,
-	    void *pdata,
-	    pcavector b, pavector x,
-	    pavector rhat, pavector q,
-	    uint *kk, pamatrix qr, pavector tau);
+init_pgmres(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata,
+    pcavector b, pavector x, pavector rhat, pavector q, uint *kk, pamatrix qr,
+    pavector tau);
 
 /** @brief One step of the preconditioned GMRES method.
  *
@@ -377,13 +639,9 @@ init_pgmres(addeval_t addeval,
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
 HEADER_PREFIX void
-step_pgmres(addeval_t addeval,
-	    void *matrix,
-	    prcd_t prcd,
-	    void *pdata,
-	    pcavector b, pavector x,
-	    pavector rhat, pavector q,
-	    uint *kk, pamatrix qr, pavector tau);
+step_pgmres(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata,
+    pcavector b, pavector x, pavector rhat, pavector q, uint *kk, pamatrix qr,
+    pavector tau);
 
 /** @brief Completes or restarts the preconditioned GMRES method.
  *
@@ -412,13 +670,9 @@ step_pgmres(addeval_t addeval,
  *  @param tau Scaling factors of elementary reflectors,
  *         provided by @ref qrdecomp_amatrix. */
 HEADER_PREFIX void
-finish_pgmres(addeval_t addeval,
-	      void *matrix,
-	      prcd_t prcd,
-	      void *pdata,
-	      pcavector b, pavector x,
-	      pavector rhat, pavector q,
-	      uint *kk, pamatrix qr, pavector tau);
+finish_pgmres(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata,
+    pcavector b, pavector x, pavector rhat, pavector q, uint *kk, pamatrix qr,
+    pavector tau);
 
 /** @brief Returns norm of current preconditioned residual vector.
  *

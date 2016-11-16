@@ -50,13 +50,16 @@
  *        entries for single integrals and regular double integrals.
  * @param q_singular Order of gaussian quadrature used within computation of matrix
  *        entries singular double integrals.
- * @param basis Type of basis functions used for neumann data.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
  * slp matrices @f$ V @f$ for the Laplace equation.
  */
 HEADER_PREFIX pbem3d new_slp_laplace_ocl_bem3d(pcsurface3d gr, uint q_regular,
-    uint q_singular, basisfunctionbem3d basis);
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis);
 
 /**
  * @brief Creates a new @ref _bem3d "bem3d"-object for computation of
@@ -77,16 +80,18 @@ HEADER_PREFIX pbem3d new_slp_laplace_ocl_bem3d(pcsurface3d gr, uint q_regular,
  *        entries for single integrals and regular double integrals.
  * @param q_singular Order of gaussian quadrature used within computation of matrix
  *        entries singular double integrals.
- * @param basis_neumann Type of basis functions used for neumann data.
- * @param basis_dirichlet Type of basis functions used for dirichlet data.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  * @param alpha Double layer operator + @f$\alpha@f$ mass matrix.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
  * dlp matrices @f$ K + \alpha M @f$ for the Laplace equation.
  */
 HEADER_PREFIX pbem3d new_dlp_laplace_ocl_bem3d(pcsurface3d gr, uint q_regular,
-    uint q_singular, basisfunctionbem3d basis_neumann,
-    basisfunctionbem3d basis_dirichlet, field alpha);
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis,
+    field alpha);
 
 /**
  * @brief Delete a @ref _bem3d "bem3d" object for the Laplace equation with

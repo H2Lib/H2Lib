@@ -119,8 +119,121 @@ del_surface3d(psurface3d gr)
 }
 
 /* ------------------------------------------------------------
- Debugging
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
+
+void
+getproperties_surface3d(pcsurface3d gr, preal hmin, preal hmax,
+			preal anglemin, preal angleedge)
+{
+  uint      edges = gr->edges;
+  uint      triangles = gr->triangles;
+  const     real(*x)[3] = (const real(*)[3]) gr->x;
+  const     uint(*t)[3] = (const uint(*)[3]) gr->t;
+  const     uint(*s)[3] = (const uint(*)[3]) gr->s;
+  const     real(*n)[3] = (const real(*)[3]) gr->n;
+  const real *g = (const real *) gr->g;
+  uint     *neighbour;
+  real      dt[3], ds[3], h[3], nn, angle;
+  real      h_min, h_max, angle_min, angle_edge;
+  uint      i, j;
+
+  /* Just to avoid warnings */
+  h_min = h_max = angle_min = 0.0;
+
+  for (i = 0; i < triangles; i++) {
+    dt[0] = x[t[i][1]][0] - x[t[i][0]][0];
+    dt[1] = x[t[i][1]][1] - x[t[i][0]][1];
+    dt[2] = x[t[i][1]][2] - x[t[i][0]][2];
+
+    ds[0] = x[t[i][2]][0] - x[t[i][0]][0];
+    ds[1] = x[t[i][2]][1] - x[t[i][0]][1];
+    ds[2] = x[t[i][2]][2] - x[t[i][0]][2];
+
+    h[0] = (REAL_SQR(dt[0]) + REAL_SQR(dt[1]) + REAL_SQR(dt[2]));
+    h[1] = (REAL_SQR(ds[0]) + REAL_SQR(ds[1]) + REAL_SQR(ds[2]));
+    h[2] = (REAL_SQR(dt[0] - ds[0]) + REAL_SQR(dt[1] - ds[1])
+	    + REAL_SQR(dt[2] - ds[2]));
+
+    if (i == 0 || h[0] < h_min)
+      h_min = h[0];
+
+    if (i == 0 || h[0] > h_max)
+      h_max = h[0];
+
+    if (h[1] < h_min)
+      h_min = h[1];
+
+    if (h[1] > h_max)
+      h_max = h[1];
+
+    if (h[2] < h_min)
+      h_min = h[2];
+
+    if (h[2] > h_max)
+      h_max = h[2];
+
+    angle = g[i] / REAL_SQRT(h[0] * h[1]);
+
+    if (i == 0 || angle < angle_min)
+      angle_min = angle;
+  }
+
+  if (hmin)
+    *hmin = REAL_SQRT(h_min);
+
+  if (hmax)
+    *hmax = REAL_SQRT(h_max);
+
+  if (anglemin)
+    *anglemin = REAL_ASIN(angle_min);
+
+  if (angleedge) {
+    neighbour = (uint *) allocmem(sizeof(uint) * edges);
+
+    for (i = 0; i < edges; i++)
+      neighbour[i] = triangles;
+
+    angle_edge = 1.0;
+
+    for (i = 0; i < triangles; i++) {
+      if (neighbour[s[i][0]] < triangles) {
+	j = neighbour[s[i][0]];
+	nn = (n[i][0] * n[j][0] + n[i][1] * n[j][1] + n[i][2] * n[j][2]);
+	if (nn < angle_edge)
+	  angle_edge = nn;
+      }
+      else
+	neighbour[s[i][0]] = i;
+
+      if (neighbour[s[i][1]] < triangles) {
+	j = neighbour[s[i][1]];
+	nn = (n[i][0] * n[j][0] + n[i][1] * n[j][1] + n[i][2] * n[j][2]);
+	if (nn < angle_edge)
+	  angle_edge = nn;
+      }
+      else
+	neighbour[s[i][1]] = i;
+
+      if (neighbour[s[i][2]] < triangles) {
+	j = neighbour[s[i][2]];
+	nn = (n[i][0] * n[j][0] + n[i][1] * n[j][1] + n[i][2] * n[j][2]);
+	if (nn < angle_edge)
+	  angle_edge = nn;
+      }
+      else
+	neighbour[s[i][2]] = i;
+    }
+
+    *angleedge = REAL_ACOS(angle_edge);
+
+    freemem(neighbour);
+  }
+}
+
+/* ------------------------------------------------------------
+ * Debugging
+ * ------------------------------------------------------------ */
 
 void
 print_surface3d(pcsurface3d gr)
@@ -308,6 +421,85 @@ scale_surface3d(psurface3d gr, real * a, real * b)
   prepare_surface3d(gr);
 }
 
+void
+translate_surface3d(psurface3d gr, real * t)
+{
+  uint      vertices = gr->vertices;
+
+  uint      i;
+
+  for (i = 0; i < vertices; ++i) {
+    gr->x[i][0] += t[0];
+    gr->x[i][1] += t[1];
+    gr->x[i][2] += t[2];
+  }
+
+  prepare_surface3d(gr);
+}
+
+psurface3d
+merge_surface3d(pcsurface3d gr1, pcsurface3d gr2)
+{
+  uint      i;
+
+  psurface3d gr;
+
+  gr = new_surface3d(gr1->vertices + gr2->vertices, gr1->edges + gr2->edges,
+		     gr1->triangles + gr2->triangles);
+
+  for (i = 0; i < gr1->vertices; ++i) {
+    gr->x[i][0] = gr1->x[i][0];
+    gr->x[i][1] = gr1->x[i][1];
+    gr->x[i][2] = gr1->x[i][2];
+  }
+
+  for (i = 0; i < gr2->vertices; ++i) {
+    gr->x[i + gr1->vertices][0] = gr2->x[i][0];
+    gr->x[i + gr1->vertices][1] = gr2->x[i][1];
+    gr->x[i + gr1->vertices][2] = gr2->x[i][2];
+  }
+
+  for (i = 0; i < gr1->edges; ++i) {
+    gr->e[i][0] = gr1->e[i][0];
+    gr->e[i][1] = gr1->e[i][1];
+    gr->e[i][2] = gr1->e[i][2];
+  }
+
+  for (i = 0; i < gr2->edges; ++i) {
+    gr->e[i + gr1->edges][0] = gr2->e[i][0] + gr1->vertices;
+    gr->e[i + gr1->edges][1] = gr2->e[i][1] + gr1->vertices;
+    gr->e[i + gr1->edges][2] = gr2->e[i][2] + gr1->vertices;
+  }
+
+  for (i = 0; i < gr1->triangles; ++i) {
+    gr->t[i][0] = gr1->t[i][0];
+    gr->t[i][1] = gr1->t[i][1];
+    gr->t[i][2] = gr1->t[i][2];
+    gr->s[i][0] = gr1->s[i][0];
+    gr->s[i][1] = gr1->s[i][1];
+    gr->s[i][2] = gr1->s[i][2];
+    gr->n[i][0] = gr1->n[i][0];
+    gr->n[i][1] = gr1->n[i][1];
+    gr->n[i][2] = gr1->n[i][2];
+    gr->g[i] = gr1->g[i];
+  }
+
+  for (i = 0; i < gr2->triangles; ++i) {
+    gr->t[i + gr1->triangles][0] = gr2->t[i][0] + gr1->vertices;
+    gr->t[i + gr1->triangles][1] = gr2->t[i][1] + gr1->vertices;
+    gr->t[i + gr1->triangles][2] = gr2->t[i][2] + gr1->vertices;
+    gr->s[i + gr1->triangles][0] = gr2->s[i][0] + gr1->edges;
+    gr->s[i + gr1->triangles][1] = gr2->s[i][1] + gr1->edges;
+    gr->s[i + gr1->triangles][2] = gr2->s[i][2] + gr1->edges;
+    gr->n[i + gr1->triangles][0] = gr2->n[i][0];
+    gr->n[i + gr1->triangles][1] = gr2->n[i][1];
+    gr->n[i + gr1->triangles][2] = gr2->n[i][2];
+    gr->g[i + gr1->triangles] = gr2->g[i];
+  }
+
+  return gr;
+}
+
 /* ------------------------------------------------------------
  File I/O
  ------------------------------------------------------------ */
@@ -425,10 +617,8 @@ read_surface3d(const char *filename)
   for (i = 0; i < vertices; i++) {
     line = readline(buf, 80, in, &ln);
 
-    if (line == 0
-	|| sscanf(line,
-		  "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %" SCANF_PREFIX "f",
-		  x[i], x[i] + 1, x[i] + 2)
+    if (line == 0 || sscanf(line, "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %"
+			    SCANF_PREFIX "f", x[i], x[i] + 1, x[i] + 2)
 	!= 3) {
       (void) fprintf(stderr,
 		     "Could not read vertex %u in line %u of file \"%s\"\n",
@@ -484,6 +674,8 @@ read_surface3d(const char *filename)
 #else
   fclose(in);
 #endif
+
+  prepare_surface3d(gr);
 
   return gr;
 }
@@ -707,7 +899,7 @@ mark_edge(struct edge_list *list, uint vert)
 
 static void
 prepare_edges(uint vertices, uint(*t)[3], uint triangles,
-	      uint(**e)[2], uint * edges)
+	      uint(*e)[2], uint edges)
 {
   struct edge_list *(*list);
   struct edge_list *l;
@@ -723,6 +915,10 @@ prepare_edges(uint vertices, uint(*t)[3], uint triangles,
   }
 
   for (i = 0; i < triangles; ++i) {
+    assert(t[i][0] < vertices);
+    assert(t[i][1] < vertices);
+    assert(t[i][2] < vertices);
+
     list[t[i][0]] = prepend_edge(list[t[i][0]], t[i][1]);
     list[t[i][0]] = prepend_edge(list[t[i][0]], t[i][2]);
 
@@ -733,17 +929,17 @@ prepare_edges(uint vertices, uint(*t)[3], uint triangles,
     list[t[i][2]] = prepend_edge(list[t[i][2]], t[i][1]);
   }
 
-  *edges = 0;
-  for (i = 0; i < vertices; ++i) {
-    l = list[i];
-    while (l->next != NULL) {
-      l = l->next;
-      (*edges)++;
-    }
-  }
-  *edges = *edges / 2;
+  //  *edges = 0;
+  //  for (i = 0; i < vertices; ++i) {
+  //    l = list[i];
+  //    while (l->next != NULL) {
+  //      l = l->next;
+  //      (*edges)++;
+  //    }
+  //  }
+  //  *edges = *edges / 2;
 
-  *e = (uint(*)[2]) allocmem(*edges * sizeof(uint[2]));
+  //  *e = (uint (*)[2]) allocmem(*edges * sizeof(uint[2]));
 
   i = 0;
   for (j = 0; j < vertices; ++j) {
@@ -751,8 +947,10 @@ prepare_edges(uint vertices, uint(*t)[3], uint triangles,
     while (l->next != NULL) {
       k = l->x;
       if (k != (uint) - 1) {
-	(*e)[i][0] = j;
-	(*e)[i][1] = k;
+	//        (*e)[i][0] = j;
+	//        (*e)[i][1] = k;
+	e[i][0] = j;
+	e[i][1] = k;
 	mark_edge(list[j], k);
 	mark_edge(list[k], j);
 	i++;
@@ -760,7 +958,7 @@ prepare_edges(uint vertices, uint(*t)[3], uint triangles,
       l = l->next;
     }
   }
-  assert(i == *edges);
+  assert(i == edges);
 
   for (i = 0; i < vertices; ++i) {
     freemem(list[i]);
@@ -888,7 +1086,10 @@ read_netgen_surface3d(const char *filename)
   fclose(in);
 #endif
 
-  prepare_edges(vertices, t, triangles, &e, &edges);
+  edges = 1.5 * triangles;
+  e = (uint(*)[2]) allocuint(edges);
+
+  prepare_edges(vertices, t, triangles, e, edges);
   prepare_arrays_s(t, e, triangles, edges, s);
 
   printf("geometry with %u vertices, %u edges, %u triangles read.\n",
@@ -904,6 +1105,382 @@ read_netgen_surface3d(const char *filename)
   gr->e = e;
   freemem(gr->s);
   gr->s = s;
+
+  return gr;
+}
+
+psurface3d
+read_gmsh_surface3d(const char *filename)
+{
+#ifdef USE_ZLIB
+  gzFile    file;
+#else
+  FILE     *file;
+#endif
+  char      buf[255];
+  uint      line;
+  uint      vertices, edges, triangles;
+  uint      i, tmp, tmp2, tmp3, tmp4, tmp5, tmp6;
+  int       c;
+
+  psurface3d gr;
+
+#ifdef USE_ZLIB
+  file = gzopen(filename, "rb");
+#else
+  file = fopen(filename, "r");
+#endif
+
+  line = 0;
+
+  /****************************************************
+   * Find number of vertices ...
+   ****************************************************/
+
+  while (strcmp(buf, "$Nodes\n")) {
+    readline(buf, 255, file, &line);
+  }
+  readline(buf, 255, file, &line);
+  sscanf(buf, "%d", &vertices);
+
+  i = 0;
+  while (strcmp(buf, "$EndNodes\n")) {
+    i++;
+    readline(buf, 255, file, &line);
+  }
+  i--;
+  assert(i == vertices);
+
+  /****************************************************
+   * Find number of triangles ...
+   ****************************************************/
+
+  while (strcmp(buf, "$Elements\n")) {
+    readline(buf, 255, file, &line);
+  }
+  readline(buf, 255, file, &line);
+  sscanf(buf, "%d", &triangles);
+
+  i = 0;
+  while (strcmp(buf, "$EndElements\n")) {
+    c = sscanf(buf, "%d 2 2 %d %d %d %d %d", &tmp, &tmp2, &tmp3, &tmp4, &tmp5,
+	       &tmp6);
+    if (c != 6) {
+      triangles--;
+    }
+    i++;
+    readline(buf, 255, file, &line);
+  }
+  i--;
+  triangles++;
+
+  /****************************************************
+   * Rewind file / create geometry structure
+   ****************************************************/
+
+#ifdef USE_ZLIB
+  gzrewind(file);
+#else
+  rewind(file);
+#endif
+  line = 0;
+
+  edges = 1.5 * triangles;
+  gr = new_surface3d(vertices, edges, triangles);
+
+  /****************************************************
+   * Read vertices
+   ****************************************************/
+
+  while (strcmp(buf, "$Nodes\n")) {
+    readline(buf, 255, file, &line);
+  }
+  readline(buf, 255, file, &line);
+  i = 0;
+  while (strcmp(buf, "$EndNodes\n")) {
+    readline(buf, 255, file, &line);
+    sscanf(buf, "%d %" SCANF_PREFIX "f %" SCANF_PREFIX "f %" SCANF_PREFIX "f",
+	   &tmp, gr->x[i] + 0, gr->x[i] + 1, gr->x[i] + 2);
+    i++;
+  }
+  i--;
+  assert(i == vertices);
+
+  /****************************************************
+   * Read triangles
+   ****************************************************/
+
+  while (strcmp(buf, "$Elements\n")) {
+    readline(buf, 255, file, &line);
+  }
+  readline(buf, 255, file, &line);
+  i = 0;
+  while (strcmp(buf, "$EndElements\n") && i <= triangles) {
+    readline(buf, 255, file, &line);
+    c = sscanf(buf, "%d 2 2 %d %d %d %d %d", &tmp, &tmp2, &tmp3, gr->t[i] + 0,
+	       gr->t[i] + 1, gr->t[i] + 2);
+    if (c == 6) {
+      gr->t[i][0]--;
+      gr->t[i][1]--;
+      gr->t[i][2]--;
+      i++;
+    }
+  }
+  assert(i == triangles);
+
+#ifdef USE_ZLIB
+  gzclose(file);
+#else
+  fclose(file);
+#endif
+
+  /****************************************************
+   * Generate Edges and arrays gr->s
+   ****************************************************/
+
+  prepare_edges(vertices, gr->t, triangles, gr->e, edges);
+  prepare_arrays_s(gr->t, gr->e, triangles, edges, gr->s);
+
+  prepare_surface3d(gr);
+
+  return gr;
+}
+
+static void
+prepare_dynamic_edges(uint vertices, uint(*t)[3], uint triangles,
+		      uint(**e)[2], uint * edges)
+{
+  struct edge_list *(*list);
+  struct edge_list *l;
+  uint      i, j, k;
+
+  list =
+    (struct edge_list **) allocmem(vertices * sizeof(struct edge_list *));
+
+  for (i = 0; i < vertices; ++i) {
+    list[i] = (struct edge_list *) allocmem(sizeof(struct edge_list));
+    list[i]->x = (uint) - 1;
+    list[i]->next = NULL;
+  }
+
+  for (i = 0; i < triangles; ++i) {
+    assert(t[i][0] < vertices);
+    assert(t[i][1] < vertices);
+    assert(t[i][2] < vertices);
+
+    list[t[i][0]] = prepend_edge(list[t[i][0]], t[i][1]);
+    list[t[i][0]] = prepend_edge(list[t[i][0]], t[i][2]);
+
+    list[t[i][1]] = prepend_edge(list[t[i][1]], t[i][0]);
+    list[t[i][1]] = prepend_edge(list[t[i][1]], t[i][2]);
+
+    list[t[i][2]] = prepend_edge(list[t[i][2]], t[i][0]);
+    list[t[i][2]] = prepend_edge(list[t[i][2]], t[i][1]);
+  }
+
+  *edges = 0;
+  for (i = 0; i < vertices; ++i) {
+    l = list[i];
+    while (l->next != NULL) {
+      l = l->next;
+      (*edges)++;
+    }
+  }
+  (*edges) = (*edges) / 2;
+
+  (*e) = (uint(*)[2]) allocmem(*edges * sizeof(uint[2]));
+
+  i = 0;
+  for (j = 0; j < vertices; ++j) {
+    l = list[j];
+    while (l->next != NULL) {
+      k = l->x;
+      if (k != (uint) - 1) {
+	(*e)[i][0] = j;
+	(*e)[i][1] = k;
+	mark_edge(list[j], k);
+	mark_edge(list[k], j);
+	i++;
+      }
+      l = l->next;
+    }
+  }
+  assert(i == *edges);
+
+  for (i = 0; i < vertices; ++i) {
+    freemem(list[i]);
+  }
+  freemem(list);
+}
+
+psurface3d
+read_unv_surface3d(char *filename)
+{
+#ifdef USE_ZLIB
+  gzFile    file;
+#else
+  FILE     *file;
+#endif
+  uint      i, j, k, line, triangles, edges, vertices;
+  char     *buf;
+  uint     *x;
+  uint     *t;
+  uint      tmp1, tmp2, tmp3, tmp4, tmp5;
+
+  psurface3d gr;
+
+  buf = (char *) allocmem(255 * sizeof(char));
+#ifdef USE_ZLIB
+  file = gzopen(filename, "rb");
+#else
+  file = fopen(filename, "r");
+#endif
+
+  line = 0;
+  readline(buf, 255, file, &line);
+
+  /****************************************************
+   * Find number of vertices ...
+   ****************************************************/
+
+  /* Scan fileheader until definition of nodes starts. */
+  while (strncmp(buf, "  2411", 6)) {
+    readline(buf, 255, file, &line);
+  }
+
+  i = 0;
+  while (strncmp(buf, "    -1", 6)) {
+    i++;
+    readline(buf, 255, file, &line);
+  }
+  i--;
+  /* Number of vertices found. */
+  vertices = i / 2;
+
+  /****************************************************
+   * Find number of triangles ...
+   ****************************************************/
+
+  /* Scan fileheader until definition of triangles starts. */
+  while (strncmp(buf, "  2412", 6)) {
+    readline(buf, 255, file, &line);
+  }
+
+  i = 0;
+  while (strncmp(buf, "    -1", 6)) {
+    i++;
+    readline(buf, 255, file, &line);
+  }
+  i--;
+  /* Number of vertices found. */
+  triangles = i / 2;
+
+  edges = 1.5 * triangles;
+  gr = new_surface3d(vertices, edges, triangles);
+  x = allocuint(vertices);
+  t = allocuint(triangles);
+
+  printf("%d, %d, %d\n", vertices, edges, triangles);
+
+#ifdef USE_ZLIB
+  gzrewind(file);
+#else
+  rewind(file);
+#endif
+
+  line = 0;
+  readline(buf, 255, file, &line);
+
+  /****************************************************
+   * Read vertices ...
+   ****************************************************/
+
+  /* Scan fileheader until definition of nodes starts. */
+  while (strncmp(buf, "  2411", 6)) {
+    readline(buf, 255, file, &line);
+  }
+
+  i = 0;
+  readline(buf, 255, file, &line);
+  while (strncmp(buf, "    -1", 6)) {
+    assert(sscanf
+	   (buf, "    %d         %d         %d         %d", x + i, &tmp1,
+	    &tmp2, &tmp3)
+	   == 4);
+    readline(buf, 255, file, &line);
+    assert(sscanf
+	   (buf, "%" SCANF_PREFIX "f %" SCANF_PREFIX "f %" SCANF_PREFIX "f",
+	    gr->x[i] + 0, gr->x[i] + 1, gr->x[i] + 2) == 3);
+    readline(buf, 255, file, &line);
+    i++;
+  }
+
+  /****************************************************
+   * Read triangles ...
+   ****************************************************/
+
+  /* Scan fileheader until definition of triangles starts. */
+  while (strncmp(buf, "  2412", 6)) {
+    readline(buf, 255, file, &line);
+  }
+
+  i = 0;
+  readline(buf, 255, file, &line);
+  while (strncmp(buf, "    -1", 6)) {
+    assert(sscanf(buf,
+		  "    %d        %d         %d         %d         %d         %d",
+		  t + i, &tmp1, &tmp2, &tmp3, &tmp4, &tmp5)
+	   == 6);
+    readline(buf, 255, file, &line);
+    assert(sscanf(buf, "    %d    %d    %d", gr->t[i] + 0, gr->t[i] + 1,
+		  gr->t[i] + 2)
+	   == 3);
+    readline(buf, 255, file, &line);
+    i++;
+  }
+
+#ifdef USE_ZLIB
+  gzclose(file);
+#else
+  fclose(file);
+#endif
+
+  /****************************************************
+   * Assign correct vertex ordering
+   ****************************************************/
+
+  for (i = 0; i < triangles; ++i) {
+    for (k = 0; k < 3; ++k) {
+      for (j = 0; j < vertices; ++j) {
+	if (gr->t[i][k] == x[j]) {
+	  gr->t[i][k] = j;
+	  break;
+	}
+      }
+      assert(j < vertices);
+    }
+  }
+
+  /****************************************************
+   * Compute redundant edges/triangles information
+   ****************************************************/
+
+  freemem(gr->e);
+  prepare_dynamic_edges(vertices, gr->t, triangles, &gr->e, &gr->edges);
+  edges = gr->edges;
+  freemem(gr->s);
+  gr->s = (uint(*)[3]) allocuint(3 * edges);
+  prepare_arrays_s(gr->t, gr->e, triangles, edges, gr->s);
+
+  prepare_surface3d(gr);
+
+  assert(check_surface3d(gr) == 0);
+  //  assert(isclosed_surface3d(gr));
+  assert(isoriented_surface3d(gr));
+
+  freemem(buf);
+  freemem(x);
+  freemem(t);
 
   return gr;
 }

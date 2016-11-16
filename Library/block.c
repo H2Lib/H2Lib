@@ -256,6 +256,57 @@ build_nonstrict_block(pcluster rc, pcluster cc, void *eta, admissible admis)
 }
 
 pblock
+build_nonstrict_lower_block(pcluster rc, pcluster cc, void *eta,
+			    admissible admis)
+{
+  pblock    b;
+
+  bool      a;
+  uint      rsons, csons;
+  uint      i, j;
+
+  a = admis(rc, cc, eta);
+
+  if (a == false) {
+    /* inadmissible leaf */
+    if (rc->sons * cc->sons == 0) {
+      rsons = 0;
+      csons = 0;
+    }
+    /* no leaf */
+    else {
+      rsons = rc->sons;
+      csons = cc->sons;
+    }
+  }
+  /* admissible leaf */
+  else {
+    assert(a == true);
+    rsons = 0;
+    csons = 0;
+  }
+
+  b = new_block(rc, cc, a, rsons, csons);
+
+  for (j = 0; j < csons; j++) {
+    for (i = 0; i < j; ++i) {
+      b->son[i + j * rsons] = new_block(rc->son[i], cc->son[j], true, 0, 0);
+      update_block(b->son[i + j * rsons]);
+    }
+    b->son[i + j * rsons] =
+      build_nonstrict_lower_block(rc->son[i], cc->son[j], eta, admis);
+    for (i = j + 1; i < rsons; i++) {
+      b->son[i + j * rsons] =
+	build_nonstrict_block(rc->son[i], cc->son[j], eta, admis);
+    }
+  }
+
+  update_block(b);
+
+  return b;
+}
+
+pblock
 build_strict_block(pcluster rc, pcluster cc, void *eta, admissible admis)
 {
   pblock    b;
@@ -542,12 +593,12 @@ reshape_glut_block(int width, int height)
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   if (width > height) {
-    glFrustum(-1.5 * width / height, 1.5 * width / height,
-	      -1.5, 1.5, 38.5, 41.5);
+    glFrustum(-1.5 * width / height, 1.5 * width / height, -1.5, 1.5, 38.5,
+	      41.5);
   }
   else {
-    glFrustum(-1.5, 1.5,
-	      -1.5 * height / width, 1.5 * height / width, 38.5, 41.5);
+    glFrustum(-1.5, 1.5, -1.5 * height / width, 1.5 * height / width, 38.5,
+	      41.5);
   }
   glMatrixMode(GL_MODELVIEW);
   glEnable(GL_LIGHT0);
@@ -591,9 +642,15 @@ static void
 displaylist_block(pcblock b, uint roff, uint coff, uint level,
 		  pcblock left, pcblock right, pcblock down, pcblock up)
 {
-  GLfloat   mat_wall[] = { 0.3, 0.3, 0.3, 1.0 };
-  GLfloat   mat_adm[] = { 0.0, 1.0, 0.0, 1.0 };
-  GLfloat   mat_inadm[] = { 1.0, 0.0, 0.0, 1.0 };
+  GLfloat   mat_wall[] = {
+    0.3, 0.3, 0.3, 1.0
+  };
+  GLfloat   mat_adm[] = {
+    0.0, 1.0, 0.0, 1.0
+  };
+  GLfloat   mat_inadm[] = {
+    1.0, 0.0, 0.0, 1.0
+  };
   pcblock   up1, down1, left1, right1;
   uint      rows = b->rc->size;
   uint      cols = b->cc->size;

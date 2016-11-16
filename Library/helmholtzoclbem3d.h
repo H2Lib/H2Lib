@@ -42,21 +42,23 @@
  * \mathcal I}@f$ and also @ref _hmatrix "hmatrix"
  * or @ref _h2matrix "h2matrix" approximation of this matrix.
  *
- * @param kvec Three-dimensional vector of field representing the wavevector
- *   @f$\vec \kappa@f$.
+ * @param k Wavenumber @f$\kappa@f$.
  * @param gr Surface mesh
  * @param q_regular Order of gaussian quadrature used within computation of matrix
  *        entries for single integrals and regular double integrals.
  * @param q_singular Order of gaussian quadrature used within computation of matrix
  *        entries singular double integrals.
- * @param basis Type of basis functions used for neumann data.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
  * slp matrices @f$ V @f$ for the helmholtz equation.
  */
 HEADER_PREFIX pbem3d
-new_slp_helmholtz_ocl_bem3d(field * kvec, pcsurface3d gr, uint q_regular,
-    uint q_singular, basisfunctionbem3d basis);
+new_slp_helmholtz_ocl_bem3d(field k, pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis);
 
 /**
  * @brief Creates a new @ref _bem3d "bem3d"-object for computation of
@@ -70,24 +72,25 @@ new_slp_helmholtz_ocl_bem3d(field * kvec, pcsurface3d gr, uint q_regular,
  * or @ref _h2matrix "h2matrix"
  * approximation of this matrix.
  *
- * @param kvec Three-dimensional vector of field representing the wavevector
- *   @f$\vec \kappa@f$.
+ * @param k Wavenumber @f$\kappa@f$.
  * @param gr Surface mesh.
  * @param q_regular Order of gaussian quadrature used within computation of matrix
  *        entries for single integrals and regular double integrals.
  * @param q_singular Order of gaussian quadrature used within computation of matrix
  *        entries singular double integrals.
- * @param basis_neumann Type of basis functions used for neumann data.
- * @param basis_dirichlet Type of basis functions used for dirichlet data.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  * @param alpha Double layer operator + @f$\alpha@f$ mass matrix.
  *
  * @return Returns a @ref _bem3d "bem"-object that can compute fully populated
  * dlp matrices @f$ K + \alpha M @f$ for the laplace equation.
  */
 HEADER_PREFIX pbem3d
-new_dlp_helmholtz_ocl_bem3d(field * kvec, pcsurface3d gr, uint q_regular,
-    uint q_singular, basisfunctionbem3d basis_neumann,
-    basisfunctionbem3d basis_dirichlet, field alpha);
+new_dlp_helmholtz_ocl_bem3d(field k, pcsurface3d gr, uint q_regular,
+    uint q_singular, basisfunctionbem3d row_basis, basisfunctionbem3d col_basis,
+    field alpha);
 
 /**
  * @brief Delete a @ref _bem3d "bem3d" object for the Helmholtz equation

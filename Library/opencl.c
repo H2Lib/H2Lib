@@ -12,9 +12,11 @@
 
 /* C STD LIBRARY */
 #include <unistd.h>
+#include <string.h>
 /* CORE 0 */
 /* CORE 1 */
 #include "opencl.h"
+#include "clsettings.h"
 /* CORE 2 */
 /* CORE 3 */
 /* SIMPLE */
@@ -205,48 +207,6 @@ set_opencl_devices(cl_device_id * devices, cl_uint ndevices,
 
 }
 
-static    bool
-read_file(const char *filename, char **str, size_t * str_size)
-{
-  FILE     *file;
-  size_t    size;
-
-  /****************************************************
-   * Open file for reading and check if it exists.
-   ****************************************************/
-
-  file = fopen(filename, "r");
-  if (!file) {
-    fprintf(stderr, "Failed to load sourcefile %s!\n", filename);
-    return false;
-  }
-
-  /****************************************************
-   * Determine the size of the file
-   ****************************************************/
-
-  fseek(file, 0L, SEEK_END);
-  *str_size = size = ftell(file);
-  rewind(file);
-  *str = (char *) allocmem(size * sizeof(char));
-
-  /****************************************************
-   * Read all bytes of the file.
-   ****************************************************/
-
-  size = fread(*str, 1, size, file);
-
-  assert(size == *str_size);
-
-  /****************************************************
-   * Close file and return.
-   ****************************************************/
-
-  fclose(file);
-
-  return true;
-}
-
 const char *
 get_error_string(cl_int error)
 {
@@ -393,22 +353,22 @@ get_error_string(cl_int error)
 }
 
 void
-setup_kernels(const char *filename, const uint num_kernels,
+setup_kernels(const char *src_str, const uint num_kernels,
 	      const char **kernel_names, cl_kernel ** kernels)
 {
   cl_uint   num_devices = ocl_system.num_devices;
   cl_uint   num_queues = ocl_system.queues_per_device;
-  char     *src_str = NULL;
-  size_t    size_src_str;
+  const char **srcs;
+  size_t    size_src_str[2];
   cl_int    res;
   cl_int    i, j, k;
   cl_program program;
 
-  /****************************************************
-   * Read the source file.
-   ****************************************************/
-
-  assert(read_file(filename, &src_str, &size_src_str) == true);
+  size_src_str[0] = strlen(clsettings_src);
+  size_src_str[1] = strlen(src_str);
+  srcs = (const char **) allocmem(2 * sizeof(char *));
+  srcs[0] = clsettings_src;
+  srcs[1] = src_str;
 
   /****************************************************
    * Create OpenCL program object.
@@ -420,9 +380,8 @@ setup_kernels(const char *filename, const uint num_kernels,
 
   for (k = 0; k < num_devices; ++k) {
 
-    program = clCreateProgramWithSource(ocl_system.contexts[k], 1,
-					(const char **) &src_str,
-					(const size_t *) &size_src_str, &res);
+    program = clCreateProgramWithSource(ocl_system.contexts[k], 2, srcs,
+					size_src_str, &res);
     CL_CHECK(res)
 
     /****************************************************
@@ -492,7 +451,7 @@ setup_kernels(const char *filename, const uint num_kernels,
     clReleaseProgram(program);
   }
 
-  freemem(src_str);
+  freemem(srcs);
 }
 
 /****************************************************

@@ -10,9 +10,6 @@
  * Representation of structured matrix products
  * ------------------------------------------------------------ */
 
-typedef struct _hprodentry hprodentry;
-typedef hprodentry *phprodentry;
-
 struct _hprodentry {
   field     alpha;
   bool      xtrans;

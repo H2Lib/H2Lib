@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "amatrix.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "amatrix.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file amatrix.h
  *  @author Steffen B&ouml;rm
@@ -36,6 +37,7 @@ typedef const amatrix *pcamatrix;
 #include "blas.h"
 #include "avector.h"
 #include "realavector.h"
+#include "krylov.h"
 
 /** @brief Representation of a matrix as an array in column-major order. */
 struct _amatrix {
@@ -465,8 +467,22 @@ random_spd_amatrix(pamatrix a, real alpha);
  *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
  *  @param a Source matrix.
  *  @param b Target matrix. */
-void
+HEADER_PREFIX void
 copy_amatrix(bool atrans, pcamatrix a, pamatrix b);
+
+/** @brief Copy a matrix into another matrix, permuting the columns,
+ *  i.e., @f$B \gets A P_\pi@f$ or @f$B \gets (A P_\pi)^*@f$.
+ *
+ *  The numbers of rows and columns have to match.
+ *
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
+ *  @param a Source matrix.
+ *  @param colpiv Array of dimension <tt>a->cols</tt> containing the
+ *     column indices.
+ *  @param b Target matrix. */
+HEADER_PREFIX void
+copy_colpiv_amatrix(bool atrans, pcamatrix a, const uint *colpiv,
+		    pamatrix b);
 
 /** @brief Create a duplicate of an existing @ref amatrix.
  *
@@ -534,30 +550,6 @@ scale_amatrix(field alpha, pamatrix a);
 HEADER_PREFIX void
 conjugate_amatrix(pamatrix a);
 
-/** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
- *
- *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$A^* A@f$ and computing the square root of
- *  the resulting eigenvalue approximation.
- *
- *  @param a Matrix @f$A@f$.
- *  @returns Approximation of @f$\|A\|_2@f$. */
-HEADER_PREFIX real
-norm2_amatrix(pcamatrix a);
-
-/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
- *  of two matrices @f$A@f$ and @f$B@f$.
- *
- *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
- *  of the resulting eigenvalue approximation.
- *
- *  @param a Matrix @f$A@f$.
- *  @param b Matrix @f$B@f$.
- *  @returns Approximation of @f$\|A-B\|_2@f$. */
-HEADER_PREFIX real
-norm2diff_amatrix(pcamatrix a, pcamatrix b);
-
 /** @brief Compute the Frobenius inner product
  *  @f$\langle A, B \rangle_F@f$ of two matrices @f$A@f$ and @f$B@f$.
  *
@@ -570,6 +562,17 @@ norm2diff_amatrix(pcamatrix a, pcamatrix b);
 HEADER_PREFIX field
 dotprod_amatrix(pcamatrix a, pcamatrix b);
 
+/** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$A^* A@f$ and computing the square root of
+ *  the resulting eigenvalue approximation.
+ *
+ *  @param A Dense matrix @f$A@f$.
+ *  @returns Approximation of @f$\|A\|_2@f$. */
+HEADER_PREFIX real
+norm2_amatrix(pcamatrix A);
+
 /** @brief Compute the Frobenius norm @f$\|A\|_F@f$ of a matrix @f$A@f$.
  *
  *  The Frobenius norm is given by
@@ -579,6 +582,29 @@ dotprod_amatrix(pcamatrix a, pcamatrix b);
  *  @returns Frobenius norm @f$\|A\|_F@f$. */
 HEADER_PREFIX real
 normfrob_amatrix(pcamatrix a);
+
+/** @brief Compute the squared Frobenius norm @f$\|A\|_F^2@f$ of a matrix @f$A@f$.
+ *
+ *  The Frobenius norm is given by
+ *  @f$\|A\|_F^2 = \sum_{i,j} |a_{ij}|^2@f$.
+ *
+ *  @param a Matrix @f$A@f$.
+ *  @returns Squared Frobenius norm @f$\|A\|_F^2@f$. */
+HEADER_PREFIX real
+normfrob2_amatrix(pcamatrix a);
+
+/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
+ *  of two matrices @f$A@f$ and @f$B@f$.
+ *
+ *  The spectral norm is approximated by applying a few steps of the power
+ *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
+ *  of the resulting eigenvalue approximation.
+ *
+ *  @param a Dense matrix @f$A@f$.
+ *  @param b Dense matrix @f$B@f$.
+ *  @returns Approximation of @f$\|A-B\|_2@f$. */
+HEADER_PREFIX real
+norm2diff_amatrix(pcamatrix a, pcamatrix b);
 
 /** @brief Multiply a matrix @f$A@f$ by a vector @f$x@f$,
  *  @f$y \gets y + \alpha A x@f$.
