@@ -1,3 +1,4 @@
+
 /* ------------------------------------------------------------
  * This is the file "krylov.c" of the H2Lib package.
  * All rights reserved, Steffen Boerm 2010
@@ -320,7 +321,7 @@ step_uzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21,
   add_avector(-lambda, a1, x1);
 
   /* mu = <r_2, s> / gamma */
-  mu = dotprod_avector(r2, s2) / CONJ(gamma);
+  mu = dotprod_avector(s2, r2) / CONJ(gamma);
 
   /* p_2 = r_2 - mu p_2 */
   scale_avector(-mu, p2);
@@ -404,7 +405,7 @@ step_puzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21,
   add_avector(-lambda, a1, x1);
 
   /* mu = <r_2, s> / gamma */
-  mu = dotprod_avector(q2, s2) / CONJ(gamma);
+  mu = dotprod_avector(s2, q2) / CONJ(gamma);
 
   /* p_2 = q_2 - mu p_2 */
   scale_avector(-mu, p2);
