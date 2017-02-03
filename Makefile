@@ -145,7 +145,8 @@ SOURCES_examples = \
 	Examples/example_hmatrix_bem3d.c \
 	Examples/example_h2matrix_bem3d.c\
 	Examples/example_fem_p1_harith.c\
-	Examples/example_fem_rt0_harith.c
+	Examples/example_fem_rt0_harith.c \
+	Tests/laplace_doublelayer_lindholm_c.c
 
 OBJECTS_examples = \
 	$(SOURCES_examples:.c=.o)

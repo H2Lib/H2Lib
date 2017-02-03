@@ -697,147 +697,158 @@ fill_dnx_dny_kernel_laplacebem3d(pcbem3d bem, const real(*X)[3],
 #ifdef USE_SIMD
 static void
 fill_kernel_c_laplacebem3d(const uint * idx, const real(*Z)[3],
-			   pcbem3d bem, pamatrix V)
+			   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_row_simd_c_bem3d(idx, Z, bem, V, slp_kernel_simd_laplacebem3d);
+  fill_row_simd_c_bem3d(idx, Z, bem, trans, V, slp_kernel_simd_laplacebem3d);
 }
 #else
 static void
 fill_kernel_c_laplacebem3d(const uint * idx, const real(*Z)[3],
-			   pcbem3d bem, pamatrix V)
+			   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_row_c_bem3d(idx, Z, bem, V, slp_kernel_laplacebem3d);
+  fill_row_c_bem3d(idx, Z, bem, trans, V, slp_kernel_laplacebem3d);
 }
 #endif
 
 static void
 fill_kernel_l_laplacebem3d(const uint * idx, const real(*Z)[3],
-			   pcbem3d bem, pamatrix V)
+			   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_row_l_bem3d(idx, Z, bem, V, slp_kernel_laplacebem3d);
+  fill_row_l_bem3d(idx, Z, bem, trans, V, slp_kernel_laplacebem3d);
 }
 
 #ifdef USE_SIMD
 static void
 fill_dnz_kernel_c_laplacebem3d(const uint * idx, const real(*Z)[3],
-			       const real(*N)[3], pcbem3d bem, pamatrix V)
+			       const real(*N)[3], pcbem3d bem, bool trans,
+			       pamatrix V)
 {
-  fill_dnz_row_simd_c_bem3d(idx, Z, N, bem, V, dlp_kernel_simd_laplacebem3d);
+  fill_dnz_row_simd_c_bem3d(idx, Z, N, bem, trans, V,
+			    dlp_kernel_simd_laplacebem3d);
 }
 #else
 static void
 fill_dnz_kernel_c_laplacebem3d(const uint * idx,
 			       const real(*Z)[3], const real(*N)[3],
-			       pcbem3d bem, pamatrix V)
+			       pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_row_c_bem3d(idx, Z, N, bem, V, dlp_kernel_laplacebem3d);
+  fill_dnz_row_c_bem3d(idx, Z, N, bem, trans, V, dlp_kernel_laplacebem3d);
 }
 #endif
 
 static void
 fill_dnz_kernel_l_laplacebem3d(const uint * idx, const real(*Z)[3],
-			       const real(*N)[3], pcbem3d bem, pamatrix V)
+			       const real(*N)[3], pcbem3d bem, bool trans,
+			       pamatrix V)
 {
-  fill_dnz_row_l_bem3d(idx, Z, N, bem, V, dlp_kernel_laplacebem3d);
+  fill_dnz_row_l_bem3d(idx, Z, N, bem, trans, V, dlp_kernel_laplacebem3d);
 }
 
 #ifdef USE_SIMD
 static void
 fill_dnzdrow_kernel_c_laplacebem3d(const uint * idx,
 				   const real(*Z)[3], const real(*N)[3],
-				   pcbem3d bem, pamatrix V)
+				   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_row_simd_c_bem3d(idx, Z, N, bem, V, hs_kernel_simd_laplacebem3d);
+  fill_dnz_row_simd_c_bem3d(idx, Z, N, bem, trans, V,
+			    hs_kernel_simd_laplacebem3d);
 }
 #else
 static void
 fill_dnzdrow_kernel_c_laplacebem3d(const uint * idx,
 				   const real(*Z)[3], const real(*N)[3],
-				   pcbem3d bem, pamatrix V)
+				   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_row_c_bem3d(idx, Z, N, bem, V, hs_kernel_laplacebem3d);
+  fill_dnz_row_c_bem3d(idx, Z, N, bem, trans, V, hs_kernel_laplacebem3d);
 }
 #endif
 
 static void
 fill_dnzdrow_kernel_l_laplacebem3d(const uint * idx,
 				   const real(*Z)[3], const real(*N)[3],
-				   pcbem3d bem, pamatrix V)
+				   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_row_l_bem3d(idx, Z, N, bem, V, hs_kernel_laplacebem3d);
+  fill_dnz_row_l_bem3d(idx, Z, N, bem, trans, V, hs_kernel_laplacebem3d);
 }
 
 #ifdef USE_SIMD
 static void
 fill_dnzdcol_kernel_c_laplacebem3d(const uint * idx,
 				   const real(*Z)[3], const real(*N)[3],
-				   pcbem3d bem, pamatrix V)
+				   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_col_simd_c_bem3d(idx, Z, N, bem, V, hs_kernel_simd_laplacebem3d);
+  fill_dnz_col_simd_c_bem3d(idx, Z, N, bem, trans, V,
+			    hs_kernel_simd_laplacebem3d);
 }
 #else
 static void
 fill_dnzdcol_kernel_c_laplacebem3d(const uint * idx,
 				   const real(*Z)[3], const real(*N)[3],
-				   pcbem3d bem, pamatrix V)
+				   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_col_c_bem3d(idx, Z, N, bem, V, hs_kernel_laplacebem3d);
+  fill_dnz_col_c_bem3d(idx, Z, N, bem, trans, V, hs_kernel_laplacebem3d);
 }
 #endif
 
 static void
 fill_dnzdcol_kernel_l_laplacebem3d(const uint * idx,
 				   const real(*Z)[3], const real(*N)[3],
-				   pcbem3d bem, pamatrix V)
+				   pcbem3d bem, bool trans, pamatrix V)
 {
-  fill_dnz_col_l_bem3d(idx, Z, N, bem, V, hs_kernel_laplacebem3d);
+  fill_dnz_col_l_bem3d(idx, Z, N, bem, trans, V, hs_kernel_laplacebem3d);
 }
 
 #ifdef USE_SIMD
 static void
 fill_drow_kernel_c_laplacebem3d(const uint * idx,
-				const real(*Z)[3], pcbem3d bem, pamatrix V)
+				const real(*Z)[3], pcbem3d bem, bool trans,
+				pamatrix V)
 {
-  fill_row_simd_c_bem3d(idx, Z, bem, V, adlp_kernel_simd_laplacebem3d);
+  fill_row_simd_c_bem3d(idx, Z, bem, trans, V, adlp_kernel_simd_laplacebem3d);
 }
 #else
 static void
 fill_drow_kernel_c_laplacebem3d(const uint * idx,
-				const real(*Z)[3], pcbem3d bem, pamatrix V)
+				const real(*Z)[3], pcbem3d bem, bool trans,
+				pamatrix V)
 {
-  fill_row_c_bem3d(idx, Z, bem, V, adlp_kernel_laplacebem3d);
+  fill_row_c_bem3d(idx, Z, bem, trans, V, adlp_kernel_laplacebem3d);
 }
 #endif
 
 static void
 fill_drow_kernel_l_laplacebem3d(const uint * idx,
-				const real(*Z)[3], pcbem3d bem, pamatrix V)
+				const real(*Z)[3], pcbem3d bem, bool trans,
+				pamatrix V)
 {
-  fill_row_l_bem3d(idx, Z, bem, V, adlp_kernel_laplacebem3d);
+  fill_row_l_bem3d(idx, Z, bem, trans, V, adlp_kernel_laplacebem3d);
 }
 
 #ifdef USE_SIMD
 static void
 fill_dcol_kernel_c_laplacebem3d(const uint * idx,
-				const real(*Z)[3], pcbem3d bem, pamatrix V)
+				const real(*Z)[3], pcbem3d bem, bool trans,
+				pamatrix V)
 {
-  fill_col_simd_c_bem3d(idx, Z, bem, V, dlp_kernel_simd_laplacebem3d);
+  fill_col_simd_c_bem3d(idx, Z, bem, trans, V, dlp_kernel_simd_laplacebem3d);
 }
 
 #else
 static void
 fill_dcol_kernel_c_laplacebem3d(const uint * idx,
-				const real(*Z)[3], pcbem3d bem, pamatrix V)
+				const real(*Z)[3], pcbem3d bem, bool trans,
+				pamatrix V)
 {
-  fill_col_c_bem3d(idx, Z, bem, V, dlp_kernel_laplacebem3d);
+  fill_col_c_bem3d(idx, Z, bem, trans, V, dlp_kernel_laplacebem3d);
 }
 #endif
 
 static void
 fill_dcol_kernel_l_laplacebem3d(const uint * idx,
-				const real(*Z)[3], pcbem3d bem, pamatrix V)
+				const real(*Z)[3], pcbem3d bem, bool trans,
+				pamatrix V)
 {
-  fill_col_l_bem3d(idx, Z, bem, V, dlp_kernel_laplacebem3d);
+  fill_col_l_bem3d(idx, Z, bem, trans, V, dlp_kernel_laplacebem3d);
 }
 
 pbem3d

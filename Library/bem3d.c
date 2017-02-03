@@ -348,7 +348,7 @@ uninit_recompression_bem3d(paprxbem3d aprx)
  Constructors and destructors
  ------------------------------------------------------------ */
 
-static    pgreencluster3d
+static pgreencluster3d
 new_greencluster3d(pccluster c)
 {
   pgreencluster3d gc;
@@ -384,7 +384,7 @@ del_greencluster3d(pgreencluster3d gc)
   freemem(gc);
 }
 
-static    pgreenclusterbasis3d
+static pgreenclusterbasis3d
 new_greenclusterbasis3d(pcclusterbasis cb)
 {
   pgreenclusterbasis3d gcb;
@@ -421,7 +421,7 @@ del_greenclusterbasis3d(pgreenclusterbasis3d gcb)
   freemem(gcb);
 }
 
-static    plistnode
+static plistnode
 new_listnode(uint data, plistnode next)
 {
   plistnode ln;
@@ -450,7 +450,7 @@ del_listnode(plistnode ln)
 
 }
 
-static    paprxbem3d
+static paprxbem3d
 new_aprxbem3d()
 {
   paprxbem3d aprx;
@@ -502,7 +502,7 @@ del_aprxbem3d(paprxbem3d aprx)
   freemem(aprx);
 }
 
-static    pkernelbem3d
+static pkernelbem3d
 new_kernelbem3d()
 {
   pkernelbem3d kernels;
@@ -531,7 +531,7 @@ del_kernelbem3d(pkernelbem3d kernels)
   freemem(kernels);
 }
 
-static    pparbem3d
+static pparbem3d
 new_parbem3d()
 {
   pparbem3d par;
@@ -681,7 +681,6 @@ new_bem3d(pcsurface3d gr, basisfunctionbem3d row_basis,
   bem->aprx = new_aprxbem3d();
   bem->kernels = new_kernelbem3d();
   bem->par = new_parbem3d();
-
 
   if (row_basis == BASIS_LINEAR_BEM3D || col_basis == BASIS_LINEAR_BEM3D) {
     setup_vertex_to_triangle_map_bem3d(bem);
@@ -3540,15 +3539,15 @@ fill_wave_bem3d(pcbem3d bem, const real(*X)[3], const real(*Y)[3],
 
 void
 fill_row_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		 pamatrix V, kernel_func3d kernel)
+		 bool trans, pamatrix V, kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -3588,7 +3587,12 @@ fill_row_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 	sum += ww[q] * kernel(x, Z[i], n, NULL, (void *) bem);
       }
 
-      V->a[t + i * ld] = sum * gt_fac;
+      if (trans) {
+	V->a[i + t * ld] = sum * gt_fac;
+      }
+      else {
+	V->a[t + i * ld] = sum * gt_fac;
+      }
     }
   }
 }
@@ -3597,13 +3601,13 @@ fill_row_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 #ifdef USE_TRIQUADPOINTS
 void
 fill_row_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		      pamatrix V, kernel_simd_func3d kernel)
+		      bool trans, pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -3671,22 +3675,27 @@ fill_row_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
       sum =
 	((vreduce(sum_r) + base) * gt_fac) + (vreduce(sum_i) * gt_fac) * I;
 
-      V->a[t + i * ld] = sum;
+      if (trans) {
+	V->a[i + t * ld] = sum;
+      }
+      else {
+	V->a[t + i * ld] = sum;
+      }
     }
   }
 }
 #else
 void
 fill_row_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		      pamatrix V, kernel_simd_func3d kernel)
+		      bool trans, pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -3770,7 +3779,12 @@ fill_row_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
       sum =
 	((vreduce(sum_r) + base) * gt_fac) + (vreduce(sum_i) * gt_fac) * I;
 
-      V->a[t + i * ld] = sum;
+      if (trans) {
+	V->a[i + t * ld] = sum;
+      }
+      else {
+	V->a[t + i * ld] = sum;
+      }
     }
   }
 }
@@ -3779,15 +3793,15 @@ fill_row_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 
 void
 fill_col_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		 pamatrix V, kernel_func3d kernel)
+		 bool trans, pamatrix V, kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -3827,7 +3841,12 @@ fill_col_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 	sum += ww[q] * kernel(Z[i], x, NULL, n, (void *) bem);
       }
 
-      V->a[s + i * ld] = sum * gs_fac;
+      if (trans) {
+	V->a[i + s * ld] = sum * gs_fac;
+      }
+      else {
+	V->a[s + i * ld] = sum * gs_fac;
+      }
     }
   }
 }
@@ -3836,13 +3855,13 @@ fill_col_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 #ifdef USE_TRIQUADPOINTS
 void
 fill_col_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		      pamatrix V, kernel_simd_func3d kernel)
+		      bool trans, pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -3910,22 +3929,27 @@ fill_col_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
       sum =
 	((vreduce(sum_r) + base) * gs_fac) + (vreduce(sum_i) * gs_fac) * I;
 
-      V->a[s + i * ld] = sum;
+      if (trans) {
+	V->a[i + s * ld] = sum;
+      }
+      else {
+	V->a[s + i * ld] = sum;
+      }
     }
   }
 }
 #else
 void
 fill_col_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		      pamatrix V, kernel_simd_func3d kernel)
+		      bool trans, pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4009,7 +4033,12 @@ fill_col_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
       sum =
 	((vreduce(sum_r) + base) * gs_fac) + (vreduce(sum_i) * gs_fac) * I;
 
-      V->a[s + i * ld] = sum;
+      if (trans) {
+	V->a[i + s * ld] = sum;
+      }
+      else {
+	V->a[s + i * ld] = sum;
+      }
     }
   }
 }
@@ -4018,7 +4047,7 @@ fill_col_simd_c_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 
 void
 fill_row_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		 pamatrix V, kernel_func3d kernel)
+		 bool trans, pamatrix V, kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
@@ -4026,8 +4055,8 @@ fill_row_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
   plistnode *v2t = bem->v2t;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   field    *aa = V->a;
   longindex ld = V->ld;
   uint      nq = bem->sq->n_single;
@@ -4116,6 +4145,13 @@ fill_row_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 	      }
 
 	      aa[k + j * ld] += sum * gt_fac;
+
+	      if (trans) {
+		aa[j + k * ld] += sum * gt_fac;
+	      }
+	      else {
+		aa[k + j * ld] += sum * gt_fac;
+	      }
 	    }
 	    ww += vnq;
 	  }
@@ -4134,7 +4170,7 @@ fill_row_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 
 void
 fill_col_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
-		 pamatrix V, kernel_func3d kernel)
+		 bool trans, pamatrix V, kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
@@ -4142,8 +4178,8 @@ fill_col_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
   plistnode *v2t = bem->v2t;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   field    *aa = V->a;
   longindex ld = V->ld;
   uint      nq = bem->sq->n_single;
@@ -4231,7 +4267,12 @@ fill_col_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 		sum += ww[q] * quad[q];
 	      }
 
-	      aa[k + j * ld] += sum * gs_fac;
+	      if (trans) {
+		aa[j + k * ld] += sum * gs_fac;
+	      }
+	      else {
+		aa[k + j * ld] += sum * gs_fac;
+	      }
 	    }
 	    ww += vnq;
 	  }
@@ -4250,7 +4291,7 @@ fill_col_l_bem3d(const uint * idx, const real(*Z)[3], pcbem3d bem,
 
 void
 fill_dnz_row_c_bem3d(const uint * idx, const real(*Z)[3],
-		     const real(*N)[3], pcbem3d bem, pamatrix V,
+		     const real(*N)[3], pcbem3d bem, bool trans, pamatrix V,
 		     kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
@@ -4258,8 +4299,8 @@ fill_dnz_row_c_bem3d(const uint * idx, const real(*Z)[3],
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4299,7 +4340,12 @@ fill_dnz_row_c_bem3d(const uint * idx, const real(*Z)[3],
 	sum += ww[q] * kernel(x, Z[i], n, N[i], (void *) bem);
       }
 
-      V->a[t + i * ld] = sum * gt_fac;
+      if (trans) {
+	V->a[i + t * ld] = sum * gt_fac;
+      }
+      else {
+	V->a[t + i * ld] = sum * gt_fac;
+      }
     }
   }
 }
@@ -4308,14 +4354,14 @@ fill_dnz_row_c_bem3d(const uint * idx, const real(*Z)[3],
 #ifdef USE_TRIQUADPOINTS
 void
 fill_dnz_row_simd_c_bem3d(const uint * idx, const real(*Z)[3],
-			  const real(*N)[3], pcbem3d bem, pamatrix V,
-			  kernel_simd_func3d kernel)
+			  const real(*N)[3], pcbem3d bem, bool trans,
+			  pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4384,23 +4430,28 @@ fill_dnz_row_simd_c_bem3d(const uint * idx, const real(*Z)[3],
       sum =
 	((vreduce(sum_r) + base) * gt_fac) + (vreduce(sum_i) * gt_fac) * I;
 
-      V->a[t + i * ld] = sum;
+      if (trans) {
+	V->a[i + t * ld] = sum;
+      }
+      else {
+	V->a[t + i * ld] = sum;
+      }
     }
   }
 }
 #else
 void
 fill_dnz_row_simd_c_bem3d(const uint * idx, const real(*Z)[3],
-			  const real(*N)[3], pcbem3d bem, pamatrix V,
-			  kernel_simd_func3d kernel)
+			  const real(*N)[3], pcbem3d bem, bool trans,
+			  pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4485,7 +4536,12 @@ fill_dnz_row_simd_c_bem3d(const uint * idx, const real(*Z)[3],
       sum =
 	((vreduce(sum_r) + base) * gt_fac) + (vreduce(sum_i) * gt_fac) * I;
 
-      V->a[t + i * ld] = sum;
+      if (trans) {
+	V->a[i + t * ld] = sum;
+      }
+      else {
+	V->a[t + i * ld] = sum;
+      }
     }
   }
 }
@@ -4494,7 +4550,7 @@ fill_dnz_row_simd_c_bem3d(const uint * idx, const real(*Z)[3],
 
 void
 fill_dnz_col_c_bem3d(const uint * idx, const real(*Z)[3],
-		     const real(*N)[3], pcbem3d bem, pamatrix V,
+		     const real(*N)[3], pcbem3d bem, bool trans, pamatrix V,
 		     kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
@@ -4502,8 +4558,8 @@ fill_dnz_col_c_bem3d(const uint * idx, const real(*Z)[3],
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4543,7 +4599,12 @@ fill_dnz_col_c_bem3d(const uint * idx, const real(*Z)[3],
 	sum += ww[q] * kernel(Z[i], x, N[i], n, (void *) bem);
       }
 
-      V->a[s + i * ld] = sum * gs_fac;
+      if (trans) {
+	V->a[i + s * ld] = sum * gs_fac;
+      }
+      else {
+	V->a[s + i * ld] = sum * gs_fac;
+      }
     }
   }
 }
@@ -4552,14 +4613,14 @@ fill_dnz_col_c_bem3d(const uint * idx, const real(*Z)[3],
 #ifdef USE_TRIQUADPOINTS
 void
 fill_dnz_col_simd_c_bem3d(const uint * idx, const real(*Z)[3],
-			  const real(*N)[3], pcbem3d bem, pamatrix V,
-			  kernel_simd_func3d kernel)
+			  const real(*N)[3], pcbem3d bem, bool trans,
+			  pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4628,23 +4689,28 @@ fill_dnz_col_simd_c_bem3d(const uint * idx, const real(*Z)[3],
       sum =
 	((vreduce(sum_r) + base) * gs_fac) + (vreduce(sum_i) * gs_fac) * I;
 
-      V->a[s + i * ld] = sum;
+      if (trans) {
+	V->a[i + s * ld] = sum;
+      }
+      else {
+	V->a[s + i * ld] = sum;
+      }
     }
   }
 }
 #else
 void
 fill_dnz_col_simd_c_bem3d(const uint * idx, const real(*Z)[3],
-			  const real(*N)[3], pcbem3d bem, pamatrix V,
-			  kernel_simd_func3d kernel)
+			  const real(*N)[3], pcbem3d bem, bool trans,
+			  pamatrix V, kernel_simd_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
   const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
   const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   longindex ld = V->ld;
 
   uint      nq = bem->sq->n_single;
@@ -4729,7 +4795,12 @@ fill_dnz_col_simd_c_bem3d(const uint * idx, const real(*Z)[3],
       sum =
 	((vreduce(sum_r) + base) * gs_fac) + (vreduce(sum_i) * gs_fac) * I;
 
-      V->a[s + i * ld] = sum;
+      if (trans) {
+	V->a[i + s * ld] = sum;
+      }
+      else {
+	V->a[s + i * ld] = sum;
+      }
     }
   }
 }
@@ -4738,7 +4809,7 @@ fill_dnz_col_simd_c_bem3d(const uint * idx, const real(*Z)[3],
 
 void
 fill_dnz_row_l_bem3d(const uint * idx, const real(*Z)[3],
-		     const real(*N)[3], pcbem3d bem, pamatrix V,
+		     const real(*N)[3], pcbem3d bem, bool trans, pamatrix V,
 		     kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
@@ -4747,8 +4818,8 @@ fill_dnz_row_l_bem3d(const uint * idx, const real(*Z)[3],
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
   plistnode *v2t = bem->v2t;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   field    *aa = V->a;
   longindex ld = V->ld;
   uint      nq = bem->sq->n_single;
@@ -4836,7 +4907,12 @@ fill_dnz_row_l_bem3d(const uint * idx, const real(*Z)[3],
 		sum += ww[q] * quad[q];
 	      }
 
-	      aa[k + j * ld] += sum * gt_fac;
+	      if (trans) {
+		aa[j + k * ld] += sum * gt_fac;
+	      }
+	      else {
+		aa[k + j * ld] += sum * gt_fac;
+	      }
 	    }
 	    ww += vnq;
 	  }
@@ -4855,7 +4931,7 @@ fill_dnz_row_l_bem3d(const uint * idx, const real(*Z)[3],
 
 void
 fill_dnz_col_l_bem3d(const uint * idx, const real(*Z)[3],
-		     const real(*N)[3], pcbem3d bem, pamatrix V,
+		     const real(*N)[3], pcbem3d bem, bool trans, pamatrix V,
 		     kernel_func3d kernel)
 {
   pcsurface3d gr = bem->gr;
@@ -4864,8 +4940,8 @@ fill_dnz_col_l_bem3d(const uint * idx, const real(*Z)[3],
   const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
   plistnode *v2t = bem->v2t;
-  uint      rows = V->rows;
-  uint      cols = V->cols;
+  uint      rows = trans ? V->cols : V->rows;
+  uint      cols = trans ? V->rows : V->cols;
   field    *aa = V->a;
   longindex ld = V->ld;
   uint      nq = bem->sq->n_single;
@@ -4953,7 +5029,12 @@ fill_dnz_col_l_bem3d(const uint * idx, const real(*Z)[3],
 		sum += ww[q] * quad[q];
 	      }
 
-	      aa[k + j * ld] += sum * gs_fac;
+	      if (trans) {
+		aa[j + k * ld] += sum * gs_fac;
+	      }
+	      else {
+		aa[k + j * ld] += sum * gs_fac;
+	      }
 	    }
 	    ww += vnq;
 	  }
@@ -5310,7 +5391,7 @@ assemble_bem3d_inter_row_rkmatrix(pccluster rc, uint rname,
 
   resize_rkmatrix(R, rows, cols, k);
 
-  kernels->kernel_col(cc->idx, (const real(*)[3]) z, bem, B);
+  kernels->kernel_col(cc->idx, (const real(*)[3]) z, bem, false, B);
   conjugate_amatrix(B);
   kernels->lagrange_row(rc->idx, px, py, pz, bem, A);
 
@@ -5349,7 +5430,7 @@ assemble_bem3d_inter_col_rkmatrix(pccluster rc, uint rname,
 
   resize_rkmatrix(R, rows, cols, k);
 
-  kernels->fundamental_row(rc->idx, (const real(*)[3]) z, bem, A);
+  kernels->fundamental_row(rc->idx, (const real(*)[3]) z, bem, false, A);
   kernels->lagrange_col(cc->idx, px, py, pz, bem, B);
 
   del_realavector(px);
@@ -5405,12 +5486,13 @@ assemble_bem3d_green_row_rkmatrix(pccluster rc, uint rname,
   aprx->quadpoints(bem, a, b, delta, &Z, &N);
 
   init_sub_amatrix(T, A, rc->size, 0, k2, 0);
-  kernels->fundamental_row(rc->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(rc->idx, (const real(*)[3]) Z, (pcbem3d) bem,
+			   false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, B, cc->size, 0, k2, 0);
   kernels->dnz_kernel_col(cc->idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   for (nu = 0; nu < k2; ++nu) {
@@ -5421,11 +5503,11 @@ assemble_bem3d_green_row_rkmatrix(pccluster rc, uint rname,
 
   init_sub_amatrix(T, A, rc->size, 0, k2, k2);
   kernels->dnz_fundamental_row(rc->idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, B, cc->size, 0, k2, k2);
-  kernels->kernel_col(cc->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(cc->idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   conjugate_amatrix(B);
@@ -5470,12 +5552,12 @@ assemble_bem3d_green_col_rkmatrix(pccluster rc, uint rname,
   aprx->quadpoints(bem, a, b, delta, &Z, &N);
 
   init_sub_amatrix(T, B, cc->size, 0, k2, 0);
-  kernels->kernel_col(cc->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(cc->idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A, rc->size, 0, k2, 0);
   kernels->dnz_fundamental_row(rc->idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   for (nu = 0; nu < k2; ++nu) {
@@ -5486,11 +5568,12 @@ assemble_bem3d_green_col_rkmatrix(pccluster rc, uint rname,
 
   init_sub_amatrix(T, B, cc->size, 0, k2, k2);
   kernels->dnz_kernel_col(cc->idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A, rc->size, 0, k2, k2);
-  kernels->fundamental_row(rc->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(rc->idx, (const real(*)[3]) Z, (pcbem3d) bem,
+			   false, T);
   uninit_amatrix(T);
 
   conjugate_amatrix(B);
@@ -5558,11 +5641,12 @@ assemble_row_greencluster3d(pcbem3d bem, pgreencluster3d gc)
 
   init_sub_amatrix(T, A_t, c->size, 0, k2, k2);
   kernels->dnz_fundamental_row(c->idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, c->size, 0, k2, 0);
-  kernels->fundamental_row(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, false,
+			   T);
   uninit_amatrix(T);
 
   R = new_rkmatrix(rows, k, 0);
@@ -5663,11 +5747,11 @@ assemble_col_greencluster3d(pcbem3d bem, pgreencluster3d gc)
 
   init_sub_amatrix(T, A_t, c->size, 0, k2, k2);
   kernels->dnz_kernel_col(c->idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, c->size, 0, k2, 0);
-  kernels->kernel_col(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   R = new_rkmatrix(cols, rank, 0);
@@ -5905,8 +5989,8 @@ assemble_bem3d_HCA_rkmatrix(pccluster rc, uint rname, pccluster cc,
 
   resize_rkmatrix(R, rows, cols, rank);
 
-  kernels->kernel_row(ridx, (const real(*)[3]) ISk, bem, &R->A);
-  kernels->kernel_col(cidx, (const real(*)[3]) ITk, bem, &R->B);
+  kernels->fundamental_row(ridx, (const real(*)[3]) ISk, bem, false, &R->A);
+  kernels->kernel_col(cidx, (const real(*)[3]) ITk, bem, false, &R->B);
 
   conjugate_amatrix(&R->B);
 
@@ -6227,12 +6311,13 @@ assemble_bem3d_greenhybrid_leaf_row_clusterbasis(uint rname, pcbem3d bem)
   A_t = new_amatrix(rows, rank);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, 0);
-  kernels->fundamental_row(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, false,
+			   T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, k2);
   kernels->dnz_fundamental_row(c->idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   R = new_rkmatrix(rows, rank, 0);
@@ -6297,12 +6382,13 @@ assemble_bem3d_greenhybrid_transfer_row_clusterbasis(uint rname, pcbem3d bem)
   A_t = new_amatrix(rank, 2 * k2);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, 0);
-  kernels->fundamental_row(idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(idx, (const real(*)[3]) Z, (pcbem3d) bem, false,
+			   T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, k2);
   kernels->dnz_fundamental_row(idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   R = new_rkmatrix(rank, 2 * k2, 0);
@@ -6376,12 +6462,12 @@ assemble_bem3d_greenhybrid_leaf_col_clusterbasis(uint cname, pcbem3d bem)
   A_t = new_amatrix(rows, rank);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, 0);
-  kernels->kernel_col(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(c->idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, k2);
   kernels->dnz_kernel_col(c->idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   R = new_rkmatrix(rows, rank, 0);
@@ -6447,12 +6533,12 @@ assemble_bem3d_greenhybrid_transfer_col_clusterbasis(uint cname, pcbem3d bem)
   A_t = new_amatrix(rank, 2 * k2);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, 0);
-  kernels->kernel_col(idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, k2);
   kernels->dnz_kernel_col(idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   R = new_rkmatrix(rank, 2 * k2, 0);
@@ -6557,12 +6643,13 @@ assemble_bem3d_greenhybrid_ortho_leaf_row_clusterbasis(uint rname,
   A_t = new_amatrix(rows, rank);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, 0);
-  kernels->fundamental_row(t->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(t->idx, (const real(*)[3]) Z, (pcbem3d) bem, false,
+			   T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, k2);
   kernels->dnz_fundamental_row(t->idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   /* Do ACA of A_t to obtain row pivots. */
@@ -6642,12 +6729,13 @@ assemble_bem3d_greenhybrid_ortho_transfer_row_clusterbasis(uint rname,
   A_t = new_amatrix(rank, 2 * k2);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, 0);
-  kernels->fundamental_row(idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->fundamental_row(idx, (const real(*)[3]) Z, (pcbem3d) bem, false,
+			   T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, k2);
   kernels->dnz_fundamental_row(idx, (const real(*)[3]) Z,
-			       (const real(*)[3]) N, (pcbem3d) bem, T);
+			       (const real(*)[3]) N, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   /* Do ACA of \tilde A_t. */
@@ -6751,12 +6839,12 @@ assemble_bem3d_greenhybrid_ortho_leaf_col_clusterbasis(uint cname,
   A_t = new_amatrix(rows, rank);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, 0);
-  kernels->kernel_col(t->idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(t->idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rows, 0, k2, k2);
   kernels->dnz_kernel_col(t->idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   /* Do ACA of A_t to obtain row pivots. */
@@ -6835,12 +6923,12 @@ assemble_bem3d_greenhybrid_ortho_transfer_col_clusterbasis(uint cname,
   A_t = new_amatrix(rank, 2 * k2);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, 0);
-  kernels->kernel_col(idx, (const real(*)[3]) Z, (pcbem3d) bem, T);
+  kernels->kernel_col(idx, (const real(*)[3]) Z, (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   init_sub_amatrix(T, A_t, rank, 0, k2, k2);
   kernels->dnz_kernel_col(idx, (const real(*)[3]) Z, (const real(*)[3]) N,
-			  (pcbem3d) bem, T);
+			  (pcbem3d) bem, false, T);
   uninit_amatrix(T);
 
   /* Do ACA of \tilde A_t. */
@@ -7178,7 +7266,7 @@ assemble_bem3d_inter_wave_transfer_row_dclusterbasis(uint rname, pcbem3d bem)
 	if (E->cols > 0) {
 	  assert(E->rows > 0);
 	  assert(E->rows == rb->k[iota]);
-//          assert(E->cols == rb->son[j]->k[0]);                        /* Isn't true for direct orthogonalization */
+	  //          assert(E->cols == rb->son[j]->k[0]);                        /* Isn't true for direct orthogonalization */
 
 	  assemble_bem3d_lagrange_wave_amatrix((const real(*)[3]) X, px, py,
 					       pz, fc->dir[iota], bem, E);
@@ -7230,7 +7318,7 @@ assemble_bem3d_inter_wave_transfer_col_dclusterbasis(uint cname, pcbem3d bem)
 	if (E->cols > 0) {
 	  assert(E->rows > 0);
 	  assert(E->rows == cb->k[iota]);
-//          assert(E->cols == cb->son[j]->k[0]);                  /* Isn't true for direct orthogonalization */
+	  //          assert(E->cols == cb->son[j]->k[0]);                  /* Isn't true for direct orthogonalization */
 
 	  assemble_bem3d_lagrange_wave_amatrix((const real(*)[3]) X, px, py,
 					       pz, fc->dir[iota], bem, E);

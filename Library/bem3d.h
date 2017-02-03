@@ -331,7 +331,6 @@ struct _bem3d {
    */
   field alpha;
 
-
   /**
    * @brief Wavenumber for Helmholtz type problems, possibly complex valued.
    */
@@ -909,7 +908,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*kernel_row)(const uint *idx, const real (*Z)[3], pcbem3d bem,
-      pamatrix A);
+      bool trans, pamatrix A);
 
   /**
    * @brief Integrate the kernel function within the 2nd component.
@@ -940,7 +939,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*kernel_col)(const uint *idx, const real (*Z)[3], pcbem3d bem,
-      pamatrix B);
+      bool trans, pamatrix B);
 
   /**
    * @brief Integrate the normal derivative of the kernel function with respect
@@ -974,7 +973,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*dnz_kernel_row)(const uint *idx, const real (*Z)[3],
-      const real (*NZ)[3], pcbem3d bem, pamatrix A);
+      const real (*NZ)[3], pcbem3d bem, bool trans, pamatrix A);
 
   /**
    * @brief Integrate the normal derivative of the kernel function with respect
@@ -1008,7 +1007,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*dnz_kernel_col)(const uint *idx, const real (*Z)[3],
-      const real (*NZ)[3], pcbem3d bem, pamatrix B);
+      const real (*NZ)[3], pcbem3d bem, bool trans, pamatrix B);
 
   /**
    * @brief Integrate the fundamental solution within the 1st component.
@@ -1034,7 +1033,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*fundamental_row)(const uint *idx, const real (*Z)[3], pcbem3d bem,
-      pamatrix A);
+      bool trans, pamatrix A);
 
   /**
    * @brief Integrate the fundamental solution within the 2nd component.
@@ -1061,7 +1060,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*fundamental_col)(const uint *idx, const real (*Z)[3], pcbem3d bem,
-      pamatrix B);
+      bool trans, pamatrix B);
 
   /**
    * @brief Integrate the normal derivative of the fundamental solution with respect
@@ -1091,7 +1090,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*dnz_fundamental_row)(const uint *idx, const real (*Z)[3],
-      const real (*NZ)[3], pcbem3d bem, pamatrix A);
+      const real (*NZ)[3], pcbem3d bem, bool trans, pamatrix A);
 
   /**
    * @brief Integrate the normal derivative of the fundamental solution with respect
@@ -1121,7 +1120,7 @@ struct _kernelbem3d {
    * @f]
    */
   void (*dnz_fundamental_col)(const uint *idx, const real (*Z)[3],
-      const real (*NZ)[3], pcbem3d bem, pamatrix B);
+      const real (*NZ)[3], pcbem3d bem, bool trans, pamatrix B);
 
   /**
    * @brief Integrate the Lagrange polynomials or their derivatives within the
@@ -1862,11 +1861,11 @@ fill_wave_bem3d(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
  * @param kernel The kernel function to be integrated.
  */
 HEADER_PREFIX void
-fill_row_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
-    kernel_func3d kernel);
+fill_row_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, bool trans,
+    pamatrix V, kernel_func3d kernel);
 #ifdef USE_SIMD
 HEADER_PREFIX void
-fill_row_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem,
+fill_row_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, bool trans,
     pamatrix V, kernel_simd_func3d kernel);
 #endif
 
@@ -1897,11 +1896,11 @@ fill_row_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem,
  * @param kernel The kernel function to be integrated.
  */
 HEADER_PREFIX void
-fill_col_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
-    kernel_func3d kernel);
+fill_col_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, bool trans,
+    pamatrix V, kernel_func3d kernel);
 #ifdef USE_SIMD
 HEADER_PREFIX void
-fill_col_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem,
+fill_col_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, bool trans,
     pamatrix V, kernel_simd_func3d kernel);
 #endif
 
@@ -1932,8 +1931,8 @@ fill_col_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem,
  * @param kernel The kernel function to be integrated.
  */
 HEADER_PREFIX void
-fill_row_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
-    kernel_func3d kernel);
+fill_row_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, bool trans,
+    pamatrix V, kernel_func3d kernel);
 
 /**
  * @brief This function will integrate a kernel function @f$g@f$ on
@@ -1962,8 +1961,8 @@ fill_row_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
  * @param kernel The kernel function to be integrated.
  */
 HEADER_PREFIX void
-fill_col_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
-    kernel_func3d kernel);
+fill_col_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, bool trans,
+    pamatrix V, kernel_func3d kernel);
 
 /**
  * @brief This function will integrate a normal derivative of a kernel function
@@ -1995,11 +1994,11 @@ fill_col_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
  */
 HEADER_PREFIX void
 fill_dnz_row_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
-    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+    pcbem3d bem, bool trans, pamatrix V, kernel_func3d kernel);
 #ifdef USE_SIMD
 HEADER_PREFIX void
 fill_dnz_row_simd_c_bem3d(const uint * idx, const real (*Z)[3],
-    const real (*N)[3], pcbem3d bem, pamatrix V, kernel_simd_func3d kernel);
+    const real (*N)[3], pcbem3d bem, bool trans, pamatrix V, kernel_simd_func3d kernel);
 #endif
 
 /**
@@ -2032,11 +2031,11 @@ fill_dnz_row_simd_c_bem3d(const uint * idx, const real (*Z)[3],
  */
 HEADER_PREFIX void
 fill_dnz_col_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
-    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+    pcbem3d bem, bool trans, pamatrix V, kernel_func3d kernel);
 #ifdef USE_SIMD
 HEADER_PREFIX void
 fill_dnz_col_simd_c_bem3d(const uint * idx, const real (*Z)[3],
-    const real (*N)[3], pcbem3d bem, pamatrix V, kernel_simd_func3d kernel);
+    const real (*N)[3], pcbem3d bem, bool trans, pamatrix V, kernel_simd_func3d kernel);
 #endif
 
 /**
@@ -2069,7 +2068,7 @@ fill_dnz_col_simd_c_bem3d(const uint * idx, const real (*Z)[3],
  */
 HEADER_PREFIX void
 fill_dnz_row_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
-    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+    pcbem3d bem, bool trans, pamatrix V, kernel_func3d kernel);
 
 /**
  * @brief This function will integrate a normal derivative of a kernel function
@@ -2101,7 +2100,7 @@ fill_dnz_row_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
  */
 HEADER_PREFIX void
 fill_dnz_col_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
-    pcbem3d bem, pamatrix V, kernel_func3d kernel);
+    pcbem3d bem, bool trans, pamatrix V, kernel_func3d kernel);
 
 /* ------------------------------------------------------------
  * Initializer functions for h-matrix approximations
