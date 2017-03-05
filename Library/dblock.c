@@ -15,8 +15,8 @@
 static uint active_dblock = 0;
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 pdblock
 new_dblock(pdcluster rc, pdcluster cc, uint rd, uint cd,
@@ -88,8 +88,8 @@ del_dblock(pdblock b)
 }
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 uint
 getactives_dblock()
@@ -133,8 +133,8 @@ getdepth_dblock(pcdblock b)
 }
 
 /* ------------------------------------------------------------
-   Drawing
-   ------------------------------------------------------------ */
+ * Drawing
+ * ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
 static void
@@ -233,8 +233,8 @@ cairodraw_dblock(cairo_t * cr, pcdblock b, int levels)
 #endif
 
 /* ------------------------------------------------------------
-   Building standard block trees
-   ------------------------------------------------------------ */
+ * Building standard block trees
+ * ------------------------------------------------------------ */
 
 pdblock
 build_dblock(pdcluster rc, pdcluster cc, uint l,
@@ -299,8 +299,8 @@ parabolic_admissibility(pdcluster rc, pdcluster cc, uint l,
     /* Compute distance of midpoints */
     dist2 = 0.0;
     for (i = 0; i < dim; i++) {
-      xy[i] = 0.5 * (cc->bmax[i] + cc->bmin[i]
-		     - rc->bmax[i] - rc->bmin[i]);
+      xy[i] = 0.5 * (rc->bmax[i] + rc->bmin[i]
+		     - cc->bmax[i] - cc->bmin[i]);
       dist2 += REAL_SQR(xy[i]);
     }
     invdist = 1.0 / REAL_SQRT(dist2);
@@ -310,33 +310,9 @@ parabolic_admissibility(pdcluster rc, pdcluster cc, uint l,
       xy[i] *= invdist;
 
     /* ... and choose a direction that is sufficiently close */
-    /*
-       iota = finddirection_dcluster(rc, 1.0, xy);
-     */
     iota = finddirection_leveldir(dad->ld, l, 1.0, xy);
     *rd = iota;
     *cd = iota;
-
-    /* DEBUGGING --------------------
-       if(rc->directions > 0) {
-       dist2 = 0.0;
-       for(i=0; i<dim; i++)
-       dist2 += REAL_SQR(xy[i] - rc->dir[iota][i]);
-       dist = REAL_SQRT(dist2);
-       if(dist > rdiam * wave_k)
-       printf("  %g > %g\n",
-       dist, dad->eta1 * rdiam * wave_k);
-       }
-       if(cc->directions > 0) {
-       dist2 = 0.0;
-       for(i=0; i<dim; i++)
-       dist2 += REAL_SQR(xy[i] - cc->dir[iota][i]);
-       dist = REAL_SQRT(dist2);
-       if(dist > cdiam * wave_k)
-       printf("  %g > %g\n",
-       dist, dad->eta1 * cdiam * wave_k);
-       }
-       -------------------- */
 
     return true;
   }
@@ -374,8 +350,8 @@ standard_admissibility(pdcluster rc, pdcluster cc, uint l,
     /* Compute distance of midpoints */
     dist2 = 0.0;
     for (i = 0; i < dim; i++) {
-      xy[i] = 0.5 * (cc->bmax[i] + cc->bmin[i]
-		     - rc->bmax[i] - rc->bmin[i]);
+      xy[i] = 0.5 * (rc->bmax[i] + rc->bmin[i]
+		     - cc->bmax[i] - cc->bmin[i]);
       dist2 += REAL_SQR(xy[i]);
     }
     invdist = 1.0 / REAL_SQRT(dist2);
@@ -429,33 +405,6 @@ getmaxeta_dblock(pcdblock b)
   return eta;
 }
 
-
-
-/* FOR DEBUGGING
-static void
-print_used_tree(uint **used, pleveldir ld){
-
-uint i, j;
-
-i = ld->depth+1;
-
-printf("Used structure \n");
-while(i > 0){
-i--;
-printf("Level :%u \n", i);
-for(j = 0; j < ld->directions[i]; j++){
-if(used[i][j] > 0){
-printf(" %u %u \n", j, used[i][j]);
-}
-}
-}
-
-}
-*/
-
-
-
-
 static void
 scan_tree(pdblock b, uint ** used, uint ** dirson, uint * fill, uint count)
 {
@@ -486,7 +435,7 @@ scan_tree(pdblock b, uint ** used, uint ** dirson, uint * fill, uint count)
 	}
       }
     }
-    if (directions > 1) {	/*We always have a symmetric direction object -> more than one direction */
+    if (directions > 1) {	/* We always have a symmetric direction object -> more than one direction */
       used[count][b->rd] = 1;
       used[count][b->cd] = 1;
     }
@@ -766,8 +715,8 @@ remove_unused_direction(pdblock b, pdcluster t, pleveldir lold)
 }
 
 /* ------------------------------------------------------------
- Enumeration
- ------------------------------------------------------------ */
+ * Enumeration
+ * ------------------------------------------------------------ */
 
 
 static void
