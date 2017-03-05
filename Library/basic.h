@@ -516,7 +516,7 @@ INLINE_PREFIX uint _h2_uintmin3(uint x, uint y, uint z) {
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>sz</tt> bytes. */
-void *
+HEADER_PREFIX void *
 _h2_allocmem(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage of type @ref uint.
@@ -530,7 +530,7 @@ _h2_allocmem(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>sz</tt> variables of type @ref uint. */
-uint *
+HEADER_PREFIX uint *
 _h2_allocuint(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage of type @ref real.
@@ -544,7 +544,7 @@ _h2_allocuint(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>sz</tt> variables of type @ref real. */
-real *
+HEADER_PREFIX real *
 _h2_allocreal(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage of type @ref field.
@@ -558,7 +558,7 @@ _h2_allocreal(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>sz</tt> variables of type @ref field. */
-field *
+HEADER_PREFIX field *
 _h2_allocfield(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage for a matrix.
@@ -579,13 +579,13 @@ _h2_allocfield(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>rows*cols</tt> variables of type @ref field. */
-field *
+HEADER_PREFIX field *
 _h2_allocmatrix(size_t rows, size_t cols, const char *filename, int line);
 
 /** @brief Release allocated storage.
  *
  *  @param ptr Pointer to allocated storage. */
-void
+HEADER_PREFIX void
 freemem(void *ptr);
 
 /* ------------------------------------------------------------
