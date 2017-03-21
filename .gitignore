@@ -1,0 +1,9 @@
+Doc/html
+libh2.a
+Library/*.o
+Library/*.d
+Tests/test_*
+Tests/*.o
+Tests/*.d
+Tests/*.pdf
+
