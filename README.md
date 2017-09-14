@@ -18,7 +18,7 @@ Enjoy.
 The public version of H2Lib can be obtained from the github repository
 (https://github.com/H2Lib/H2Lib):
 
-    git clone htts://github.com/H2Lib/H2Lib
+    git clone https://github.com/H2Lib/H2Lib
 
 This will download the H2Lib library into a directory called `H2Lib` in
 the current working directory.
