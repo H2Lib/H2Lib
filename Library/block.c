@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "block.c" of the H2Lib package.
- All rights reserved, Knut Reimer 2009
- ------------------------------------------------------------ */
+ * This is the file "block.c" of the H2Lib package.
+ * All rights reserved, Knut Reimer 2009
+ * ------------------------------------------------------------ */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -21,18 +22,15 @@
 #include "block.h"
 
 /* ------------------------------------------------------------
- admissibility condition
- ------------------------------------------------------------ */
+ * Admissibility conditions
+ * ------------------------------------------------------------ */
 
 bool
 admissible_2_cluster(pcluster rc, pcluster cc, void *data)
 {
   real      eta = *(real *) data;
-
-  bool      i;
-
-  real      diamt, diams, dist;
-  real      a;
+  real      diamt, diams, dist, a;
+  uint      i;
 
   diamt = 0.0;
   diams = 0.0;
@@ -47,60 +45,31 @@ admissible_2_cluster(pcluster rc, pcluster cc, void *data)
     dist += a * a;
   }
 
-  a = REAL_MAX(diamt, diams);
-
-  if (a < eta * eta * dist) {
-    i = true;
-  }
-  else {
-    i = false;
-  }
-
-  return i;
+  return (diamt <= eta * eta * dist && diams <= eta * eta * dist);
 }
 
 bool
 admissible_max_cluster(pcluster rc, pcluster cc, void *data)
 {
-  bool      i;
-  real      eta;
-  real      diamt, diams, dist, a;
-
-  diamt = 0.0;
-  diams = 0.0;
-  dist = 0.0;
-  eta = *(real *) data;
+  real      eta = *(real *) data;
+  real      diamt, diams, dist;
 
   diamt = getdiam_max_cluster(rc);
   diams = getdiam_max_cluster(cc);
   dist = getdist_max_cluster(rc, cc);
 
-  a = REAL_MAX(diamt, diams);
-
-  if (a <= eta * dist) {
-    i = true;
-  }
-  else {
-    i = false;
-  }
-
-  return i;
+  return (diamt <= eta * dist && diams <= eta * dist);
 }
 
 bool
 admissible_sphere_cluster(pcluster rc, pcluster cc, void *data)
 {
-  bool      i;
-  real      eta;
-  real      diamt, diams, dist, a;
+  real      eta = *(real *) data;
   uint      dim = rc->dim;
+  real      diamt, diams, dist;
+  uint      i;
 
   assert(cc->dim == dim);
-
-  diamt = 0.0;
-  diams = 0.0;
-  dist = 0.0;
-  eta = *(real *) data;
 
   diamt = getdiam_2_cluster(rc);
   diams = getdiam_2_cluster(cc);
@@ -112,42 +81,20 @@ admissible_sphere_cluster(pcluster rc, pcluster cc, void *data)
   }
   dist = REAL_SQRT(dist) - 0.5 * (diamt + diams);
 
-  a = REAL_MAX(diamt, diams);
-
-  if (a <= eta * dist) {
-    i = true;
-  }
-  else {
-    i = false;
-  }
-
-  return i;
+  return (diamt <= eta * dist && diams <= eta * dist);
 }
 
 bool
 admissible_2_min_cluster(pcluster rc, pcluster cc, void *data)
 {
   real      eta = *(real *) data;
-
-  bool      i;
-
   real      diamt, diams, dist;
-  real      a;
 
   diamt = getdiam_2_cluster(rc);
   diams = getdiam_2_cluster(cc);
   dist = getdist_2_cluster(rc, cc);
 
-  a = REAL_MIN(diamt, diams);
-
-  if (a < eta * dist) {
-    i = true;
-  }
-  else {
-    i = false;
-  }
-
-  return i;
+  return (diamt <= eta * dist || diams <= eta * dist);
 }
 
 /* ------------------------------------------------------------
