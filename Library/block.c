@@ -74,6 +74,7 @@ admissible_sphere_cluster(pcluster rc, pcluster cc, void *data)
   diamt = getdiam_2_cluster(rc);
   diams = getdiam_2_cluster(cc);
 
+  dist = 0.0;
   for (i = 0; i < dim; ++i) {
     dist +=
       REAL_SQR(0.5 *
