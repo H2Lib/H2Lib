@@ -236,6 +236,8 @@ setrank_clusterbasis(pclusterbasis cb, uint k)
   else
     resize_amatrix(&cb->V, cb->t->size, k);
 
+  resize_amatrix(&cb->E, k, cb->E.cols);
+
   cb->k = k;
 
   update_clusterbasis(cb);
@@ -1474,11 +1476,13 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
   pamatrix  Vhat, Eold, Qhat, Vhat1, Eold1, Qhat1;
   pavector  tau;
   uint      sons = cb->sons;
-  uint      i, k, m, off;
+  uint      i, k, kold, m, off;
 
   assert(old2new == 0 || sons == old2new->sons);
   assert(cb->rlist == 0);
   assert(cb->clist == 0);
+
+  kold = cb->k;
 
   if (sons > 0) {
     /* Orthogonalize sons' bases */
@@ -1490,12 +1494,12 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
     }
 
     /* Prepare Vhat */
-    Vhat = init_amatrix(&tmp1, m, cb->k);
+    Vhat = init_amatrix(&tmp1, m, kold);
 
     /* Copy transfer matrices into Vhat */
     off = 0;
     for (i = 0; i < cb->sons; i++) {
-      Vhat1 = init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, cb->k, 0);
+      Vhat1 = init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, kold, 0);
 
       copy_amatrix(false, &cb->son[i]->E, Vhat1);
 
@@ -1506,7 +1510,7 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
     assert(off == m);
 
     /* Determine new rank */
-    k = UINT_MIN(m, cb->k);
+    k = UINT_MIN(m, kold);
 
     /* Compute Householder factorization Vhat = Qhat R */
     tau = init_avector(&tmp4, k);
@@ -1520,7 +1524,7 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
     setrank_clusterbasis(cb, k);
 
     /* Replace transfer matrix E by R E, restoring consistency */
-    Vhat1 = init_sub_amatrix(&tmp3, Vhat, cb->k, 0, cb->k, 0);
+    Vhat1 = init_sub_amatrix(&tmp3, Vhat, k, 0, kold, 0);
     triangulareval_amatrix(false, false, false, Vhat1, false, Eold);
     uninit_amatrix(Vhat1);
     Eold1 = init_sub_amatrix(&tmp3, Eold, k, 0, Eold->cols, 0);
@@ -1530,7 +1534,7 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
 
     /* Copy R into "old2new" cluster operator if required */
     if (old2new) {
-      resize_clusteroperator(old2new, k, cb->k);
+      resize_clusteroperator(old2new, k, kold);
 
       copy_upper_amatrix(Vhat, false, &old2new->C);
     }
@@ -1563,26 +1567,26 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
     m = cb->t->size;
 
     /* Copy leaf matrix into Vhat */
-    Vhat = init_amatrix(&tmp1, m, cb->k);
+    Vhat = init_amatrix(&tmp1, m, kold);
 
     copy_amatrix(false, &cb->V, Vhat);
 
     /* Determine new rank */
-    k = UINT_MIN(m, cb->k);
+    k = UINT_MIN(m, kold);
 
     /* Compute Householder factorization Vhat = Qhat R */
     tau = init_avector(&tmp4, k);
     qrdecomp_amatrix(Vhat, tau);
 
     /* Clone original transfer matrix */
-    Eold = init_amatrix(&tmp2, cb->k, cb->E.cols);
+    Eold = init_amatrix(&tmp2, kold, cb->E.cols);
     copy_amatrix(false, &cb->E, Eold);
 
     /* Switch to new rank */
     setrank_clusterbasis(cb, k);
 
     /* Replace transfer matrix E by R E, restoring consistency */
-    Vhat1 = init_sub_amatrix(&tmp3, Vhat, cb->k, 0, cb->k, 0);
+    Vhat1 = init_sub_amatrix(&tmp3, Vhat, k, 0, kold, 0);
     triangulareval_amatrix(false, false, false, Vhat1, false, Eold);
     uninit_amatrix(Vhat1);
     Eold1 = init_sub_amatrix(&tmp3, Eold, k, 0, Eold->cols, 0);
@@ -1592,7 +1596,7 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
 
     /* Copy R into "old2new" cluster operator if required */
     if (old2new) {
-      resize_clusteroperator(old2new, k, cb->k);
+      resize_clusteroperator(old2new, k, kold);
 
       copy_upper_amatrix(Vhat, false, &old2new->C);
     }
