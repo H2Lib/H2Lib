@@ -16,6 +16,7 @@
  *  @{ */
 
 #include <math.h>
+#include <stdbool.h>
 #include <stddef.h>
 #ifdef USE_COMPLEX
 #include <complex.h>
@@ -31,7 +32,7 @@
 
 /** @brief Prefix for inline functions. */
 #ifdef __cplusplus
-#define INLINE_PREFIX static extern "C"
+#define INLINE_PREFIX inline
 #else
 #define INLINE_PREFIX static
 #endif
@@ -53,15 +54,6 @@
 /* ------------------------------------------------------------
  * Types
  * ------------------------------------------------------------ */
-
-/** @brief Boolean type. */
-typedef unsigned short bool;
-
-/** @brief Boolean constant <tt>true</tt>. */
-extern const bool true;
-
-/** @brief Boolean constant <tt>false</tt>. */
-extern const bool false;
 
 /** @brief Unsigned integer type.
  *

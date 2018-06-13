@@ -5,9 +5,6 @@
 
 #include "settings.h"
 
-const bool true = 1;
-const bool false = 0;
-
 #ifdef USE_FLOAT
 const real r_zero = 0.0f;
 const real r_one = 1.0f;
