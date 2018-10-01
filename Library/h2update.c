@@ -1212,26 +1212,26 @@ rkupdate_h2matrix(prkmatrix R, ph2matrix Gh2, pclusteroperator rwf,
   /* -------------------------------------------------- */
   /* truncate the row clusterbasis (V A) */
   k = rb->k;
+  E1 = init_amatrix(&tmp2, k, rb->E.cols);
+  copy_amatrix(false, &rb->E, E1);
   truncate_rkupdate_clusterbasis(rb, &R->A, rw, tm, eps);
-  E1 = init_amatrix(&tmp2, rb->k, rb->E.cols);
-  clear_amatrix(E1);
   Z1 = init_sub_amatrix(&tmp3, &rw->C, rb->k, 0, k, 0);
-  addmul_amatrix(1.0, false, Z1, false, &rb->E, E1);
-  uninit_amatrix(&rb->E);
-  rb->E = *E1;
+  clear_amatrix(&rb->E);
+  addmul_amatrix(1.0, false, Z1, false, E1, &rb->E);
   uninit_amatrix(Z1);
+  uninit_amatrix(E1);
 
   /* -------------------------------------------------- */
   /* truncate the col clusterbasis (W B) */
   k = cb->k;
+  E1 = init_amatrix(&tmp2, k, cb->E.cols);
+  copy_amatrix(false, &cb->E, E1);
   truncate_rkupdate_clusterbasis(cb, &R->B, cw, tm, eps);
-  E1 = init_amatrix(&tmp2, cb->k, cb->E.cols);
-  clear_amatrix(E1);
   Z1 = init_sub_amatrix(&tmp3, &cw->C, cb->k, 0, k, 0);
-  addmul_amatrix(1.0, false, Z1, false, &cb->E, E1);
-  uninit_amatrix(&cb->E);
-  cb->E = *E1;
+  clear_amatrix(&cb->E);
+  addmul_amatrix(1.0, false, Z1, false, E1, &cb->E);
   uninit_amatrix(Z1);
+  uninit_amatrix(E1);
 
   /* -------------------------------------------------- */
   /* update the subblocks of Gh2 */

@@ -228,10 +228,15 @@ HEADER_PREFIX void
 update_tree_clusterbasis(pclusterbasis cb);
 
 /** @brief Change the rank of a cluster basis and resize
- *  <tt>cb->V,</tt> <tt>cb->son[i]->E</tt> is resized for all sons.
+ *  <tt>cb->V</tt> and <tt>cb->E</tt>, as well as <tt>cb->son[i]->E</tt>
+ *  for all sons.
  *
- *  @remark <tt>cb->E</tt> is not resized, since this is in most standard
- *  algorithms a task for the father cluster.
+ *  @remark In typical algorithms, the transfer matrices of the sons
+ *  and the leaf matrix will subsequently be set to new values.
+ *  In order to keep the basis consistent, it is frequently advisable
+ *  to copy <tt>cb->E</tt> before calling this routine and updating
+ *  the resized matrix afterwards, e.g., by multiplying with the
+ *  appropriate basis transformation.
  *
  *  @param cb Cluster basis that will be changed.
  *  @param k New rank, i.e., number of columns of <tt>V</tt> or <tt>cb->son[i]->E</tt>. */
@@ -239,10 +244,15 @@ HEADER_PREFIX void
 resize_clusterbasis(pclusterbasis cb, uint k);
 
 /** @brief Change the rank of a cluster basis and resize
- *  <tt>cb->V</tt>, while <tt>cb->son[i]->E</tt> is resized for all sons.
+ *  <tt>cb->V</tt> and <tt>cb->E</tt>, as well as <tt>cb->son[i]->E</tt>
+ *  for all sons.
  *
- *  @remark <tt>cb->E</tt> is not resized, since this is in most standard
- *  algorithms a task for the father cluster.
+ *  @remark In typical algorithms, the transfer matrices of the sons
+ *  and the leaf matrix will subsequently be set to new values.
+ *  In order to keep the basis consistent, it is frequently advisable
+ *  to copy <tt>cb->E</tt> before calling this routine and updating
+ *  the resized matrix afterwards, e.g., by multiplying with the
+ *  appropriate basis transformation.
  *
  *  @param cb Cluster basis that will be changed.
  *  @param k New rank, i.e., number of columns of <tt>V</tt> or <tt>cb->son[i]->E</tt>. */
