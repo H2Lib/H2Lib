@@ -471,7 +471,7 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
 {
   amatrix   tmp1, tmp2, tmp3;
   realavector tmp4;
-  pamatrix  Vhat, Vhat1, VhatZ, Q, Q1, A1, C1;
+  pamatrix  Vhat, Vhat1, VhatZ, Q, Q1, A1, C1, E1;
   prealavector sigma;
   pclusteroperator cw1;
   real      zeta_level;
@@ -493,12 +493,18 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
     uninit_amatrix(Vhat1);
   }
   else {
+    /* Save original transfer matrices */
+    E1 = allocmem(sizeof(amatrix) * cb->sons);
+
     /* Compute cluster bases for son clusters recursively */
     m = 0;
     off = 0;
     assert(cb->sons == cw->sons);
     for (i = 0; i < cb->sons; i++) {
       cw1 = cw->son[i];
+
+      init_amatrix(E1+i, cb->son[i]->E.rows, cb->son[i]->E.cols);
+      copy_amatrix(false, &cb->son[i]->E, E1+i);
 
       A1 = init_sub_amatrix(&tmp2, A, cb->son[i]->t->size, off, A->cols, 0);
       truncate_rkupdate_clusterbasis(cb->son[i], A1, cw1, tm,
@@ -517,24 +523,28 @@ truncate_rkupdate_clusterbasis(pclusterbasis cb, pamatrix A,
     for (i = 0; i < cb->sons; i++) {
       Vhat1 = init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, cb->k, 0);
       C1 = init_sub_amatrix(&tmp3, &cw->son[i]->C, cb->son[i]->k, 0,
-			    cb->son[i]->E.rows, 0);
+			    E1[i].rows, 0);
       clear_amatrix(Vhat1);
-      addmul_amatrix(1.0, false, C1, false, &cb->son[i]->E, Vhat1);
+      addmul_amatrix(1.0, false, C1, false, E1+i, Vhat1);
       uninit_amatrix(Vhat1);
       uninit_amatrix(C1);
 
       Vhat1 =
 	init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, A->cols, cb->k);
       C1 =
-	init_sub_amatrix(&tmp3, &cw->son[i]->C, cb->son[i]->k, 0, A->cols,
-			 cb->son[i]->E.rows);
+	init_sub_amatrix(&tmp3, &cw->son[i]->C, cb->son[i]->k, 0,
+			 A->cols, E1[i].rows);
       copy_amatrix(false, C1, Vhat1);
       uninit_amatrix(Vhat1);
       uninit_amatrix(C1);
 
+      uninit_amatrix(E1+i);
+
       off += cb->son[i]->k;
     }
     assert(off == m);
+    
+    freemem(E1);
   }
 
   /* Multiply by weight matrix */
