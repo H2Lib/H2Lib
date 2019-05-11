@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
- * This is the file "basic.c" of the H2Lib package.
- * All rights reserved, Steffen Boerm 2009
- * ------------------------------------------------------------ */
+ This is the file "basic.c" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2009
+ ------------------------------------------------------------ */
 
 #include "basic.h"
 
@@ -35,9 +34,13 @@
 
 int       max_pardepth = 0;
 
+#ifdef TRACE_MEMORY
+size_t    current_memory = 0;
+#endif
+
 /* ------------------------------------------------------------
- * Set up the library
- * ------------------------------------------------------------ */
+ Set up the library
+ ------------------------------------------------------------ */
 
 void
 init_h2lib(int *argc, char ***argv)
@@ -87,15 +90,197 @@ uninit_h2lib()
 }
 
 /* ------------------------------------------------------------
- * Memory management
- * ------------------------------------------------------------ */
+ Memory management
+ ------------------------------------------------------------ */
+
+#ifdef TRACE_MEMORY
+
+#ifdef USE_SIMD
+#define ALLOC_OFFSET (VALIGN)
+#else
+#define ALLOC_OFFSET (sizeof(size_t))
+#endif
 
 void     *
 _h2_allocmem(size_t sz, const char *filename, int line)
 {
   void     *ptr;
 
-  ptr = malloc(sz);
+  sz += ALLOC_OFFSET;
+
+  ptr = h2_malloc(sz);
+  if (ptr == NULL && sz > 0) {
+    (void) fprintf(stderr, "Memory allocation of %lu bytes failed in %s:%d\n",
+		   (unsigned long) sz, filename, line);
+    abort();
+  }
+
+  *((size_t *) ptr) = sz;
+
+#ifdef USE_OPENMP
+#pragma omp atomic
+#endif
+  current_memory += sz;
+
+  return ptr + ALLOC_OFFSET;
+}
+
+uint     *
+_h2_allocuint(size_t sz, const char *filename, int line)
+{
+  uint     *ptr;
+  size_t    dsz;
+
+  dsz = sizeof(uint) * sz + ALLOC_OFFSET;
+  if ((dsz - ALLOC_OFFSET) / sizeof(uint) != sz) {
+    (void) fprintf(stderr, "Integer overflow in vector allocation in %s:%d\n",
+		   filename, line);
+    abort();
+  }
+
+  ptr = (uint *) h2_malloc(dsz);
+  if (ptr == NULL && dsz > 0) {
+    (void) fprintf(stderr,
+		   "Vector allocation of %lu entries failed in %s:%d\n",
+		   (unsigned long) sz, filename, line);
+    abort();
+  }
+
+  *((size_t *) ptr) = dsz;
+
+#ifdef USE_OPENMP
+#pragma omp atomic
+#endif
+  current_memory += dsz;
+
+  return (uint *) ((void *) ptr + ALLOC_OFFSET);
+}
+
+real     *
+_h2_allocreal(size_t sz, const char *filename, int line)
+{
+  real     *ptr;
+  size_t    dsz;
+
+  dsz = sizeof(real) * sz + ALLOC_OFFSET;
+  if ((dsz - ALLOC_OFFSET) / sizeof(real) != sz) {
+    (void) fprintf(stderr, "Integer overflow in vector allocation in %s:%d\n",
+		   filename, line);
+    abort();
+  }
+
+  ptr = (real *) h2_malloc(dsz);
+  if (ptr == NULL && dsz > 0) {
+    (void) fprintf(stderr,
+		   "Vector allocation of %lu entries failed in %s:%d\n",
+		   (unsigned long) sz, filename, line);
+    abort();
+  }
+
+  *((size_t *) ptr) = dsz;
+
+#ifdef USE_OPENMP
+#pragma omp atomic
+#endif
+  current_memory += dsz;
+
+  return (real *) ((void *) ptr + ALLOC_OFFSET);
+}
+
+field    *
+_h2_allocfield(size_t sz, const char *filename, int line)
+{
+  field    *ptr;
+  size_t    dsz;
+
+  dsz = sizeof(field) * sz + ALLOC_OFFSET;
+  if ((dsz - ALLOC_OFFSET) / sizeof(field) != sz) {
+    (void) fprintf(stderr, "Integer overflow in vector allocation in %s:%d\n",
+		   filename, line);
+    abort();
+  }
+
+  ptr = (field *) h2_malloc(dsz);
+  if (ptr == NULL && dsz > 0) {
+    (void) fprintf(stderr,
+		   "Vector allocation of %lu entries failed in %s:%d\n",
+		   (unsigned long) sz, filename, line);
+    abort();
+  }
+
+  *((size_t *) ptr) = dsz;
+
+#ifdef USE_OPENMP
+#pragma omp atomic
+#endif
+  current_memory += dsz;
+
+  return (field *) ((void *) ptr + ALLOC_OFFSET);
+}
+
+field    *
+_h2_allocmatrix(size_t rows, size_t cols, const char *filename, int line)
+{
+  field    *ptr;
+  size_t    dsz;
+
+  dsz = sizeof(field) * rows * cols + ALLOC_OFFSET;
+  if ((dsz - ALLOC_OFFSET) / sizeof(field) != rows * cols) {
+    (void) fprintf(stderr, "Integer overflow in matrix allocation in %s:%d\n",
+		   filename, line);
+    abort();
+  }
+
+  ptr = (field *) h2_malloc(dsz);
+  if (ptr == NULL && dsz > 0) {
+    (void) fprintf(stderr,
+		   "Matrix allocation with %lu rows and %lu columns failed in %s:%d\n",
+		   (unsigned long) rows, (unsigned long) cols, filename,
+		   line);
+    abort();
+  }
+
+  *((size_t *) ptr) = dsz;
+
+#ifdef USE_OPENMP
+#pragma omp atomic
+#endif
+  current_memory += dsz;
+
+  return (field *) ((void *) ptr + ALLOC_OFFSET);
+}
+
+void
+freemem(void *ptr)
+{
+  size_t    sz;
+
+  if (ptr != NULL) {
+    sz = *(size_t *) (ptr - ALLOC_OFFSET);
+
+    h2_free(ptr - ALLOC_OFFSET);
+
+    assert(current_memory >= sz);
+
+#ifdef USE_OPENMP
+#pragma omp atomic
+#endif
+    current_memory -= sz;
+  }
+}
+
+size_t
+get_current_memory()
+{
+  return current_memory;
+}
+#else
+void     *
+_h2_allocmem(size_t sz, const char *filename, int line)
+{
+  void     *ptr;
+
+  ptr = h2_malloc(sz);
   if (ptr == NULL && sz > 0) {
     (void) fprintf(stderr, "Memory allocation of %lu bytes failed in %s:%d\n",
 		   (unsigned long) sz, filename, line);
@@ -118,7 +303,7 @@ _h2_allocuint(size_t sz, const char *filename, int line)
     abort();
   }
 
-  ptr = (uint *) malloc(dsz);
+  ptr = (uint *) h2_malloc(dsz);
   if (ptr == NULL && dsz > 0) {
     (void) fprintf(stderr,
 		   "Vector allocation of %lu entries failed in %s:%d\n",
@@ -142,7 +327,7 @@ _h2_allocreal(size_t sz, const char *filename, int line)
     abort();
   }
 
-  ptr = (real *) malloc(dsz);
+  ptr = (real *) h2_malloc(dsz);
   if (ptr == NULL && dsz > 0) {
     (void) fprintf(stderr,
 		   "Vector allocation of %lu entries failed in %s:%d\n",
@@ -166,7 +351,7 @@ _h2_allocfield(size_t sz, const char *filename, int line)
     abort();
   }
 
-  ptr = (field *) malloc(dsz);
+  ptr = (field *) h2_malloc(dsz);
   if (ptr == NULL && dsz > 0) {
     (void) fprintf(stderr,
 		   "Vector allocation of %lu entries failed in %s:%d\n",
@@ -190,7 +375,7 @@ _h2_allocmatrix(size_t rows, size_t cols, const char *filename, int line)
     abort();
   }
 
-  ptr = (field *) malloc(dsz);
+  ptr = (field *) h2_malloc(dsz);
   if (ptr == NULL && dsz > 0) {
     (void) fprintf(stderr,
 		   "Matrix allocation with %lu rows and %lu columns failed in %s:%d\n",
@@ -205,12 +390,23 @@ _h2_allocmatrix(size_t rows, size_t cols, const char *filename, int line)
 void
 freemem(void *ptr)
 {
-  free(ptr);
+  if (ptr != NULL) {
+    h2_free(ptr);
+  }
 }
 
+size_t
+get_current_memory()
+{
+  fprintf(stderr, "Memory tracing not available!\n"
+	  "Please activate by setting TRACE_MEMORY compiler flag!\n");
+  return 0;
+}
+#endif
+
 /* ------------------------------------------------------------
- * Sorting
- * ------------------------------------------------------------ */
+ Sorting
+ ------------------------------------------------------------ */
 
 static void
 heap_down(uint root, uint n, bool leq(uint, uint, void *),
@@ -261,8 +457,8 @@ _h2_heapsort(uint n, bool leq(uint, uint, void *),
 }
 
 /* ------------------------------------------------------------
- * Timing
- * ------------------------------------------------------------ */
+ Timing
+ ------------------------------------------------------------ */
 
 struct _stopwatch {
 #ifdef WIN32
@@ -270,13 +466,13 @@ struct _stopwatch {
   DWORD     current;
 #else
 #ifdef USE_OPENMP
-  real      start;
-  real      current;
+  double      start;
+  double      current;
 #else
   struct tms start;
   struct tms current;
 #endif
-  real      clk_tck;
+  double      clk_tck;
 #endif
 };
 
@@ -332,8 +528,8 @@ stop_stopwatch(pstopwatch sw)
 }
 
 /* ------------------------------------------------------------
- * Drawing
- * ------------------------------------------------------------ */
+ Drawing
+ ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
 cairo_t  *
@@ -349,5 +545,37 @@ new_cairopdf(const char *filename, double width, double height)
   cairo_surface_destroy(pdf);
 
   return cr;
+}
+
+cairo_t  *
+new_cairopng(uint width, uint height)
+{
+  cairo_t  *cr;
+  cairo_surface_t *img;
+
+  img = cairo_image_surface_create(CAIRO_FORMAT_RGB24, (int) width,
+				   (int) height);
+  cr = cairo_create(img);
+  cairo_surface_destroy(img);
+  cairo_set_line_width(cr, 1.0);
+
+  cairo_save(cr);
+  cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+  cairo_paint(cr);
+  cairo_restore(cr);
+
+  return cr;
+}
+
+bool
+write_cairopng(cairo_t * cr, const char *filename)
+{
+  cairo_surface_t *img;
+  cairo_status_t res;
+
+  img = cairo_get_target(cr);
+  res = cairo_surface_write_to_png(img, filename);
+
+  return (res == CAIRO_STATUS_SUCCESS);
 }
 #endif

@@ -32,7 +32,7 @@ endif
 # Optimization settings
 #
 ifdef OPT
-  CFLAGS += -O3 -march=native -funroll-loops -funswitch-loops
+  CFLAGS += -O3 -march=native -funroll-loops
 endif
 
 #
@@ -43,11 +43,32 @@ ifdef USE_COMPLEX
 endif
 
 #
+# Use singles or double precision floating point numbers?
+#
+ifdef USE_FLOAT
+  CFLAGS += -DUSE_FLOAT
+endif
+
+#
 # BLAS/LAPACK
 #
 ifdef USE_BLAS
   CFLAGS += -DUSE_BLAS
   LIBS += -llapack -lblas -lgfortran
+endif
+
+#
+# SIMD
+#
+ifdef USE_SIMD
+  CFLAGS += -DUSE_SIMD
+endif
+
+#
+# Triquadpoints
+#
+ifdef USE_TRIQUADPOINTS
+  CFLAGS += -DUSE_TRIQUADPOINTS
 endif
 
 #
@@ -104,6 +125,14 @@ endif
 ifdef USE_FREEGLUT
   CFLAGS += -DUSE_FREEGLUT
   LIBS += -lglut -lGLU -lGL
+endif
+
+#
+# Libpng for png files with freeglut
+#
+ifdef USE_LIBPNG
+  CFLAGS += -DUSE_LIBPNG
+  LIBS += -lpng
 endif
 
 #

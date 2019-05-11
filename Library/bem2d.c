@@ -3828,7 +3828,7 @@ void
 assemble_bem2d_h2matrix(pbem2d bem, pblock b, ph2matrix G)
 {
   pparbem2d par = bem->par;
-  par->h2n = enumerate_h2matrix(b, G);
+  par->h2n = enumerate_h2matrix(G);
 
   iterate_byrow_block(b, 0, 0, 0, max_pardepth, NULL,
 		      assemble_bem2d_block_h2matrix, bem);
@@ -3847,7 +3847,7 @@ assemblehiercomp_bem2d_h2matrix(pbem2d bem, pblock b, ph2matrix G)
   real      s;
   uint      i;
 
-  par->h2n = enumerate_h2matrix(b, G);
+  par->h2n = enumerate_h2matrix(G);
   par->rwn = (pclusteroperator *) allocmem((size_t) sizeof(pclusteroperator) *
 					   blocks);
   par->cwn =

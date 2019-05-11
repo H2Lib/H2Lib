@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
- * This is the file "harith2.h" of the H2Lib package.
- * All rights reserved, Steffen Boerm 2015
- * ------------------------------------------------------------ */
+   This is the file "harith2.h" of the H2Lib package.
+   All rights reserved, Steffen Boerm 2015
+   ------------------------------------------------------------ */
 
 /** @file harith2.h
     @author Steffen B&ouml;rm
@@ -116,7 +116,7 @@ flush_haccum(phaccum ha);
  *  @param b Target matrix @f$B@f$. */
 HEADER_PREFIX void
 add_amatrix_destructive_rkmatrix(field alpha, bool atrans, pamatrix a,
-				 pctruncmode tm, real eps, prkmatrix b);
+         pctruncmode tm, real eps, prkmatrix b);
 
 /** @brief Locally truncated addition of a matrix in @ref amatrix
  *  representation to a hierarchical matrix in @ref hmatrix representation,
@@ -133,7 +133,7 @@ add_amatrix_destructive_rkmatrix(field alpha, bool atrans, pamatrix a,
  *  @param b Target @ref hmatrix @f$B@f$. */
 HEADER_PREFIX void
 add_amatrix_destructive_hmatrix(field alpha, bool atrans, pamatrix a,
-				pctruncmode tm, real eps, phmatrix b);
+        pctruncmode tm, real eps, phmatrix b);
 
 /** @brief Multiply two H-matrices using accumulators,
  *  @f$Z \gets \operatorname{succtrunc}(Z + \alpha X Y,\epsilon)@f$.

@@ -7,6 +7,7 @@
 #include "h2matrix.h"
 #include "h2compression.h"
 #include "laplacebem2d.h"
+#include "matrixnorms.h"
 
 static uint problems = 0;
 
@@ -301,6 +302,28 @@ main(int argc, char **argv)
 			    10.0 * tolerance) ? "       " : "   NOT ");
   if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
     problems++;
+
+#ifdef USE_NETCDF
+  (void) printf("Writing to \"G3.nc\"\n");
+  start_stopwatch(sw);
+  write_cdfcomplete_h2matrix(G3, "G3.nc");
+  t_run = stop_stopwatch(sw);
+
+  (void) printf("Reading from \"G3.nc\"\n");
+  start_stopwatch(sw);
+  G4 = read_cdfcomplete_h2matrix("G3.nc");
+  t_run = stop_stopwatch(sw);
+
+  (void) printf("Relative spectral error bound by power iteration\n");
+  error = norm2diff_h2matrix(G3, G4) / normG;
+  (void) printf("  %.4e                                %s okay\n", error,
+		IS_IN_RANGE(0.0, error,
+			    10.0 * tolerance) ? "       " : "   NOT ");
+  if (!IS_IN_RANGE(0.0, error, 10.0 * tolerance))
+    problems++;
+
+  del_h2matrix(G4);
+#endif
 
   (void) printf("========================================\n"
 		"Creating H-matrix structure\n");

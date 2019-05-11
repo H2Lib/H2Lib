@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "clustergeometry.h" of the H2Lib package.
- All rights reserved, Knut Reimer 2009
- ------------------------------------------------------------ */
+ * This is the file "clustergeometry.h" of the H2Lib package.
+ * All rights reserved, Knut Reimer 2009
+ * ------------------------------------------------------------ */
 
 /**
  * @file clustergeometry.h
@@ -121,7 +122,7 @@ update_point_bbox_clustergeometry(pclustergeometry cf, uint size, uint *idx);
 /**
  * @brief Update a bounding box for the support of a cluster.
  * 
- *  Computes a bounding box for the support of a cluster <tt> t </tt>using only 
+ *  Computes a bounding box for the support of a cluster <tt>t</tt> using only 
  *  the fields <tt>smin</tt> and <tt>smax</tt> and the index set <tt>idx</tt>
  *  of the @ref clustergeometry structure.
  *  Already existing entries are overwritten.

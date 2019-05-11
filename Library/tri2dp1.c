@@ -616,13 +616,13 @@ build_tri2dp1_clustergeometry(pctri2dp1 p1, uint * idx)
   uint      ndof = p1->ndof;
   pctri2d   t2 = p1->t2;
   uint      vertices = t2->vertices;
-  uint triangles = t2->triangles;
+  uint      triangles = t2->triangles;
   const bool *is_dof = p1->is_dof;
   const uint *idx2dof = p1->idx2dof;
   const     real(*x)[2] = (const real(*)[2]) t2->x;
-  uint v[3];
-  real min[2], max[2];
-  
+  uint      v[3];
+  real      min[2], max[2];
+
   cg = new_clustergeometry(2, ndof);
 
   /* Copy characteristic vertices into clustergeometry structure and
@@ -642,26 +642,26 @@ build_tri2dp1_clustergeometry(pctri2dp1 p1, uint * idx)
       idx[c] = c;
     }
   }
-  
-  for(i=0;i<triangles;i++){ /* all triangles */
-    getvertices_tri2d(t2, i, v); /* get all vertices of triangle i */
+
+  for (i = 0; i < triangles; i++) {	/* all triangles */
+    getvertices_tri2d(t2, i, v);	/* get all vertices of triangle i */
 
     min[0] = REAL_MIN3(x[v[0]][0], x[v[1]][0], x[v[2]][0]);
     min[1] = REAL_MIN3(x[v[0]][1], x[v[1]][1], x[v[2]][1]);
     max[0] = REAL_MAX3(x[v[0]][0], x[v[1]][0], x[v[2]][0]);
     max[1] = REAL_MAX3(x[v[0]][1], x[v[1]][1], x[v[2]][1]);
 
-    for (j = 0; j < 3; j++) { /* all vertices */
-      if(is_dof[v[j]]){ /* vertex is degree of freedom */
+    for (j = 0; j < 3; j++) {	/* all vertices */
+      if (is_dof[v[j]]) {	/* vertex is degree of freedom */
 	k = idx2dof[v[j]];
 
-        cg->smin[k][0] = REAL_MIN(cg->smin[k][0], min[0]);
-        cg->smin[k][1] = REAL_MIN(cg->smin[k][1], min[1]);
+	cg->smin[k][0] = REAL_MIN(cg->smin[k][0], min[0]);
+	cg->smin[k][1] = REAL_MIN(cg->smin[k][1], min[1]);
 	cg->smax[k][0] = REAL_MAX(cg->smax[k][0], max[0]);
-        cg->smax[k][1] = REAL_MAX(cg->smax[k][1], max[1]);
+	cg->smax[k][1] = REAL_MAX(cg->smax[k][1], max[1]);
       }
     }
-  }  
+  }
 
   update_point_bbox_clustergeometry(cg, ndof, idx);
 

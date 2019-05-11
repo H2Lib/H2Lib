@@ -219,7 +219,13 @@ update_tree_clusterbasis(pclusterbasis cb)
 }
 
 void
-resize_clusterbasis(pclusterbasis cb, int k)
+resize_clusterbasis(pclusterbasis cb, uint k)
+{
+  setrank_clusterbasis(cb, k);
+}
+
+void
+setrank_clusterbasis(pclusterbasis cb, uint k)
 {
   uint      i;
 
@@ -229,6 +235,8 @@ resize_clusterbasis(pclusterbasis cb, int k)
   }
   else
     resize_amatrix(&cb->V, cb->t->size, k);
+
+  resize_amatrix(&cb->E, k, cb->E.cols);
 
   cb->k = k;
 
@@ -1143,6 +1151,49 @@ compress_parallel_clusterbasis_amatrix(pcclusterbasis cb, pcamatrix Xp,
   uninit_amatrix(Xc);
 }
 
+void
+expand_clusterbasis_amatrix(pcclusterbasis cb, pamatrix Yt, pamatrix Yp)
+{
+  amatrix   tmp1, tmp2, tmp3;
+  pamatrix  Yt1, Yp1, Yc;
+  uint      i, off;
+
+  assert(Yt->rows == cb->kbranch);
+
+  /* This part of Yt contains the coefficients for the current cluster */
+  Yc = init_sub_amatrix(&tmp1, Yt, cb->k, 0, Yt->cols, 0);
+
+  if (cb->sons > 0) {
+    off = 0;
+    for (i = 0; i < cb->sons; i++) {
+      /* This part corresponds to the i-th son */
+      Yt1 = init_sub_amatrix(&tmp2, Yt, cb->son[i]->k, cb->k, Yt->cols, 0);
+      clear_amatrix(Yt1);
+
+      addmul_amatrix(1.0, false, &cb->son[i]->E, false, Yc, Yt1);
+      uninit_amatrix(Yt1);
+
+      /* These parts correspond to the subtree rooted in the i-th son */
+      Yt1 = init_sub_amatrix(&tmp2, Yt, cb->son[i]->kbranch, cb->k, Yt->cols, 0);
+      Yp1 = init_sub_amatrix(&tmp3, Yp, cb->son[i]->t->size, off, Yt->cols, 0);
+
+      /* Treat coefficients in the subtree */
+      expand_clusterbasis_amatrix(cb->son[i], Yt1, Yp1);
+
+      uninit_amatrix(Yp1);
+      uninit_amatrix(Yt1);
+
+      off += cb->son[i]->t->size;
+    }
+    assert(off == cb->t->size);
+  }
+  else {
+    /* Multiply by leaf matrix */
+    addmul_amatrix(1.0, false, &cb->V, false, Yc, Yp);
+  }
+  uninit_amatrix(Yc);
+}
+
 /* ------------------------------------------------------------
  * Forward and backward transformation for matrices
  * ------------------------------------------------------------ */
@@ -1460,35 +1511,40 @@ addevaltrans_clusterbasis_avector(field alpha, pcclusterbasis cb,
  * Orthogonalization
  * ------------------------------------------------------------ */
 
-pclusterbasis
-ortho_clusterbasis(pclusterbasis cb, pclusteroperator co)
+void
+ortho_clusterbasis(pclusterbasis cb, pclusteroperator old2new)
 {
-  amatrix   tmp1, tmp2;
-  avector   tmp3;
-  pamatrix  Vhat, Qhat, Vhat1, Qhat1;
+  amatrix   tmp1, tmp2, tmp3;
+  avector   tmp4;
+  pamatrix  Vhat, Eold, Qhat, Vhat1, Eold1, Qhat1;
   pavector  tau;
-  uint      i, k, m, off;
+  uint      sons = cb->sons;
+  uint      i, k, kold, m, off;
 
-  assert(cb->sons == co->sons);
+  assert(old2new == 0 || sons == old2new->sons);
+  assert(cb->rlist == 0);
+  assert(cb->clist == 0);
 
-  if (cb->sons > 0) {
+  kold = cb->k;
+
+  if (sons > 0) {
+    /* Orthogonalize sons' bases */
     m = 0;
     for (i = 0; i < cb->sons; i++) {
-      ortho_clusterbasis(cb->son[i], co->son[i]);
-      m += co->son[i]->krow;
+      ortho_clusterbasis(cb->son[i], (old2new ? old2new->son[i] : 0));
+
+      m += cb->son[i]->k;
     }
 
-    Vhat = init_amatrix(&tmp1, m, cb->k);
-    clear_amatrix(Vhat);
+    /* Prepare Vhat */
+    Vhat = init_amatrix(&tmp1, m, kold);
 
+    /* Copy transfer matrices into Vhat */
     off = 0;
     for (i = 0; i < cb->sons; i++) {
-      Vhat1 = init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, cb->k, 0);
+      Vhat1 = init_sub_amatrix(&tmp2, Vhat, cb->son[i]->k, off, kold, 0);
 
-      assert(co->son[i]->krow == cb->son[i]->k);
-      assert(co->son[i]->kcol == cb->son[i]->E.rows);
-      addmul_amatrix(1.0, false, &co->son[i]->C, false, &cb->son[i]->E,
-		     Vhat1);
+      copy_amatrix(false, &cb->son[i]->E, Vhat1);
 
       uninit_amatrix(Vhat1);
 
@@ -1496,27 +1552,44 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator co)
     }
     assert(off == m);
 
-    k = UINT_MIN(m, cb->k);
+    /* Determine new rank */
+    k = UINT_MIN(m, kold);
 
-    tau = init_avector(&tmp3, k);
-
+    /* Compute Householder factorization Vhat = Qhat R */
+    tau = init_avector(&tmp4, k);
     qrdecomp_amatrix(Vhat, tau);
 
-    resize_clusteroperator(co, k, cb->k);
-    resize_clusterbasis(cb, k);
+    /* Clone original transfer matrix */
+    Eold = init_amatrix(&tmp2, kold, cb->E.cols);
+    copy_amatrix(false, &cb->E, Eold);
 
-    copy_upper_amatrix(Vhat, false, &co->C);
+    /* Switch to new rank */
+    setrank_clusterbasis(cb, k);
 
+    /* Replace transfer matrix E by R E, restoring consistency */
+    Vhat1 = init_sub_amatrix(&tmp3, Vhat, k, 0, kold, 0);
+    triangulareval_amatrix(false, false, false, Vhat1, false, Eold);
+    uninit_amatrix(Vhat1);
+    Eold1 = init_sub_amatrix(&tmp3, Eold, k, 0, Eold->cols, 0);
+    copy_amatrix(false, Eold1, &cb->E);
+    uninit_amatrix(Eold1);
+    uninit_amatrix(Eold);
+
+    /* Copy R into "old2new" cluster operator if required */
+    if (old2new) {
+      resize_clusteroperator(old2new, k, kold);
+
+      copy_upper_amatrix(Vhat, false, &old2new->C);
+    }
+
+    /* Expand matrix Qhat of Householder factorization */
     Qhat = init_amatrix(&tmp2, m, k);
-
     qrexpand_amatrix(Vhat, tau, Qhat);
 
-    uninit_amatrix(Vhat);
-    uninit_avector(tau);
-
+    /* Blocks of Qhat are the new transfer matrices */
     off = 0;
     for (i = 0; i < cb->sons; i++) {
-      Qhat1 = init_sub_amatrix(&tmp1, Qhat, cb->son[i]->k, off, k, 0);
+      Qhat1 = init_sub_amatrix(&tmp3, Qhat, cb->son[i]->k, off, k, 0);
 
       assert(cb->son[i]->E.rows == cb->son[i]->k);
       assert(cb->son[i]->E.cols == cb->k);
@@ -1528,33 +1601,56 @@ ortho_clusterbasis(pclusterbasis cb, pclusteroperator co)
     }
     assert(off == m);
 
+    /* Clean up */
     uninit_amatrix(Qhat);
+    uninit_avector(tau);
+    uninit_amatrix(Vhat);
   }
   else {
     m = cb->t->size;
 
-    Vhat = init_amatrix(&tmp1, m, cb->k);
+    /* Copy leaf matrix into Vhat */
+    Vhat = init_amatrix(&tmp1, m, kold);
 
     copy_amatrix(false, &cb->V, Vhat);
 
-    k = UINT_MIN(m, cb->k);
+    /* Determine new rank */
+    k = UINT_MIN(m, kold);
 
-    tau = init_avector(&tmp3, k);
-
+    /* Compute Householder factorization Vhat = Qhat R */
+    tau = init_avector(&tmp4, k);
     qrdecomp_amatrix(Vhat, tau);
 
-    resize_clusteroperator(co, k, cb->k);
-    resize_clusterbasis(cb, k);
+    /* Clone original transfer matrix */
+    Eold = init_amatrix(&tmp2, kold, cb->E.cols);
+    copy_amatrix(false, &cb->E, Eold);
 
-    copy_upper_amatrix(Vhat, false, &co->C);
+    /* Switch to new rank */
+    setrank_clusterbasis(cb, k);
 
+    /* Replace transfer matrix E by R E, restoring consistency */
+    Vhat1 = init_sub_amatrix(&tmp3, Vhat, k, 0, kold, 0);
+    triangulareval_amatrix(false, false, false, Vhat1, false, Eold);
+    uninit_amatrix(Vhat1);
+    Eold1 = init_sub_amatrix(&tmp3, Eold, k, 0, Eold->cols, 0);
+    copy_amatrix(false, Eold1, &cb->E);
+    uninit_amatrix(Eold1);
+    uninit_amatrix(Eold);
+
+    /* Copy R into "old2new" cluster operator if required */
+    if (old2new) {
+      resize_clusteroperator(old2new, k, kold);
+
+      copy_upper_amatrix(Vhat, false, &old2new->C);
+    }
+
+    /* Expand matrix Qhat of Householder factorization */
     qrexpand_amatrix(Vhat, tau, &cb->V);
 
+    /* Clean up */
     uninit_avector(tau);
     uninit_amatrix(Vhat);
   }
-
-  return cb;
 }
 
 real
@@ -1846,37 +1942,41 @@ write_cdf(pcclusterbasis cb,
 		nc_file, nc_sons, nc_size, nc_rank, nc_coeff);
 
     /* Write transfer matrices */
-    start = *coeffidx;
-    stride = 1;
-    for (i = 0; i < cb->sons; i++) {
-      count = cb->son[i]->k;
-      assert(start + cb->son[i]->k * cb->k <= coeffs);
-
-      for (j = 0; j < cb->k; j++) {
-	result =
-	  nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
-		      cb->son[i]->E.a + j * cb->son[i]->E.ld);
-	assert(result == NC_NOERR);
-
-	start += cb->son[i]->k;
+    if(coeffs > 0) {
+      start = *coeffidx;
+      stride = 1;
+      for (i = 0; i < cb->sons; i++) {
+	count = cb->son[i]->k;
+	assert(start + cb->son[i]->k * cb->k <= coeffs);
+	
+	for (j = 0; j < cb->k; j++) {
+	  result =
+	    nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
+			cb->son[i]->E.a + j * cb->son[i]->E.ld);
+	  assert(result == NC_NOERR);
+	  
+	  start += cb->son[i]->k;
+	}
       }
+      (*coeffidx) = start;
     }
-    (*coeffidx) = start;
   }
   else {
     /* Write leaf matrix to nc_coeff */
-    start = *coeffidx;
-    count = cb->V.rows;
-    assert(start + cb->V.rows * cb->V.cols <= coeffs);
-    for (j = 0; j < cb->V.cols; j++) {
-      result =
-	nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
-		    cb->V.a + j * cb->V.ld);
-      assert(result == NC_NOERR);
-
-      start += cb->V.rows;
+    if(coeffs > 0) {
+      start = *coeffidx;
+      count = cb->V.rows;
+      assert(start + cb->V.rows * cb->V.cols <= coeffs);
+      for (j = 0; j < cb->V.cols; j++) {
+	result =
+	  nc_put_vars(nc_file, nc_coeff, &start, &count, &stride,
+		      cb->V.a + j * cb->V.ld);
+	assert(result == NC_NOERR);
+	
+	start += cb->V.rows;
+      }
+      *coeffidx = start;
     }
-    *coeffidx = start;
   }
 }
 
@@ -1903,8 +2003,11 @@ write_cdf_clusterbasis(pcclusterbasis cb, const char *name)
   assert(result == NC_NOERR);
 
   /* Define "coeffs" dimension */
-  result = nc_def_dim(nc_file, "coeffs", coeffs, &nc_coeffs);
-  assert(result == NC_NOERR);
+  nc_coeffs = 0;
+  if(coeffs > 0) {
+    result = nc_def_dim(nc_file, "coeffs", coeffs, &nc_coeffs);
+    assert(result == NC_NOERR);
+  }
 
   /* Define "sons" variable */
   result = nc_def_var(nc_file, "sons", NC_INT, 1, &nc_clusters, &nc_sons);
@@ -1919,8 +2022,10 @@ write_cdf_clusterbasis(pcclusterbasis cb, const char *name)
   assert(result == NC_NOERR);
 
   /* Define "coeff" variable */
-  result = nc_def_var(nc_file, "coeff", NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
-  assert(result == NC_NOERR);
+  if(coeffs > 0) {
+    result = nc_def_var(nc_file, "coeff", NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
+    assert(result == NC_NOERR);
+  }
 
   /* Finish NetCDF define mode */
   result = nc_enddef(nc_file);
@@ -1978,9 +2083,12 @@ write_cdfpart_clusterbasis(pcclusterbasis cb, int nc_file, const char *prefix)
   assert(result == NC_NOERR);
 
   /* Define "coeffs" dimension */
-  prefix_name(buf, bufsize, prefix, "coeffs");
-  result = nc_def_dim(nc_file, buf, coeffs, &nc_coeffs);
-  assert(result == NC_NOERR);
+  nc_coeffs = 0;
+  if(coeffs > 0) {
+    prefix_name(buf, bufsize, prefix, "coeffs");
+    result = nc_def_dim(nc_file, buf, coeffs, &nc_coeffs);
+    assert(result == NC_NOERR);
+  }
 
   /* Define "sons" variable */
   prefix_name(buf, bufsize, prefix, "sons");
@@ -1998,9 +2106,11 @@ write_cdfpart_clusterbasis(pcclusterbasis cb, int nc_file, const char *prefix)
   assert(result == NC_NOERR);
 
   /* Define "coeff" variable */
-  prefix_name(buf, bufsize, prefix, "coeff");
-  result = nc_def_var(nc_file, buf, NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
-  assert(result == NC_NOERR);
+  if(coeffs > 0) {
+    prefix_name(buf, bufsize, prefix, "coeff");
+    result = nc_def_var(nc_file, buf, NC_DOUBLE, 1, &nc_coeffs, &nc_coeff);
+    assert(result == NC_NOERR);
+  }
 
   /* Finish NetCDF define mode */
   result = nc_enddef(nc_file);
@@ -2095,23 +2205,25 @@ read_cdf_part(int nc_file, size_t clusters, size_t coeffs,
     resize_clusterbasis(cb, k);
 
     /* Read transfer matrices */
-    start = (*coeffidx);
-    stride = 1;
-    for (i = 0; i < sons; i++) {
-      assert(cb->son[i]->E.rows == cb->son[i]->k);
-      assert(cb->son[i]->E.cols == k);
-
-      count = cb->son[i]->k;
-      for (j = 0; j < k; j++) {
-	result =
-	  nc_get_vars(nc_file, nc_coeff, &start, &count, &stride,
-		      cb->son[i]->E.a + j * cb->son[i]->E.ld);
-	assert(result == NC_NOERR);
-
-	start += cb->son[i]->k;
+    if(coeffs > 0) {
+      start = (*coeffidx);
+      stride = 1;
+      for (i = 0; i < sons; i++) {
+	assert(cb->son[i]->E.rows == cb->son[i]->k);
+	assert(cb->son[i]->E.cols == k);
+	
+	count = cb->son[i]->k;
+	for (j = 0; j < k; j++) {
+	  result =
+	    nc_get_vars(nc_file, nc_coeff, &start, &count, &stride,
+			cb->son[i]->E.a + j * cb->son[i]->E.ld);
+	  assert(result == NC_NOERR);
+	  
+	  start += cb->son[i]->k;
+	}
       }
+      (*coeffidx) = start;
     }
-    (*coeffidx) = start;
   }
   else {
     /* If we have not inherited a cluster, create one */
@@ -2141,18 +2253,20 @@ read_cdf_part(int nc_file, size_t clusters, size_t coeffs,
     (*clusteridx)++;
 
     /* Read leaf matrix */
-    start = (*coeffidx);
-    count = size;
-    stride = 1;
-    for (j = 0; j < k; j++) {
-      result =
-	nc_get_vars(nc_file, nc_coeff, &start, &count, &stride,
-		    cb->V.a + j * cb->V.ld);
-      assert(result == NC_NOERR);
-
-      start += size;
+    if(coeffs > 0) {
+      start = (*coeffidx);
+      count = size;
+      stride = 1;
+      for (j = 0; j < k; j++) {
+	result =
+	  nc_get_vars(nc_file, nc_coeff, &start, &count, &stride,
+		      cb->V.a + j * cb->V.ld);
+	assert(result == NC_NOERR);
+	
+	start += size;
+      }
+      (*coeffidx) = start;
     }
-    (*coeffidx) = start;
   }
 
   update_clusterbasis(cb);
@@ -2184,9 +2298,14 @@ read_cdf_clusterbasis(const char *name, pccluster t)
 
   /* Get "coeffs" dimension */
   result = nc_inq_dimid(nc_file, "coeffs", &nc_coeffs);
-  assert(result == NC_NOERR);
-  result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
-  assert(result == NC_NOERR);
+  coeffs = 0;
+  /* Error code NC_EBADDIM means that "coeffs" is not present in
+   * the file, and by our convention this means that it is zero. */
+  if(result != NC_EBADDIM) {
+    assert(result == NC_NOERR);
+    result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
+    assert(result == NC_NOERR);
+  }
 
   /* Get "sons" variable */
   result = nc_inq_varid(nc_file, "sons", &nc_sons);
@@ -2249,9 +2368,14 @@ read_cdfpart_clusterbasis(int nc_file, const char *prefix, pccluster t)
   /* Get "coeffs" dimension */
   prefix_name(buf, bufsize, prefix, "coeffs");
   result = nc_inq_dimid(nc_file, buf, &nc_coeffs);
-  assert(result == NC_NOERR);
-  result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
-  assert(result == NC_NOERR);
+  coeffs = 0;
+  /* Error code NC_EBADDIM means that "coeffs" is not present in
+   * the file, and by our convention this means that it is zero. */
+  if(result != NC_EBADDIM) {
+    assert(result == NC_NOERR);
+    result = nc_inq_dim(nc_file, nc_coeffs, dimname, &coeffs);
+    assert(result == NC_NOERR);
+  }
 
   /* Get "sons" variable */
   prefix_name(buf, bufsize, prefix, "sons");
@@ -2269,9 +2393,11 @@ read_cdfpart_clusterbasis(int nc_file, const char *prefix, pccluster t)
   assert(result == NC_NOERR);
 
   /* Get "coeff" variable */
-  prefix_name(buf, bufsize, prefix, "coeff");
-  result = nc_inq_varid(nc_file, buf, &nc_coeff);
-  assert(result == NC_NOERR);
+  if(coeffs > 0) {
+    prefix_name(buf, bufsize, prefix, "coeff");
+    result = nc_inq_varid(nc_file, buf, &nc_coeff);
+    assert(result == NC_NOERR);
+  }
 
   /* Read cluster basis from NetCDF variables */
   t0 = (pcluster) t;

@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "bem2d.h" of the H2Lib package.
- All rights reserved, Sven Christophersen 2011
- ------------------------------------------------------------ */
+ * This is the file "bem2d.h" of the H2Lib package.
+ * All rights reserved, Sven Christophersen 2011
+ * ------------------------------------------------------------ */
 
 /**
  * @file bem2d.h
@@ -273,7 +274,7 @@ uint *v2t;
 uint *v2ts;
 
 /**
- * @brief Computes nearfield entries of Galkerin matrices.
+ * @brief Computes nearfield entries of Galerkin matrices.
  *
  * This callback function computes
  *  'nearfield' entries of the underlying problem and integral-operator.
@@ -869,8 +870,8 @@ void (*lagrange_col)(const uint *idx, pcavector px, pcavector py, pcbem2d bem,
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Main constructor for @ref _bem2d "bem2d" objects.
@@ -894,8 +895,8 @@ HEADER_PREFIX pbem2d new_bem2d(pccurve2d gr);
 HEADER_PREFIX void del_bem2d(pbem2d bem);
 
 /* ------------------------------------------------------------
- Methods to build clustertrees
- ------------------------------------------------------------ */
+ * Methods to build cluster trees
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Creates a @ref _clustergeometry "clustergeometry" object for a BEM-Problem
@@ -988,8 +989,8 @@ HEADER_PREFIX pcluster build_bem2d_cluster(pcbem2d bem, uint clf,
   basisfunctionbem2d basis);
 
 /* ------------------------------------------------------------
- Initializerfunctions for h-matrix approximations
- ------------------------------------------------------------ */
+ * Initializer functions for h-matrix approximations
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Initialize the @ref _bem2d "bem" object for on the fly recompression
@@ -1025,8 +1026,8 @@ HEADER_PREFIX void setup_hmatrix_recomp_bem2d(pbem2d bem, bool recomp,
   real accur_recomp, bool coarsen, real accur_coarsen);
 
 /* ------------------------------------------------------------
- Interpolation
- ------------------------------------------------------------ */
+ * Interpolation
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function initializes the @ref _bem2d "bem2d" object for approximating
@@ -1119,8 +1120,9 @@ HEADER_PREFIX void setup_hmatrix_aprx_inter_mixed_bem2d(pbem2d bem,
   pccluster rc, pccluster cc, pcblock tree, uint m);
 
 /* ------------------------------------------------------------
- Green
- ------------------------------------------------------------ */
+ * Green
+ * ------------------------------------------------------------ */
+
 /**
  * @brief creating hmatrix approximation using green's method with row
  * @ref _cluster "cluster" .
@@ -1292,8 +1294,8 @@ HEADER_PREFIX void setup_hmatrix_aprx_green_mixed_bem2d(pbem2d bem,
   quadpoints2d quadpoints);
 
 /* ------------------------------------------------------------
- Greenhybrid
- ------------------------------------------------------------ */
+ * Greenhybrid
+ * ------------------------------------------------------------ */
 
 /**
  * @brief creating hmatrix approximation using green's method with row
@@ -1461,8 +1463,8 @@ HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_mixed_bem2d(pbem2d bem,
   real accur, quadpoints2d quadpoints);
 
 /* ------------------------------------------------------------
- ACA
- ------------------------------------------------------------ */
+ * ACA
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Approximate matrix block with ACA using full pivoting.
@@ -1503,8 +1505,8 @@ HEADER_PREFIX void setup_hmatrix_aprx_paca_bem2d(pbem2d bem, pccluster rc,
   pccluster cc, pcblock tree, real accur);
 
 /* ------------------------------------------------------------
- HCA
- ------------------------------------------------------------ */
+ * HCA
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Approximate matrix block with hybrid cross approximation using
@@ -1568,8 +1570,8 @@ HEADER_PREFIX void setup_hmatrix_aprx_hca_bem2d(pbem2d bem, pccluster rc,
   pccluster cc, pcblock tree, uint m, real accur);
 
 /* ------------------------------------------------------------
- Initializerfunctions for h2-matrix approximations
- ------------------------------------------------------------ */
+ * Initializer functions for h2-matrix approximations
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Enables hierarchical recompression for @ref _hmatrix "hmatrices".
@@ -1804,8 +1806,8 @@ HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_ortho_bem2d(pbem2d bem,
     real delta, real accur, quadpoints2d quadpoints);
 
 /* ------------------------------------------------------------
- Fill hmatrix
- ------------------------------------------------------------ */
+ * Fill hmatrix
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Fills an @ref _hmatrix "hmatrix" with a predefined approximation
@@ -1862,8 +1864,8 @@ HEADER_PREFIX void assemblecoarsen_bem2d_hmatrix(pbem2d bem, pblock b,
   phmatrix G);
 
 /* ------------------------------------------------------------
- Fill h2-matrix
- ------------------------------------------------------------ */
+ * Fill h2-matrix
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function computes the matrix entries for the nested @ref _clusterbasis
@@ -1985,8 +1987,8 @@ HEADER_PREFIX void assemblehiercomp_bem2d_h2matrix(pbem2d bem, pblock b,
   ph2matrix G);
 
 /* ------------------------------------------------------------
- lagrange-polynomials
- ------------------------------------------------------------ */
+ * Lagrange polynomials
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function will integrate Lagrange polynomials on the boundary domain
@@ -2084,8 +2086,8 @@ HEADER_PREFIX void assemble_bem2d_lagrange_amatrix(const real (*X)[2],
   pcavector px, pcavector py, pamatrix V);
 
 /* ------------------------------------------------------------
- some useful functions
- ------------------------------------------------------------ */
+ * some useful functions
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Computes the @f$ L_2 @f$-projection of a given function using piecewise

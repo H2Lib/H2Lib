@@ -63,6 +63,8 @@ struct _clusteroperator
   uint refs;
 };
 
+#define CLUSTEROPERATOR_TYPE_COMPLETE
+
 /* ------------------------------------------------------------
    Constructors and destructors
    ------------------------------------------------------------ */
@@ -344,6 +346,31 @@ HEADER_PREFIX void
 basisproduct_clusteroperator(pcclusterbasis cb1, pcclusterbasis cb2,
 			     pclusteroperator pr);
 
-/** @} */
+#endif
+
+/* ------------------------------------------------------------
+ * Access methods
+ * ------------------------------------------------------------ */
+
+/* Avoid problems with incomplete type definitions */
+#if defined(CLUSTEROPERATOR_TYPE_COMPLETE) && !defined(CLUSTEROPERATOR_COMPLETE)
+#define CLUSTEROPERATOR_COMPLETE
+
+#ifdef __GNUC__
+INLINE_PREFIX pamatrix
+getC_clusteroperator(pclusteroperator) __attribute__ ((unused));
+#endif
+
+/* @brief Get the coefficient matrix @f$C@f$ of a @ref clusteroperator.
+ *
+ * @param co Cluster operator.
+ * @returns Coefficient matrix @f$C@f$ */
+INLINE_PREFIX pamatrix
+getC_clusteroperator(pclusteroperator co)
+{
+  return &co->C;
+}
 
 #endif
+
+/** @} */

@@ -17,18 +17,8 @@
 /** Relative accuracy used in the stopping criterion of the QR iteration. */
 #define H2_QR_EPS 1e-14
 
-/** Bound for determining when a number is essentially zero. */
-#define H2_ALMOST_ZERO 1e-300
-
 /** Run-time checks for self-made solvers. */
 /* #define RUNTIME_CHECK_EIGENSOLVERS */
-
-/** Relative tolerance for run-time checks. */
-#ifdef USE_FLOAT
-#define H2_CHECK_TOLERANCE 1.0e-6
-#else
-#define H2_CHECK_TOLERANCE 1.0e-12
-#endif
 
 /* ------------------------------------------------------------
  * Constructors and destructors
@@ -240,8 +230,8 @@ diageval_tridiag_amatrix(field alpha, bool atrans, pctridiag a,
 }
 #else
 void
-diageval_tridiag_amatrix(field alpha,
-			 bool atrans, pctridiag a, bool xtrans, pamatrix x)
+diageval_tridiag_amatrix(field alpha, bool atrans, pctridiag a,
+			 bool xtrans, pamatrix x)
 {
   pcreal    d = a->d;
   uint      n = a->size;
@@ -357,8 +347,8 @@ lowereval_tridiag_amatrix(field alpha, bool atrans, pctridiag a,
 }
 #else
 void
-lowereval_tridiag_amatrix(field alpha,
-			  bool atrans, pctridiag a, bool xtrans, pamatrix x)
+lowereval_tridiag_amatrix(field alpha, bool atrans, pctridiag a,
+			  bool xtrans, pamatrix x)
 {
   pcreal    d = a->d;
   pcreal    l = a->l;
@@ -551,7 +541,7 @@ qrstep_tridiag(ptridiag T, field shift, pamatrix Q)
 }
 
 /* ------------------------------------------------------------
- * QR iteration for self-adjoint tridiagonal matrices
+ * QR iteration for symmetric real tridiagonal matrices
  * ------------------------------------------------------------ */
 
 typedef struct {
@@ -559,7 +549,7 @@ typedef struct {
   pamatrix  U, Vt;
 } evpsortdata;
 
-static bool
+static    bool
 evp_leq(uint i, uint j, void *data)
 {
   evpsortdata *esd = (evpsortdata *) data;
@@ -571,7 +561,7 @@ evp_leq(uint i, uint j, void *data)
   return (REAL(T->d[i]) <= REAL(T->d[j]));
 }
 
-static bool
+static    bool
 evp_geq(uint i, uint j, void *data)
 {
   evpsortdata *esd = (evpsortdata *) data;
@@ -2246,6 +2236,10 @@ sb_svd_amatrix(pamatrix A, prealavector sigma, pamatrix U, pamatrix Vt,
 }
 
 #ifdef USE_BLAS
+/* Remark: if compiled the wrong way, DORMQR, and by extension DORMBR
+ * and DGESVD, are currently not thread-safe.
+ * gfortran does the right thing if called with "-frecursive", but this
+ * appears not to be the standard in, e.g., OpenSUSE Linux. */
 #if defined(THREADSAFE_LAPACK) || !defined(USE_OPENMP)
 uint
 svd_amatrix(pamatrix A, prealavector sigma, pamatrix U, pamatrix Vt)

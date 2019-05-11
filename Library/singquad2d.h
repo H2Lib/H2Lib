@@ -13,6 +13,9 @@
 /* C STD LIBRARY */
 #include <assert.h>
 /* CORE 0 */
+#ifdef USE_SIMD
+#include "simd.h"
+#endif
 #include "settings.h"
 /* CORE 1 */
 #include "gaussquad.h"
@@ -226,6 +229,24 @@ HEADER_PREFIX void
 weight_basisfunc_cl_singquad2d(real *x, real *y, real *w, uint nq);
 
 /**
+ * @brief Weighting a quadrature rule for a double integral with a combination
+ * of piecewise linear and constant basis functions.
+ *
+ * @param x Points within the first triangle using piecewise linear basis functions.
+ * @param y Points within the second triangle using piecewise constant basis functions.
+ * @param w Quadrature weights. Actually this is a 4 times nq two dimensional
+ * array of weights. The first 3 columns will be used for the 3 combinations of
+ * linear-constant basis functions weights and the last column will be remain for
+ * the standard constant-constant case.
+ * @param nq Number of quadrature points and weights stored within <tt>x, y, w</tt>.
+ *
+ * @attention The column <tt>w[3]</tt> has to be filled with valid quadrature
+ * weights before calling this function.
+ */
+HEADER_PREFIX void
+weight_basisfunc_lc_singquad2d(real *x, real *y, real *w, uint nq);
+
+/**
  * @brief Weighting a quadrature rule for a single integral with linear basis
  * functions.
  *
@@ -279,7 +300,7 @@ fast_select_quadrature(uint (*geo_t)[3], uint t, uint s);
  */
 HEADER_PREFIX uint
 select_quadrature_singquad2d(pcsingquad2d sq, const uint *tv, const uint *sv,
-    uint *tp, uint *sp, real **x, real **y, real **w, uint *n, field *base);
+    uint *tp, uint *sp, real **x, real **y, real **w, uint *n, real *base);
 
 /** @} */
 

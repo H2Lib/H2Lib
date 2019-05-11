@@ -12,9 +12,6 @@
 #ifndef LIBRARY_LAPLACEOCLBEM3D_C_
 #define LIBRARY_LAPLACEOCLBEM3D_C_
 
-#ifdef USE_OPENMP
-#ifdef USE_OPENCL
-
 /* C STD LIBRARY */
 /* CORE 0 */
 /* CORE 1 */
@@ -24,22 +21,25 @@
 /* PARTICLES */
 /* BEM */
 #include "oclbem3d.h"
-#include "laplacebem3d.c"
+#include "laplacebem3d.h"
+#include "laplacebem3d.cl"
+
+#ifdef USE_OPENMP
+#ifdef USE_OPENCL
 
 static void
-fill_slp_cc_cpu_wrapper_laplacebem3d(void *data)
+fill_cpu_wrapper_laplacebem3d(void *data)
 {
-  nearfield_args *nf_args;
-
-  nf_args = (nearfield_args *) data;
+  nearfield_args *nf_args = (nearfield_args *) data;
+  pcbem3d   bem = nf_args->bem;
 
   if (nf_args->dist) {
-    fill_slp_cc_far_laplacebem3d(nf_args->ridx, nf_args->cidx, nf_args->bem,
-				 nf_args->ntrans, nf_args->N);
+    bem->nearfield_far(nf_args->ridx, nf_args->cidx, nf_args->bem,
+		       nf_args->ntrans, nf_args->N);
   }
   else {
-    fill_slp_cc_near_laplacebem3d(nf_args->ridx, nf_args->cidx, nf_args->bem,
-				  nf_args->ntrans, nf_args->N);
+    bem->nearfield(nf_args->ridx, nf_args->cidx, nf_args->bem,
+		   nf_args->ntrans, nf_args->N);
   }
 }
 
@@ -146,9 +146,9 @@ fill_cc_ocl_gpu_wrapper_laplacebem3d(void *data, uint kernel)
   /****************************************************
    * Copy results back.
    ****************************************************/
-    res = clEnqueueReadBuffer(queue, ocl_bem3d.mem_N[current_thread],
-			      CL_TRUE, 0, mdata->pos * sizeof(field),
-			      mdata->N, 1, &calc, NULL);
+    res =
+    clEnqueueReadBuffer(queue, ocl_bem3d.mem_N[current_thread], CL_TRUE, 0,
+			mdata->pos * sizeof(field), mdata->N, 1, &calc, NULL);
   CL_CHECK(res)
 
     clReleaseEvent(h2d[0]);
@@ -197,7 +197,7 @@ fill_slp_cc_sing_cpu_wrapper_laplacebem3d(void *data)
   const uint *tri_t, *tri_s;
   real     *xq, *yq, *wq;
   uint      tp[3], sp[3];
-  real      Ax, Bx, Cx, Ay, By, Cy, tx, sx, ty, sy, dx, dy, dz, factor;
+  real      Ax, Bx, Cx, Ay, By, Cy, tx, sx, ty, sy, dx, dy, dz, factor, base;
   field     sum;
   uint      q, nq, ss, tt, t;
 
@@ -208,7 +208,7 @@ fill_slp_cc_sing_cpu_wrapper_laplacebem3d(void *data)
     tri_s = gr_t[ss];
     factor = gr_g[ss] * gr_g[tt] * KERNEL_CONST_LAPLACEBEM3D;
     select_quadrature_singquad2d(bem->sq, tri_t, tri_s, tp, sp, &xq, &yq, &wq,
-				 &nq, &sum);
+				 &nq, &base);
     wq += 9 * nq;
 
     A_t = gr_x[tri_t[tp[0]]];
@@ -218,6 +218,7 @@ fill_slp_cc_sing_cpu_wrapper_laplacebem3d(void *data)
     B_s = gr_x[tri_s[sp[1]]];
     C_s = gr_x[tri_s[sp[2]]];
 
+    sum = base;
     for (q = 0; q < nq; ++q) {
       tx = xq[q];
       sx = xq[q + nq];
@@ -266,7 +267,7 @@ fill_slp_cc_near_task_laplacebem3d(const uint * ridx, const uint * cidx,
 
     nf = new_ocltaskgroup(GPU_FIRST, NULL, merge_nf, cleanup_nf_merge,
 			  distribute_nf, close_nf,
-			  fill_slp_cc_cpu_wrapper_laplacebem3d,
+			  fill_cpu_wrapper_laplacebem3d,
 			  fill_slp_cc_dist_gpu_wrapper_laplacebem3d,
 			  getsize_nf, split_nf_task, cleanup_nf_task,
 			  (void *) &op_cb);
@@ -299,7 +300,7 @@ fill_slp_cc_far_task_laplacebem3d(const uint * ridx, const uint * cidx,
 
     nf = new_ocltaskgroup(GPU_FIRST, NULL, merge_nf, cleanup_nf_merge,
 			  distribute_nf, close_nf,
-			  fill_slp_cc_cpu_wrapper_laplacebem3d,
+			  fill_cpu_wrapper_laplacebem3d,
 			  fill_slp_cc_dist_gpu_wrapper_laplacebem3d,
 			  getsize_nf, split_nf_task, cleanup_nf_task,
 			  (void *) &op_cb);
@@ -307,23 +308,6 @@ fill_slp_cc_far_task_laplacebem3d(const uint * ridx, const uint * cidx,
 
   add_task_taskgroup(&nf, (void *) nf_args);
 
-}
-
-static void
-fill_dlp_cc_cpu_wrapper_laplacebem3d(void *data)
-{
-  nearfield_args *nf_args;
-
-  nf_args = (nearfield_args *) data;
-
-  if (nf_args->dist) {
-    fill_dlp_cc_far_laplacebem3d(nf_args->ridx, nf_args->cidx, nf_args->bem,
-				 nf_args->ntrans, nf_args->N);
-  }
-  else {
-    fill_dlp_cc_near_laplacebem3d(nf_args->ridx, nf_args->cidx, nf_args->bem,
-				  nf_args->ntrans, nf_args->N);
-  }
 }
 
 static void
@@ -368,7 +352,8 @@ fill_dlp_cc_sing_cpu_wrapper_laplacebem3d(void *data)
   const uint *tri_t, *tri_s;
   real     *xq, *yq, *wq;
   uint      tp[3], sp[3];
-  real      Ax, Bx, Cx, Ay, By, Cy, tx, sx, ty, sy, dx, dy, dz, factor, norm;
+  real      Ax, Bx, Cx, Ay, By, Cy, tx, sx, ty, sy, dx, dy, dz, factor, norm,
+    base;
   field     sum;
   uint      q, nq, ss, tt, t;
 
@@ -388,7 +373,7 @@ fill_dlp_cc_sing_cpu_wrapper_laplacebem3d(void *data)
     else {
 
       (void) select_quadrature_singquad2d(bem->sq, tri_t, tri_s, tp, sp, &xq,
-					  &yq, &wq, &nq, &sum);
+					  &yq, &wq, &nq, &base);
       wq += 9 * nq;
 
       A_t = gr_x[tri_t[tp[0]]];
@@ -398,6 +383,7 @@ fill_dlp_cc_sing_cpu_wrapper_laplacebem3d(void *data)
       B_s = gr_x[tri_s[sp[1]]];
       C_s = gr_x[tri_s[sp[2]]];
 
+      sum = base;
       for (q = 0; q < nq; ++q) {
 	tx = xq[q];
 	sx = xq[q + nq];
@@ -450,7 +436,7 @@ fill_dlp_cc_near_task_laplacebem3d(const uint * ridx, const uint * cidx,
 
     nf = new_ocltaskgroup(GPU_FIRST, NULL, merge_nf, cleanup_nf_merge,
 			  distribute_nf, close_nf,
-			  fill_dlp_cc_cpu_wrapper_laplacebem3d,
+			  fill_cpu_wrapper_laplacebem3d,
 			  fill_dlp_cc_dist_gpu_wrapper_laplacebem3d,
 			  getsize_nf, split_nf_task, cleanup_nf_task,
 			  (void *) &op_cb);
@@ -483,7 +469,7 @@ fill_dlp_cc_far_task_laplacebem3d(const uint * ridx, const uint * cidx,
 
     nf = new_ocltaskgroup(GPU_FIRST, NULL, merge_nf, cleanup_nf_merge,
 			  distribute_nf, close_nf,
-			  fill_dlp_cc_cpu_wrapper_laplacebem3d,
+			  fill_cpu_wrapper_laplacebem3d,
 			  fill_dlp_cc_dist_gpu_wrapper_laplacebem3d,
 			  getsize_nf, split_nf_task, cleanup_nf_task,
 			  (void *) &op_cb);
@@ -523,7 +509,7 @@ init_laplacebem3d_opencl(pcbem3d bem)
    * Setup all necessary kernels
    ****************************************************/
 
-  setup_kernels("Library/laplacebem3d.cl", num_kernels, kernel_names,
+  setup_kernels(laplacebem3d_ocl_src, num_kernels, kernel_names,
 		&ocl_bem3d.kernels);
   ocl_bem3d.num_kernels = num_kernels;
 
@@ -580,9 +566,8 @@ init_laplacebem3d_opencl(pcbem3d bem)
 					   2 * q * sizeof(real), NULL, &res);
     CL_CHECK(res)
       res = clEnqueueWriteBuffer(ocl_system.queues[i * num_queues],
-				 ocl_bem3d.mem_q_xw[i],
-				 CL_TRUE, 0, 2 * q * sizeof(real), q_xw, 0,
-				 NULL, NULL);
+				 ocl_bem3d.mem_q_xw[i], CL_TRUE, 0,
+				 2 * q * sizeof(real), q_xw, 0, NULL, NULL);
     CL_CHECK(res);
   }
 
@@ -617,9 +602,8 @@ init_laplacebem3d_opencl(pcbem3d bem)
 		     NULL, &res);
     CL_CHECK(res)
       res = clEnqueueWriteBuffer(ocl_system.queues[i * num_queues],
-				 ocl_bem3d.mem_q2_xw[i],
-				 CL_TRUE, 0, 2 * q * sizeof(real), q_xw, 0,
-				 NULL, NULL);
+				 ocl_bem3d.mem_q2_xw[i], CL_TRUE, 0,
+				 2 * q * sizeof(real), q_xw, 0, NULL, NULL);
     CL_CHECK(res);
   }
 
@@ -672,15 +656,13 @@ init_laplacebem3d_opencl(pcbem3d bem)
     CL_CHECK(res)
 
       res = clEnqueueWriteBuffer(ocl_system.queues[i * num_queues],
-				 ocl_bem3d.mem_gr_x[i],
-				 CL_TRUE, 0, 3 * v * sizeof(real), gr_x, 0,
-				 NULL, NULL);
+				 ocl_bem3d.mem_gr_x[i], CL_TRUE, 0,
+				 3 * v * sizeof(real), gr_x, 0, NULL, NULL);
     CL_CHECK(res);
 
     res = clEnqueueWriteBuffer(ocl_system.queues[i * num_queues],
-			       ocl_bem3d.mem_gr_t[i],
-			       CL_TRUE, 0, 3 * t * sizeof(uint), gr_t, 0,
-			       NULL, NULL);
+			       ocl_bem3d.mem_gr_t[i], CL_TRUE, 0,
+			       3 * t * sizeof(uint), gr_t, 0, NULL, NULL);
     CL_CHECK(res);
   }
 
@@ -780,17 +762,17 @@ uninit_laplacebem3d_opencl()
 
 pbem3d
 new_slp_laplace_ocl_bem3d(pcsurface3d gr, uint q_regular,
-			  uint q_singular, basisfunctionbem3d basis)
+			  uint q_singular, basisfunctionbem3d row_basis,
+			  basisfunctionbem3d col_basis)
 {
   pbem3d    bem;
 
-  bem = new_slp_laplace_bem3d(gr, q_regular, q_singular, basis);
+  bem =
+    new_slp_laplace_bem3d(gr, q_regular, q_singular, row_basis, col_basis);
 
-  if (basis == BASIS_CONSTANT_BEM3D) {
+  if (row_basis == BASIS_CONSTANT_BEM3D && col_basis == BASIS_CONSTANT_BEM3D) {
     bem->nearfield = fill_slp_cc_near_task_laplacebem3d;
     bem->nearfield_far = fill_slp_cc_far_task_laplacebem3d;
-  }
-  else {
   }
 
   init_laplacebem3d_opencl(bem);
@@ -801,28 +783,17 @@ new_slp_laplace_ocl_bem3d(pcsurface3d gr, uint q_regular,
 #ifdef USE_OPENCL
 pbem3d
 new_dlp_laplace_ocl_bem3d(pcsurface3d gr, uint q_regular,
-			  uint q_singular, basisfunctionbem3d basis_neumann,
-			  basisfunctionbem3d basis_dirichlet, field alpha)
+			  uint q_singular, basisfunctionbem3d row_basis,
+			  basisfunctionbem3d col_basis, field alpha)
 {
   pbem3d    bem;
 
-  bem = new_dlp_laplace_bem3d(gr, q_regular, q_singular, basis_dirichlet,
-			      basis_neumann, alpha);
+  bem = new_dlp_laplace_bem3d(gr, q_regular, q_singular, row_basis, col_basis,
+			      alpha);
 
-  if (basis_neumann == BASIS_CONSTANT_BEM3D && basis_dirichlet
-      == BASIS_CONSTANT_BEM3D) {
+  if (row_basis == BASIS_CONSTANT_BEM3D && col_basis == BASIS_CONSTANT_BEM3D) {
     bem->nearfield = fill_dlp_cc_near_task_laplacebem3d;
     bem->nearfield_far = fill_dlp_cc_far_task_laplacebem3d;
-  }
-  else if (basis_neumann == BASIS_LINEAR_BEM3D
-	   && basis_dirichlet == BASIS_CONSTANT_BEM3D) {
-  }
-  else if (basis_neumann == BASIS_CONSTANT_BEM3D
-	   && basis_dirichlet == BASIS_LINEAR_BEM3D) {
-  }
-  else {
-    assert(basis_neumann == BASIS_LINEAR_BEM3D && basis_dirichlet
-	   == BASIS_LINEAR_BEM3D);
   }
 
   init_laplacebem3d_opencl(bem);

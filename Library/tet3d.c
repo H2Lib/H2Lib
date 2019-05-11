@@ -508,6 +508,27 @@ getedges_tet3d(pctet3d t3, uint tn, uint e[])
   e[5] = common_edge_global(f, t[tn][0], t[tn][3]);
 }
 
+void 
+getvertices_face_tet3d(pctet3d t3, uint nf, uint v[]) {
+
+  uint e[3];
+
+  /*Get edges of face nf*/
+  e[0] = t3->f[nf][0];
+  e[1] = t3->f[nf][1];
+  e[2] = t3->f[nf][2];
+  /*Get vertices */
+  v[0] = t3->e[e[0]][0];
+  v[1] = t3->e[e[0]][1];
+
+  if (t3->e[e[1]][0] == v[0] || t3->e[e[1]][0] == v[1])
+    v[2] = t3->e[e[1]][1];
+  else {
+    /*t3->e[e[1]][1] == v[0] || t3->e[e[1]][1] == v[1]*/
+    v[2] = t3->e[e[1]][0];
+  }
+}
+
 uint
 fixnormals_tet3d(ptet3d gr)
 {

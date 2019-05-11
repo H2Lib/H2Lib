@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "hmatrix.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "hmatrix.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file hmatrix.h
  *  @author Steffen B&ouml;rm
@@ -31,6 +32,7 @@ typedef const hmatrix *pchmatrix;
 #endif
 
 #include "amatrix.h"
+#include "krylov.h"
 #include "factorizations.h"
 #include "block.h"
 #include "rkmatrix.h"
@@ -70,8 +72,9 @@ struct _hmatrix {
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
+
 /**
  * @brief Initialize a @ref hmatrix object.
  *
@@ -209,8 +212,8 @@ HEADER_PREFIX void
 del_hmatrix(phmatrix hm);
 
 /* ------------------------------------------------------------
- Reference counting
- ------------------------------------------------------------ */
+ * Reference counting
+ * ------------------------------------------------------------ */
 
 /** @brief Set a pointer to a @ref hmatrix object, increase its
  *  reference counter, and decrease reference counter of original
@@ -233,8 +236,8 @@ HEADER_PREFIX void
 unref_hmatrix(phmatrix hm);
 
 /* ------------------------------------------------------------
- Statistics
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 /** @brief Get size of a given @ref hmatrix object.
  *
@@ -258,8 +261,8 @@ HEADER_PREFIX size_t
 getfarsize_hmatrix(pchmatrix hm);
 
 /* ------------------------------------------------------------
- Access methods
- ------------------------------------------------------------ */
+ * Access methods
+ * ------------------------------------------------------------ */
 
 #ifdef __GNUC__
 INLINE_PREFIX uint
@@ -285,8 +288,8 @@ INLINE_PREFIX uint getcols_hmatrix(pchmatrix a) {
 }
 
 /* ------------------------------------------------------------
- Simple utility functions
- ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 /** @brief Set a @ref hmatrix to zero by clearing all far- and nearfield
  *  matrices.
@@ -339,8 +342,8 @@ HEADER_PREFIX void
 random_hmatrix(phmatrix hm, uint kmax);
 
 /* ------------------------------------------------------------
- Build H-matrix based on block tree
- ------------------------------------------------------------ */
+ * Build H-matrix based on block tree
+ * ------------------------------------------------------------ */
 
 /** @brief Build an @ref hmatrix object from a @ref block tree using
  *  a given local rank.
@@ -355,8 +358,8 @@ HEADER_PREFIX phmatrix
 build_from_block_hmatrix(pcblock b, uint k);
 
 /* ------------------------------------------------------------
- Build block tree from H-matrix
- ------------------------------------------------------------ */
+ * Build block tree from H-matrix
+ * ------------------------------------------------------------ */
 
 /** @brief Build an @ref block tree from an @ref hmatrix.
  *
@@ -367,8 +370,8 @@ HEADER_PREFIX pblock
 build_from_hmatrix_block(pchmatrix G);
 
 /* ------------------------------------------------------------
- Matrix-vector multiplication
- ------------------------------------------------------------ */
+ * Matrix-vector multiplication
+ * ------------------------------------------------------------ */
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha A x@f$ or @f$y \gets y + \alpha A^* x@f$.
@@ -476,8 +479,8 @@ HEADER_PREFIX void
 addevalsymm_hmatrix_avector(field alpha, pchmatrix hm, pcavector x, pavector y);
 
 /* ------------------------------------------------------------
- Enumeration by block number
- ------------------------------------------------------------ */
+ * Enumeration by block number
+ * ------------------------------------------------------------ */
 
 /** @brief Enumerate @ref hmatrix according to block tree.
  *
@@ -496,19 +499,19 @@ HEADER_PREFIX phmatrix *
 enumerate_hmatrix(pcblock b, phmatrix hm);
 
 /* ------------------------------------------------------------
- Spectral norm
- ------------------------------------------------------------ */
+ * Spectral norm
+ * ------------------------------------------------------------ */
 
-/** @brief Approximate the spectral norm @f$\|A\|_2@f$ of a matrix @f$A@f$.
+/** @brief Approximate the spectral norm @f$\|H\|_2@f$ of a matrix @f$H@f$.
  *
  *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$A^* A@f$ and computing the square root of
+ *  iteration to the matrix @f$H^* H@f$ and computing the square root of
  *  the resulting eigenvalue approximation.
  *
- *  @param a Matrix @f$A@f$.
- *  @returns Approximation of @f$\|A\|_2@f$. */
+ *  @param H Hierarchical matrix @f$H@f$.
+ *  @returns Approximation of @f$\|H\|_2@f$. */
 HEADER_PREFIX real
-norm2_hmatrix(pchmatrix a);
+norm2_hmatrix(pchmatrix H);
 
 /** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
  *  of two matrices @f$A@f$ and @f$B@f$.
@@ -517,41 +520,15 @@ norm2_hmatrix(pchmatrix a);
  *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
  *  of the resulting eigenvalue approximation.
  *
- *  @param a Matrix @f$A@f$.
- *  @param b Matrix @f$B@f$.
- *  @returns Approximation of @f$\|A-B\|_2@f$. */
-HEADER_PREFIX real
-norm2diff_amatrix_hmatrix(pchmatrix a, pcamatrix b);
-
-/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
- *  of a @ref sparsematrix @f$A@f$ and a @ref hmatrix @f$B@f$.
- *
- *  The spectral norm is approximated by applying a few (NORM_STEPS from @ref basic.h) 
- *  steps of the power iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the 
- *  square root of the resulting eigenvalue approximation.
- *
- *  @param A sparsematrix.
- *  @param B Hierarchical matrix.
- *  @returns Approximation of @f$\|A-B\|_2@f$. */
-HEADER_PREFIX real
-norm2diff_sparsematrix_hmatrix(pcsparsematrix A, pchmatrix B);
-
-/** @brief Approximate the spectral norm @f$\|A-B\|_2@f$ of the difference
- *  of two matrices @f$A@f$ and @f$B@f$.
- *
- *  The spectral norm is approximated by applying a few steps of the power
- *  iteration to the matrix @f$(A-B)^* (A-B)@f$ and computing the square root
- *  of the resulting eigenvalue approximation.
- *
- *  @param a Matrix @f$A@f$.
- *  @param b Matrix @f$B@f$.
+ *  @param a Hierarchical matrix @f$A@f$.
+ *  @param b Hierarchical matrix @f$B@f$.
  *  @returns Approximation of @f$\|A-B\|_2@f$. */
 HEADER_PREFIX real
 norm2diff_hmatrix(pchmatrix a, pchmatrix b);
 
 /* ------------------------------------------------------------
- File I/O
- ------------------------------------------------------------ */
+ * File I/O
+ * ------------------------------------------------------------ */
 
 #ifdef USE_NETCDF
 /** @brief Write a matrix into a NetCDF file.
@@ -659,8 +636,8 @@ HEADER_PREFIX phmatrix
 read_hlibsymm_hmatrix(const char *filename);
 
 /* ------------------------------------------------------------
- Drawing
- ------------------------------------------------------------ */
+ * Drawing
+ * ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
 /** @brief Draw a hierarchical matrix
@@ -681,8 +658,9 @@ draw_cairo_hmatrix(cairo_t *cr, pchmatrix hm, bool storage, uint levels);
 
 
 /* ------------------------------------------------------------
-   Copy entries of a sparse matrix 
-   ------------------------------------------------------------ */
+ * Copy entries of a sparse matrix 
+ * ------------------------------------------------------------ */
+
 /** @brief Copy entries of a @ref sparsematrix into a hierarchical matrix
  * 
  * Copy the entries of a @ref sparsematrix into a hierarchical matrix of the

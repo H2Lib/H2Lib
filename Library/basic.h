@@ -29,6 +29,10 @@ typedef stopwatch *pstopwatch;
 
 #include "settings.h"
 
+#ifdef USE_SIMD
+#include "simd.h"
+#endif
+
 /* ------------------------------------------------------------
  * Miscellaneous
  * ------------------------------------------------------------ */
@@ -79,6 +83,42 @@ uninit_h2lib();
  * General utility macros and functions
  * ------------------------------------------------------------ */
 
+/**
+ * @brief Wrapper for either aligned or not align memory allocation function
+ * @param sz Number of bytes that should be allocated.
+ */
+#ifdef USE_SIMD
+#define h2_malloc(sz) _mm_malloc(sz, VALIGN)
+#else
+#define h2_malloc(sz) malloc(sz)
+#endif
+
+/**
+ * @brief Wrapper for either aligned or not align memory free function
+ * @param p Pointer to an object that should be freed.
+ */
+#ifdef USE_SIMD
+#define h2_free(p) _mm_free(p)
+#else
+#define h2_free(p) free(p)
+#endif
+
+
+/**
+ * @brief Current amount of allocated memory (bytes)
+ * @return Current amount of currently allocated memory is returned.
+ */
+HEADER_PREFIX size_t
+get_current_memory();
+
+/**
+ * @brief Round up some value x to the nearest multiple of N.
+ * @param x Value that should be round up to nearest multiple of N.
+ * @param N Muliples of N are used for rounding up x.
+ * @return ((x + N - 1) / N) * N
+ */
+#define ROUNDUP(x, N) ((((x) + (N) - 1) / (N)) * (N))
+
 #ifdef ABS
 #undef ABS
 #endif
@@ -128,9 +168,8 @@ uninit_h2lib();
 /** @brief Compute the absolute value @f$|x|@f$ of a field element @f$x@f$. */
 #define ABS(x) REAL_SQRT(ABSSQR(x))
 
-/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$.
- *
- *  Note that @f$|\mathop{\rm sgn}(x)|=1@f$ even if @f$x=0@f$. */
+/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field
+ *  element @f$x@f$ with the convention @f$\mathop{\rm sgn}(0)=1@f$. */
 #define SIGN1(x) _h2_sgn1(x)
 
 /** @brief Compute a (pseudo-)random field element */
@@ -156,6 +195,20 @@ uninit_h2lib();
 #define REAL_COS(x) cosf(x)
 #else
 #define REAL_COS(x) cos(x)
+#endif
+
+/** @brief Compute the arcsine @f$\asin(x)@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_ASIN(x) asinf(x)
+#else
+#define REAL_ASIN(x) asin(x)
+#endif
+
+/** @brief Compute the arccosine @f$\acos(x)@f$ of a real number @f$x@f$. */
+#ifdef USE_FLOAT
+#define REAL_ACOS(x) acosf(x)
+#else
+#define REAL_ACOS(x) acos(x)
 #endif
 
 /** @brief Compute the tangent @f$\tan(x)@f$ of a real number @f$x@f$. */
@@ -202,11 +255,11 @@ uninit_h2lib();
 
 /** @brief Compute dot product of vectors of dimension 2, i.e.
  *   @f$ \bar x_1 y_1 + \bar x_2 y_2 @f$ */
-#define DOT2(x,y) (CONJ(x[0]) * y[0] + CONJ(x[1]) * y[1])
+#define DOT2(x,y) (CONJ((x)[0]) * (y)[0] + CONJ((x)[1]) * (y)[1])
 
 /** @brief Compute dot product of vectors of dimension 3, i.e.
  *   @f$ \bar x_1 y_1 + \bar x_2 y_2 + \bar x_3 y_3 @f$ */
-#define DOT3(x,y) (CONJ(x[0]) * y[0] + CONJ(x[1]) * y[1] + CONJ(x[2]) * y[2])
+#define DOT3(x,y) (CONJ((x)[0]) * (y)[0] + CONJ((x)[1]) * (y)[1] + CONJ((x)[2]) * (y)[2])
 
 /** @brief Compute squared 2-norm of a vector of  dimension 2, i.e.
  *   @f$ \lvert x \rvert^2 + \lvert y \rvert^2 @f$*/
@@ -226,11 +279,11 @@ uninit_h2lib();
 
 /** @brief Compute dot product of vectors of reals with dimension 2, i.e.
  *   @f$ x_1 y_1 + x_2 y_2 @f$ */
-#define REAL_DOT2(x,y) (x[0] * y[0] + x[1] * y[1])
+#define REAL_DOT2(x,y) ((x)[0] * (y)[0] + (x)[1] * (y)[1])
 
 /** @brief Compute dot product of vectors of reals with dimension 3, i.e.
  *   @f$ x_1 y_1 + x_2 y_2 + x_3 y_3 @f$ */
-#define REAL_DOT3(x,y) (x[0] * y[0] + x[1] * y[1] + x[2] * y[2])
+#define REAL_DOT3(x,y) ((x)[0] * (y)[0] + (x)[1] * (y)[1] + (x)[2] * (y)[2])
 
 /** @brief Compute squared 2-norm of a vector of reals with dimension 2, i.e.
  *   @f$ x^2 + y^2 @f$*/
@@ -294,7 +347,7 @@ INLINE_PREFIX real _h2_realrand();
 #endif
 
 /** @brief Compute the reciprocal square root @f$1.0/\sqrt{x}@f$ of a
- *  non-negative real nunber @f$x@f$. 
+ *  non-negative real nunber @f$x@f$.
  *  @param x Input value
  */
 INLINE_PREFIX real _h2_rsqrt(real x) {
@@ -318,7 +371,8 @@ INLINE_PREFIX real _h2_abssqr(field x) {
 }
 #endif
 
-/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field element @f$x@f$.
+/** @brief Compute the sign @f$\mathop{\rm sgn}(x)@f$ of a field
+ *  element @f$x@f$ with the convention @f$\mathop{\rm sgn}(0)=1@f$.
  *
  *  @param x Field element @f$x@f$.
  *  @returns Sign of @f$x@f$, i.e., @f$x/|x|@f$ if @f$x\neq 0@f$ and @f$1@f$ if @f$x=0@f$. */
@@ -326,7 +380,7 @@ INLINE_PREFIX real _h2_abssqr(field x) {
 INLINE_PREFIX field _h2_sgn1(field x) {
   real norm, rx, ix;
 
-  if (x == f_zero) {
+  if (ABSSQR(x) <= H2_ALMOST_ZERO) {
     return 1.0;
   } else {
     rx = REAL(x);
@@ -345,9 +399,7 @@ INLINE_PREFIX field _h2_sgn1(field x) {
  *
  *  @returns Random number with real and imaginary part in
  *    @f$[-1,1]@f$. */
-INLINE_PREFIX field
-_h2_fieldrand()
-{
+INLINE_PREFIX field _h2_fieldrand() {
   field x;
 
   x = _h2_realrand();
@@ -407,9 +459,7 @@ INLINE_PREFIX real _h2_realmin3(real x, real y, real z) {
 /** @brief Compute a (pseudo-)random number.
  *
  *  @returns Random number in @f$[-1,1]@f$. */
-INLINE_PREFIX real
-_h2_realrand()
-{
+INLINE_PREFIX real _h2_realrand() {
   return 2.0 * rand() / RAND_MAX - 1.0;
 }
 
@@ -480,7 +530,7 @@ _h2_allocmem(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>sz</tt> variables of type @ref uint. */
-uint *
+HEADER_PREFIX uint *
 _h2_allocuint(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage of type @ref real.
@@ -494,7 +544,7 @@ _h2_allocuint(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>sz</tt> variables of type @ref real. */
-real *
+HEADER_PREFIX real *
 _h2_allocreal(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage of type @ref field.
@@ -529,7 +579,7 @@ _h2_allocfield(size_t sz, const char *filename, int line);
  *  @param filename Name of source file (used for error messages).
  *  @param line Line number in source file.
  *  @returns Pointer to <tt>rows*cols</tt> variables of type @ref field. */
-field *
+HEADER_PREFIX field *
 _h2_allocmatrix(size_t rows, size_t cols, const char *filename, int line);
 
 /** @brief Release allocated storage.
@@ -626,6 +676,28 @@ stop_stopwatch(pstopwatch sw);
  *  @returns <tt>cairo_t</tt> object that can be used in drawing operations. */
 HEADER_PREFIX cairo_t *
 new_cairopdf(const char *filename, double width, double height);
+
+/** @brief Create a PNG canvas for Cairo drawing.
+ *
+ *  The resulting <tt>cairo_t</tt> object can be used in
+ *  @ref write_cairopng to write the image to a PNG file.
+ *
+ *  @remark The <tt>cairo_t</tt> object should be destroyed
+ *  using <tt>cairo_destroy</tt> once it is no longer needed.
+ *
+ *  @param width Width of the canvas in pixels.
+ *  @param height Height of the canvas in pixels.
+ *  @returns <tt>cairo_t</tt> object that can be used in drawing operations. */
+HEADER_PREFIX cairo_t *
+new_cairopng(uint width, uint height);
+
+/** @brief Write Cairo image to PNG file.
+ *
+ *  @param cr Cairo context created by @ref new_cairopng.
+ *  @param filename Name of the PNG file.
+ *  @returns True if successful. */
+HEADER_PREFIX bool
+write_cairopng(cairo_t *cr, const char *filename);
 #endif
 
 /** @} */
@@ -645,7 +717,7 @@ new_cairopdf(const char *filename, double width, double height);
  *  hierarchical matrices, the modules have been organized in a layered
  *  design that allows students to work with the lower layers (e.g.,
  *  for handling matrices and vectors) without having to worry about
- *  higher layers (e.g., approximativee algebraic routines or sophisticated
+ *  higher layers (e.g., approximative algebraic routines or sophisticated
  *  compression algorithms).
  *
  *  A researcher using <tt>H2Lib</tt> finds a relatively complete
@@ -661,7 +733,7 @@ new_cairopdf(const char *filename, double width, double height);
  *  equations or elliptic partial differential equations, with the
  *  corresponding auxiliary modules for singular quadrature and
  *  simple grid management.
- *  
+ *
  */
 
 #endif

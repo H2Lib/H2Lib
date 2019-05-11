@@ -1,4 +1,3 @@
-
 /* ------------------------------------------------------------
  * This is the file "harith.h" of the H2Lib package.
  * All rights reserved, Steffen Boerm 2014
@@ -46,8 +45,8 @@ trunc_rkmatrix(pctruncmode tm, real eps, prkmatrix r);
  *  @param eps Truncation accuracy @f$\epsilon@f$.
  *  @param b Target matrix @f$B@f$. */
 HEADER_PREFIX void
-add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a,
-		     pctruncmode tm, real eps, prkmatrix b);
+add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
+    real eps, prkmatrix b);
 
 ///* @brief Truncated addition of a full matrix to a low-rank matrix
 // *  in @ref rkmatrix representation,
@@ -86,9 +85,7 @@ add_rkmatrix_amatrix(field alpha, bool atrans, pcrkmatrix a, pamatrix b);
  *  @param a Matrix @f$A@f$.
  *  @param b Target matrix @f$B@f$. */
 HEADER_PREFIX void
-add_hmatrix_amatrix(field alpha,
-		    bool atrans, pchmatrix a,
-		    pamatrix b);
+add_hmatrix_amatrix(field alpha, bool atrans, pchmatrix a, pamatrix b);
 
 /** @brief Truncated addition of two low-rank matrices in @ref rkmatrix
  *  representation,
@@ -101,7 +98,7 @@ add_hmatrix_amatrix(field alpha,
  *  @param trg Target matrix @f$A@f$. */
 HEADER_PREFIX void
 add_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm, real eps,
-	     prkmatrix trg);
+    prkmatrix trg);
 
 ///* @brief Truncated addition of two low-rank matrices in @ref rkmatrix
 // *  representation,
@@ -132,8 +129,8 @@ add_rkmatrix(field alpha, pcrkmatrix src, pctruncmode tm, real eps,
  *  @param eps Truncation accuracy @f$\epsilon@f$.
  *  @param b Target @ref hmatrix @f$B@f$. */
 HEADER_PREFIX void
-add_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a,
-		    pctruncmode tm, real eps, phmatrix b);
+add_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
+    real eps, phmatrix b);
 
 /** @brief Locally truncated addition of a matrix in @ref amatrix
  *  representation to the lower triangular part of a hierarchical matrix
@@ -147,8 +144,8 @@ add_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a,
  *  @param eps Truncation accuracy @f$\epsilon@f$.
  *  @param b Target @ref hmatrix @f$B@f$. */
 HEADER_PREFIX void
-add_lower_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a,
-			  pctruncmode tm, real eps, phmatrix b);
+add_lower_amatrix_hmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
+    real eps, phmatrix b);
 
 /** @brief Locally truncated addition of a low-rank matrix in @ref rkmatrix
  *  representation to a hierarchical matrix in @ref hmatrix representation,
@@ -174,8 +171,8 @@ add_rkmatrix_hmatrix(field alpha, pcrkmatrix a, pctruncmode tm, real eps,
  *  @param eps Truncation accuracy @f$\epsilon@f$.
  *  @param b Target @ref hmatrix @f$B@f$. */
 HEADER_PREFIX void
-add_lower_rkmatrix_hmatrix(field alpha, pcrkmatrix a,
-			   pctruncmode tm, real eps, phmatrix b);
+add_lower_rkmatrix_hmatrix(field alpha, pcrkmatrix a, pctruncmode tm, real eps,
+    phmatrix b);
 
 /** @brief Locally truncated addition of a hierarchical matrix to
  *  a hierarchical matrix representation,
@@ -206,7 +203,6 @@ add_hmatrix(field alpha, pchmatrix a, pctruncmode tm, real eps, phmatrix b);
 //HEADER_PREFIX phmatrix
 //split_amatrix(pcamatrix f, pccluster rc, pccluster cc,
 //	      bool rsplit, bool csplit, bool copy);
-
 /** @brief Split an @ref amatrix into submatrices referencing the
  *  original matrix.
  *
@@ -217,8 +213,8 @@ add_hmatrix(field alpha, pchmatrix a, pctruncmode tm, real eps, phmatrix b);
  *  @param csplit Set to split in column direction.
  *  @returns Block matrix of depth one. */
 HEADER_PREFIX phmatrix
-split_sub_amatrix(pcamatrix f, pccluster rc, pccluster cc,
-		  bool rsplit, bool csplit);
+split_sub_amatrix(pcamatrix f, pccluster rc, pccluster cc, bool rsplit,
+    bool csplit);
 
 /** @brief Split an @ref rkmatrix into submatrices.
  *
@@ -231,8 +227,8 @@ split_sub_amatrix(pcamatrix f, pccluster rc, pccluster cc,
  *     will be zero.
  *  @returns Block matrix of depth one. */
 HEADER_PREFIX phmatrix
-split_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc,
-	       bool rsplit, bool csplit, bool copy);
+split_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc, bool rsplit,
+    bool csplit, bool copy);
 
 /** @brief Split an @ref rkmatrix into submatrices referencing the
  *  original matrix.
@@ -249,8 +245,8 @@ split_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc,
  *  @param csplit Set to split in column direction.
  *  @returns Block matrix of depth one. */
 HEADER_PREFIX phmatrix
-split_sub_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc,
-		   bool rsplit, bool csplit);
+split_sub_rkmatrix(pcrkmatrix r, pccluster rc, pccluster cc, bool rsplit,
+    bool csplit);
 
 ///* @brief Split a leaf @ref hmatrix into submatrices.
 // *
@@ -376,9 +372,8 @@ addmul_hmatrix(field alpha, bool xtrans, pchmatrix x, bool ytrans, pchmatrix y,
  *  @param eps Truncation accuracy @f$\epsilon@f$.
  *  @param z Target matrix @f$Z@f$. */
 HEADER_PREFIX void
-addmul_lower_hmatrix(field alpha,
-		     bool xtrans, pchmatrix x, bool ytrans, pchmatrix y,
-		     pctruncmode tm, real eps, phmatrix z);
+addmul_lower_hmatrix(field alpha, bool xtrans, pchmatrix x, bool ytrans,
+    pchmatrix y, pctruncmode tm, real eps, phmatrix z);
 
 /* ------------------------------------------------------------
  * Matrix inversion
@@ -528,8 +523,8 @@ triangularinvmul_amatrix_hmatrix(bool alower, bool aunit, bool atrans,
  *     The rows are assumed to be in cluster numbering according
  *     to <tt>a->rc</tt>. */
 HEADER_PREFIX void
-triangularmul_hmatrix_avector(bool alower, bool aunit, bool atrans,
-    pchmatrix a, pavector xp);
+triangularmul_hmatrix_avector(bool alower, bool aunit, bool atrans, pchmatrix a,
+    pavector xp);
 
 /** @brief Evaluate a triangular system @f$x \gets A x@f$ or
  *  @f$x \gets A^* x@f$.
@@ -559,8 +554,8 @@ triangulareval_hmatrix_avector(bool alower, bool aunit, bool atrans,
  *     The rows are assumed to be in cluster numbering according
  *     to <tt>a->rc</tt>. */
 HEADER_PREFIX void
-triangularmul_hmatrix_amatrix(bool alower, bool aunit, bool atrans,
-    pchmatrix a, bool xtrans, pamatrix xp);
+triangularmul_hmatrix_amatrix(bool alower, bool aunit, bool atrans, pchmatrix a,
+    bool xtrans, pamatrix xp);
 
 /** @brief Evaluate a triangular system,
  *  @f$X \gets \operatorname{succtrunc}(A X, \epsilon)@f$ or
@@ -603,6 +598,26 @@ triangularmul_hmatrix(bool alower, bool aunit, bool atrans, pchmatrix a,
 HEADER_PREFIX void
 lrdecomp_hmatrix(phmatrix a, pctruncmode tm, real eps);
 
+/** @brief Solve the linear systems @f$A x = b@f$
+ *  using the LR factorization provided by @ref lrdecomp_hmatrix.
+ *
+ *  @param a Matrix containing the LR factorization in the form returned
+ *     by @ref lrdecomp_hmatrix.
+ *  @param x Right-hand side vector @f$b@f$, will be overwritten by
+ *     solution vector @f$x@f$. */
+HEADER_PREFIX void
+lrsolve_n_hmatrix_avector(pchmatrix a, pavector x);
+
+/** @brief Solve the linear systems @f$A^* x = b@f$
+ *  using the LR factorization provided by @ref lrdecomp_hmatrix.
+ *
+ *  @param a Matrix containing the LR factorization in the form returned
+ *     by @ref lrdecomp_hmatrix.
+ *  @param x Right-hand side vector @f$b@f$, will be overwritten by
+ *     solution vector @f$x@f$. */
+HEADER_PREFIX void
+lrsolve_t_hmatrix_avector(pchmatrix a, pavector x);
+
 /** @brief Solve the linear systems @f$A x = b@f$ or @f$A^* x = b@f$
  *  using the LR factorization provided by @ref lrdecomp_hmatrix.
  *
@@ -613,6 +628,40 @@ lrdecomp_hmatrix(phmatrix a, pctruncmode tm, real eps);
  *     solution vector @f$x@f$. */
 HEADER_PREFIX void
 lrsolve_hmatrix_avector(bool atrans, pchmatrix a, pavector x);
+
+/**
+ * @brief Evaluate the linear system @f$x \gets A x@f$ using the LR
+ *  factorization provided by @ref lrdecomp_hmatrix.
+ *
+ *  @param a Matrix containing the LR factorization in the form
+ *    returned by @ref lrdecomp_hmatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+lreval_n_hmatrix_avector(pchmatrix a, pavector x);
+
+/**
+ * @brief Evaluate the linear system @f$x \gets A^* x@f$ using the LR
+ *  factorization provided by @ref lrdecomp_hmatrix.
+ *
+ *  @param a Matrix containing the LR factorization in the form
+ *    returned by @ref lrdecomp_hmatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+lreval_t_hmatrix_avector(pchmatrix a, pavector x);
+
+/**
+ * @brief Evaluate the linear system @f$x \gets A x@f$ or @f$x \gets A^* x@f$
+ *  using the LR factorization provided by @ref lrdecomp_hmatrix.
+ *
+ *  @param atrans Set if @f$A^*@f$ instead of @f$A@f$ is to be used.
+ *  @param a Matrix containing the LR factorization in the form
+ *    returned by @ref lrdecomp_hmatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+lreval_hmatrix_avector(bool atrans, pchmatrix a, pavector x);
 
 /** @brief Compute the Cholesky factorization,
  *  @f$A \approx L L^*@f$.
@@ -639,6 +688,17 @@ choldecomp_hmatrix(phmatrix a, pctruncmode tm, real eps);
  *     solution vector @f$x@f$. */
 HEADER_PREFIX void
 cholsolve_hmatrix_avector(pchmatrix a, pavector x);
+
+/**
+ * @brief Evaluate the linear system @f$x \gets A x@f$ using the Cholesky
+ *  factorization provided by @ref choldecomp_hmatrix.
+ *
+ *  @param a Matrix containing the Cholesky factorization in the form
+ *    returned by @ref choldecomp_hmatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+choleval_hmatrix_avector(pchmatrix a, pavector x);
 
 /** @} */
 

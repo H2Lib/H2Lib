@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "sparsematrix.c" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2012
-   ------------------------------------------------------------ */
+ * This is the file "sparsematrix.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2012
+ * ------------------------------------------------------------ */
 
 #include "sparsematrix.h"
 
@@ -10,12 +10,14 @@
 #include <stdio.h>
 
 /* ------------------------------------------------------------
-   Constructors and destructors
-   ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 psparsematrix
 new_raw_sparsematrix(uint rows, uint cols, uint nz)
 {
+  uint      i;
+
   psparsematrix sp;
 
   sp = (psparsematrix) allocmem(sizeof(sparsematrix));
@@ -26,6 +28,40 @@ new_raw_sparsematrix(uint rows, uint cols, uint nz)
   sp->rows = rows;
   sp->cols = cols;
   sp->nz = nz;
+
+  for (i = 0; i < rows + 1; ++i) {
+    sp->row[i] = 0;
+  }
+
+  return sp;
+}
+
+psparsematrix
+new_identity_sparsematrix(uint rows, uint cols)
+{
+  uint      i, n;
+
+  psparsematrix sp;
+
+  n = UINT_MIN(rows, cols);
+
+  sp = (psparsematrix) allocmem(sizeof(sparsematrix));
+  sp->row = allocuint(rows + 1);
+  sp->col = allocuint(n);
+  sp->coeff = allocfield(n);
+
+  sp->rows = rows;
+  sp->cols = cols;
+  sp->nz = n;
+
+  for (i = 0; i < n; ++i) {
+    sp->row[i] = i;
+    sp->col[i] = i;
+    sp->coeff[i] = 1.0;
+  }
+  for (; i < rows + 1; ++i) {
+    sp->row[i] = n;
+  }
 
   return sp;
 }
@@ -84,15 +120,18 @@ del_sparsematrix(psparsematrix a)
 {
   assert(a != NULL);
 
-  freemem(a->coeff);
-  freemem(a->col);
-  freemem(a->row);
+  if (a->coeff != NULL)
+    freemem(a->coeff);
+  if (a->col != NULL)
+    freemem(a->col);
+  if (a->row != NULL)
+    freemem(a->row);
   freemem(a);
 }
 
 /* ------------------------------------------------------------
-   Access methods
-   ------------------------------------------------------------ */
+ * Access methods
+ * ------------------------------------------------------------ */
 
 field
 addentry_sparsematrix(psparsematrix a, uint row, uint col, field x)
@@ -128,8 +167,8 @@ setentry_sparsematrix(psparsematrix a, uint row, uint col, field x)
 }
 
 /* ------------------------------------------------------------
-   Statistics
-   ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 size_t
 getsize_sparsematrix(pcsparsematrix a)
@@ -145,8 +184,8 @@ getsize_sparsematrix(pcsparsematrix a)
 }
 
 /* ------------------------------------------------------------
-   Simple utility functions
-   ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 static void
 swap(uint i1, uint i2, uint * col, pfield coeff)
@@ -206,14 +245,16 @@ print_sparsematrix(pcsparsematrix a)
   rows = a->rows;
 
   (void) printf("sparsematrix(%u,%u,%u)\n", rows, a->cols, a->nz);
+  if (a->nz > 0) {
+    for (i = 0; i < rows; i++) {
+      (void) printf("  %u:", i);
 
-  for (i = 0; i < rows; i++) {
-    (void) printf("  %u:", i);
+      for (j = row[i]; j < row[i + 1]; j++)
+	(void) printf(" (%u " FIELD_CS(.5, e) ")", col[j],
+		      FIELD_ARG(coeff[j]));
 
-    for (j = row[i]; j < row[i + 1]; j++)
-      (void) printf(" (%u " FIELD_CS(, g) ")", col[j], FIELD_ARG(coeff[j]));
-
-    (void) printf("\n");
+      (void) printf("\n");
+    }
   }
 }
 
@@ -260,17 +301,15 @@ print_eps_sparsematrix(pcsparsematrix a, const char *filename, uint offset)
 		 "0.1 dup translate\n"
 		 "0 setgray\n"
 		 "/bx {dup 0 exch 1 exch sub setrgbcolor moveto 0.8 0.0 rlineto 0.0 0.8 rlineto -0.8 0.0 rlineto closepath fill} def\n",
-		 offset, offset,
-		 offset + (int) (scale * cols + 0.5),
+		 offset, offset, offset + (int) (scale * cols + 0.5),
 		 offset + (int) (scale * rows + 0.5), offset, scale);
 
   for (i = 0; i < rows; i++)
     for (r = row[i]; r < row[i + 1]; r++) {
       j = col[r];
 
-      (void) fprintf(out,
-		     "%u %u %f bx\n",
-		     j, rows - 1 - i, ABS(coeff[r]) / maxval);
+      (void) fprintf(out, "%u %u %f bx\n", j, rows - 1 - i,
+		     ABS(coeff[r]) / maxval);
     }
 
   (void) fprintf(out, "showpage\n");
@@ -278,12 +317,12 @@ print_eps_sparsematrix(pcsparsematrix a, const char *filename, uint offset)
 }
 
 /* ------------------------------------------------------------
-   Basic linear algebra
-   ------------------------------------------------------------ */
+ * Basic linear algebra
+ * ------------------------------------------------------------ */
 
 void
-addeval_sparsematrix_avector(field alpha, pcsparsematrix a,
-			     pcavector x, pavector y)
+addeval_sparsematrix_avector(field alpha, pcsparsematrix a, pcavector x,
+			     pavector y)
 {
   uint     *row;
   uint     *col;
@@ -309,8 +348,9 @@ addeval_sparsematrix_avector(field alpha, pcsparsematrix a,
 
   for (i = 0; i < rows; i++) {
     sum = 0.0;
-    for (j = row[i]; j < row[i + 1]; j++)
+    for (j = row[i]; j < row[i + 1]; j++) {
       sum += coeff[j] * xv[col[j]];
+    }
     yv[i] += alpha * sum;
   }
 }
@@ -343,8 +383,9 @@ addevaltrans_sparsematrix_avector(field alpha, pcsparsematrix a,
 
   for (i = 0; i < rows; i++) {
     val = alpha * xv[i];
-    for (j = row[i]; j < row[i + 1]; j++)
+    for (j = row[i]; j < row[i + 1]; j++) {
       yv[col[j]] += coeff[j] * val;
+    }
   }
 }
 
@@ -352,43 +393,27 @@ void
 mvm_sparsematrix_avector(field alpha, bool trans, pcsparsematrix a,
 			 pcavector x, pavector y)
 {
-  if (trans)
+  if (trans) {
     addevaltrans_sparsematrix_avector(alpha, a, x, y);
-  else
+  }
+  else {
     addeval_sparsematrix_avector(alpha, a, x, y);
+  }
 }
 
 real
-norm2_sparsematrix(pcsparsematrix a)
+norm2_sparsematrix(pcsparsematrix S)
 {
-  avector   tmp1, tmp2;
-  pavector  x, y;
-  real      norm;
-  uint      i;
+  return norm2_matrix((mvm_t) mvm_sparsematrix_avector, (void *) S, S->rows,
+		      S->rows);
+}
 
-  x = init_avector(&tmp1, a->cols);
-  y = init_avector(&tmp2, a->rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  i = 0;
-  while (i < NORM_STEPS && norm > 0.0) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_sparsematrix_avector(1.0, a, x, y);
-
-    clear_avector(x);
-    addevaltrans_sparsematrix_avector(1.0, a, y, x);
-
-    norm = norm2_avector(x);
-    i++;
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+real
+norm2diff_sparsematrix(pcsparsematrix a, pcsparsematrix b)
+{
+  return norm2diff_matrix((mvm_t) mvm_sparsematrix_avector, (void *) a,
+			  (mvm_t) mvm_sparsematrix_avector, (void *) b,
+			  a->rows, a->rows);
 }
 
 void
@@ -403,24 +428,32 @@ add_sparsematrix_amatrix(field alpha, bool atrans, pcsparsematrix a,
   uint      ldb = b->ld;
   uint      i, j, k;
 
-  if (atrans) {
-    assert(b->rows == cols);
-    assert(b->cols == rows);
+#ifdef HARITH_SPARSEMATRIX_QUICK_EXIT
+  if (a->nz == 0)
+    return;
+#endif
+  if (a->nz > 0) {
+    if (atrans) {
+      assert(b->rows == cols);
+      assert(b->cols == rows);
 
-    for (i = 0; i < rows; i++)
-      for (k = row[i]; k < row[i + 1]; k++) {
-	j = col[k];
-	b->a[j + i * ldb] += alpha * coeff[k];
+      for (i = 0; i < rows; i++) {
+	for (k = row[i]; k < row[i + 1]; k++) {
+	  j = col[k];
+	  b->a[j + i * ldb] += alpha * coeff[k];
+	}
       }
-  }
-  else {
-    assert(b->rows == rows);
-    assert(b->cols == cols);
+    }
+    else {
+      assert(b->rows == rows);
+      assert(b->cols == cols);
 
-    for (i = 0; i < rows; i++)
-      for (k = row[i]; k < row[i + 1]; k++) {
-	j = col[k];
-	b->a[i + k * ldb] += alpha * coeff[k];
+      for (i = 0; i < rows; i++) {
+	for (k = row[i]; k < row[i + 1]; k++) {
+	  j = col[k];
+	  b->a[i + j * ldb] += alpha * coeff[k];
+	}
       }
+    }
   }
 }

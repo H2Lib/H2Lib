@@ -3,6 +3,7 @@
 #include "basic.h"
 #include "krylov.h"
 #include "helmholtzbem3d.h"
+#include "matrixnorms.h"
 
 #ifdef USE_CAIRO
 #include <cairo.h>
@@ -63,61 +64,6 @@ addeval_A(field alpha, void *matrix, pcavector x, pavector y)
   }
 }
 
-/* Simple convenience wrapper for GMRES solver */
-static void
-solve_gmres_bem3d(matrixtype type, void *A, pavector b, pavector x,
-		  real accuracy, uint steps)
-{
-  addeval_t addevalA;
-  pavector  rhat, q, tau;
-  pamatrix  qr;
-  uint      i, j, n, kk, kmax;
-  real      norm;
-
-  addevalA = (addeval_t) addeval_A;
-
-  kmax = 500;
-
-  n = b->dim;
-  assert(x->dim == n);
-
-  qr = new_zero_amatrix(n, kmax);
-  rhat = new_avector(n);
-  q = new_avector(n);
-  tau = new_avector(kmax);
-  clear_avector(x);
-
-  init_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-
-  for (i = 0; i < steps; i += kmax) {
-    for (j = 0; j < kmax && i + j < steps; ++j) {
-      step_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-      norm = residualnorm_gmres(rhat, kk);
-#ifndef NDEBUG
-      printf("  Residual: %.5e\t Iterations: %u\r", norm, j + i);
-      fflush(stdout);
-#endif
-      if (norm <= accuracy) {
-	finish_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-	break;
-      }
-    }
-    if (norm <= accuracy) {
-      break;
-    }
-    else {
-      finish_gmres(addevalA, A, b, x, rhat, q, &kk, qr, tau);
-    }
-  }
-
-  printf("\n");
-  del_avector(rhat);
-  del_avector(q);
-  del_avector(tau);
-  del_amatrix(qr);
-
-}
-
 field
 eval_brakhage_werner_c(pcbem3d bem, pcavector w, field eta, real * x)
 {
@@ -129,9 +75,10 @@ eval_brakhage_werner_c(pcbem3d bem, pcavector w, field eta, real * x)
   const uint rows = gr->triangles;
 
   uint      nq = bem->sq->n_single;
+  uint      vnq = ROUNDUP(nq, VREAL);
   real     *xx = bem->sq->x_single;
   real     *yy = bem->sq->y_single;
-  real     *ww = bem->sq->w_single + 3 * nq;
+  real     *ww = bem->sq->w_single + 3 * vnq;
 
   const real *A, *B, *C, *ns;
   uint      s, ss, q;
@@ -196,6 +143,7 @@ eval_brakhage_werner_l(pcbem3d bem, pcavector w, field eta, real * x)
   real      k = bem->k;
 
   uint      nq = bem->sq->n_single;
+  uint      vnq = ROUNDUP(nq, VREAL);
   real     *xx = bem->sq->x_single;
   real     *yy = bem->sq->y_single;
   real     *ww = bem->sq->w_single;
@@ -212,7 +160,7 @@ eval_brakhage_werner_l(pcbem3d bem, pcavector w, field eta, real * x)
 
   assert(gr->vertices == w->dim);
 
-  quad = allocfield(nq);
+  quad = allocfield(vnq);
   v = new_zero_avector(vertices);
 
   for (s = 0; s < triangles; s++) {
@@ -257,7 +205,7 @@ eval_brakhage_werner_l(pcbem3d bem, pcavector w, field eta, real * x)
       assert(ii < vertices);
       v->v[ii] += sum * gs_fac;
 
-      ww += nq;
+      ww += vnq;
     }
   }
 
@@ -414,7 +362,7 @@ test_system(matrixtype mattype, const char *apprxtype,
   struct _eval_A eval;
   helmholtz_data hdata;
   real      errorV, errorKM, error_solve, eps_solve;
-  uint      steps;
+  uint      steps, iter;
   boundary_func3d rhs = (boundary_func3d) rhs_dirichlet_point_helmholtzbem3d;
 
   eps_solve = 1.0e-12;
@@ -448,11 +396,11 @@ test_system(matrixtype mattype, const char *apprxtype,
     assert(mattype == H2MATRIX);
     assemble_bem3d_h2matrix_row_clusterbasis(bem_slp, ((ph2matrix) V)->rb);
     assemble_bem3d_h2matrix_col_clusterbasis(bem_slp, ((ph2matrix) V)->cb);
-    assemble_bem3d_h2matrix(bem_slp, brootV, (ph2matrix) V);
+    assemble_bem3d_h2matrix(bem_slp, (ph2matrix) V);
 
     assemble_bem3d_h2matrix_row_clusterbasis(bem_dlp, ((ph2matrix) KM)->rb);
     assemble_bem3d_h2matrix_col_clusterbasis(bem_dlp, ((ph2matrix) KM)->cb);
-    assemble_bem3d_h2matrix(bem_dlp, brootKM, (ph2matrix) KM);
+    assemble_bem3d_h2matrix(bem_dlp, (ph2matrix) KM);
 
     errorV = norm2diff_amatrix_h2matrix((ph2matrix) V, Vfull)
       / norm2_amatrix(Vfull);
@@ -466,8 +414,10 @@ test_system(matrixtype mattype, const char *apprxtype,
     eval.KMtype = H2MATRIX;
   }
 
-
-  hdata.kvec = bem_slp->kvec;
+  hdata.kvec = allocreal(3);
+  hdata.kvec[0] = ABS(bem_slp->k);
+  hdata.kvec[1] = 0.0;
+  hdata.kvec[2] = 0.0;
   hdata.source = allocreal(3);
   if (exterior) {
     hdata.source[0] = 0.0, hdata.source[1] = 0.0, hdata.source[2] = 0.2;
@@ -482,13 +432,15 @@ test_system(matrixtype mattype, const char *apprxtype,
   printf("Solving Dirichlet problem:\n");
 
   if (basis_dirichlet == BASIS_LINEAR_BEM3D) {
-    integrate_bem3d_linear_avector(bem_dlp, rhs, b, (void *) &hdata);
+    integrate_bem3d_l_avector(bem_dlp, rhs, b, (void *) &hdata);
   }
   else {
-    integrate_bem3d_const_avector(bem_dlp, rhs, b, (void *) &hdata);
+    integrate_bem3d_c_avector(bem_dlp, rhs, b, (void *) &hdata);
   }
 
-  solve_gmres_bem3d(mattype, (void *) &eval, b, x, eps_solve, steps);
+  iter = solve_gmres_avector(&eval, addeval_A, b, x, eps_solve, steps, 50);
+  printf("GMRES iterations:\n");
+  printf("  %d\n", iter);
 
   error_solve = max_rel_outer_error(bem_slp, &hdata, x, rhs, basis_neumann);
 
@@ -503,13 +455,13 @@ test_system(matrixtype mattype, const char *apprxtype,
   del_avector(x);
   del_avector(b);
   freemem(hdata.source);
+  freemem(hdata.kvec);
 }
 
 void
-test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
-	   basisfunctionbem3d basis_neumann,
-	   basisfunctionbem3d basis_dirichlet, bool exterior, real error_min,
-	   real error_max)
+test_suite(pcsurface3d gr, field k, uint q, uint clf, real eta,
+	   basisfunctionbem3d row_basis, basisfunctionbem3d col_basis,
+	   bool exterior, real error_min, real error_max)
 {
   pbem3d    bem_slp, bem_dlp;
   pcluster  rootn, rootd;
@@ -525,15 +477,15 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
   real      delta;
   real      eps_aca;
 
-  nn = basis_neumann == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
-  nd = basis_dirichlet == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
+  nn = row_basis == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
+  nd = col_basis == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
 
-  bem_slp = new_slp_helmholtz_bem3d(kvec, gr, q, q + 2, basis_neumann);
-  bem_dlp = new_dlp_helmholtz_bem3d(kvec, gr, q, q + 2, basis_neumann,
-				    basis_dirichlet, exterior ? 0.5 : -0.5);
+  bem_slp = new_slp_helmholtz_bem3d(k, gr, q, q + 2, row_basis, row_basis);
+  bem_dlp = new_dlp_helmholtz_bem3d(k, gr, q, q + 2, row_basis, col_basis,
+				    exterior ? 0.5 : -0.5);
 
-  rootn = build_bem3d_cluster(bem_slp, clf, basis_neumann);
-  rootd = build_bem3d_cluster(bem_dlp, clf, basis_dirichlet);
+  rootn = build_bem3d_cluster(bem_slp, clf, row_basis);
+  rootd = build_bem3d_cluster(bem_dlp, clf, col_basis);
 
   brootV = build_nonstrict_block(rootn, rootn, &eta, admissible_max_cluster);
   brootKM = build_nonstrict_block(rootn, rootd, &eta, admissible_max_cluster);
@@ -555,20 +507,20 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
   setup_hmatrix_aprx_inter_row_bem3d(bem_slp, rootn, rootn, brootV, m);
   setup_hmatrix_aprx_inter_row_bem3d(bem_dlp, rootn, rootd, brootKM, m);
   test_system(HMATRIX, "Interpolation row", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   setup_hmatrix_aprx_inter_col_bem3d(bem_slp, rootn, rootn, brootV, m);
   setup_hmatrix_aprx_inter_col_bem3d(bem_dlp, rootn, rootd, brootKM, m);
   test_system(HMATRIX, "Interpolation column", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   setup_hmatrix_aprx_inter_mixed_bem3d(bem_slp, rootn, rootn, brootV, m);
   setup_hmatrix_aprx_inter_mixed_bem3d(bem_dlp, rootn, rootd, brootKM, m);
   test_system(HMATRIX, "Interpolation mixed", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   /*
    * Test Green
@@ -583,23 +535,23 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
   setup_hmatrix_aprx_green_row_bem3d(bem_dlp, rootn, rootd, brootKM, m, l,
 				     delta, build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Green row", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
   setup_hmatrix_aprx_green_col_bem3d(bem_slp, rootn, rootn, brootV, m, l,
 				     delta, build_bem3d_cube_quadpoints);
   setup_hmatrix_aprx_green_col_bem3d(bem_dlp, rootn, rootd, brootKM, m, l,
 				     delta, build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Green column", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   setup_hmatrix_aprx_green_mixed_bem3d(bem_slp, rootn, rootn, brootV, m, l,
 				       delta, build_bem3d_cube_quadpoints);
   setup_hmatrix_aprx_green_mixed_bem3d(bem_dlp, rootn, rootd, brootKM, m, l,
 				       delta, build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Green mixed", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   /*
    * Test Greenhybrid
@@ -617,8 +569,8 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
 					   l, delta, eps_aca,
 					   build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Greenhybrid row", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   setup_hmatrix_aprx_greenhybrid_col_bem3d(bem_slp, rootn, rootn, brootV, m,
 					   l, delta, eps_aca,
@@ -627,8 +579,8 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
 					   l, delta, eps_aca,
 					   build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Greenhybrid column", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   setup_hmatrix_aprx_greenhybrid_mixed_bem3d(bem_slp, rootn, rootn, brootV, m,
 					     l, delta, eps_aca,
@@ -637,32 +589,32 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
 					     m, l, delta, eps_aca,
 					     build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Greenhybrid mixed", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   /*
    * Test ACA / PACA / HCA
    */
 
-  m = 2;
+  m = 3;
   eps_aca = 1.0e-2;
 
   setup_hmatrix_aprx_aca_bem3d(bem_slp, rootn, rootn, brootV, eps_aca);
   setup_hmatrix_aprx_aca_bem3d(bem_dlp, rootn, rootd, brootKM, eps_aca);
   test_system(HMATRIX, "ACA full pivoting", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
   setup_hmatrix_aprx_paca_bem3d(bem_slp, rootn, rootn, brootV, eps_aca);
   setup_hmatrix_aprx_paca_bem3d(bem_dlp, rootn, rootd, brootKM, eps_aca);
   test_system(HMATRIX, "ACA partial pivoting", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   setup_hmatrix_aprx_hca_bem3d(bem_slp, rootn, rootn, brootV, m, eps_aca);
   setup_hmatrix_aprx_hca_bem3d(bem_dlp, rootn, rootd, brootKM, m, eps_aca);
   test_system(HMATRIX, "HCA2", Vfull, KMfull, brootV, bem_slp, V, brootKM,
-	      bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
   /*
    * H2-matrix
    */
@@ -692,7 +644,7 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
   setup_h2matrix_aprx_inter_bem3d(bem_slp, Vrb, Vcb, brootV, m);
   setup_h2matrix_aprx_inter_bem3d(bem_dlp, KMrb, KMcb, brootKM, m);
   test_system(H2MATRIX, "Interpolation", Vfull, KMfull, brootV, bem_slp, V2,
-	      brootKM, bem_dlp, KM2, basis_neumann, basis_dirichlet, exterior,
+	      brootKM, bem_dlp, KM2, row_basis, col_basis, exterior,
 	      error_min, error_max);
 
   /*
@@ -711,7 +663,7 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
 					delta, eps_aca,
 					build_bem3d_cube_quadpoints);
   test_system(H2MATRIX, "Greenhybrid", Vfull, KMfull, brootV, bem_slp, V2,
-	      brootKM, bem_dlp, KM2, basis_neumann, basis_dirichlet, exterior,
+	      brootKM, bem_dlp, KM2, row_basis, col_basis, exterior,
 	      error_min, error_max);
 
   setup_h2matrix_aprx_greenhybrid_ortho_bem3d(bem_slp, Vrb, Vcb, brootV, m, l,
@@ -721,8 +673,8 @@ test_suite(pcsurface3d gr, field * kvec, uint q, uint clf, real eta,
 					      l, delta, eps_aca,
 					      build_bem3d_cube_quadpoints);
   test_system(H2MATRIX, "Greenhybrid ortho", Vfull, KMfull, brootV, bem_slp,
-	      V2, brootKM, bem_dlp, KM2, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V2, brootKM, bem_dlp, KM2, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   del_h2matrix(V2);
   del_h2matrix(KM2);
@@ -745,12 +697,12 @@ main(int argc, char **argv)
   psurface3d gr;
   uint      n, q, clf;
   real      eta;
-  field     kvec[3];
+  field     k;
 
   init_h2lib(&argc, &argv);
 
   n = 512;
-  kvec[0] = 2.0, kvec[1] = 0.0, kvec[2] = 0.0;
+  k = 2.0;
   q = 2;
   eta = 1.0;
 
@@ -769,8 +721,8 @@ main(int argc, char **argv)
   printf("Testing outer Boundary integral equations:\n");
   printf("----------------------------------------\n\n");
 
-  test_suite(gr, kvec, q, clf, eta, BASIS_CONSTANT_BEM3D,
-	     BASIS_CONSTANT_BEM3D, true, 1.0e-3, 2.0e-3);
+  test_suite(gr, k, q, clf, eta, BASIS_CONSTANT_BEM3D, BASIS_CONSTANT_BEM3D,
+	     true, 1.0e-3, 2.0e-3);
 
   clf = 16;
 
@@ -778,7 +730,7 @@ main(int argc, char **argv)
   printf("Testing outer Boundary integral equations:\n");
   printf("----------------------------------------\n\n");
 
-  test_suite(gr, kvec, q, clf, eta, BASIS_LINEAR_BEM3D, BASIS_LINEAR_BEM3D,
+  test_suite(gr, k, q, clf, eta, BASIS_LINEAR_BEM3D, BASIS_LINEAR_BEM3D,
 	     true, 2.5e-4, 3.5e-4);
 
   del_surface3d(gr);

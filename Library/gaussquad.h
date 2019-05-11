@@ -1,8 +1,8 @@
 
 /* ------------------------------------------------------------
-   This is the file "gaussquad.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2010
-   ------------------------------------------------------------ */
+ * This is the file "gaussquad.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2010
+ * ------------------------------------------------------------ */
 
 /** @file gaussquad.h
  *  @author Steffen B&ouml;rm */
@@ -10,7 +10,7 @@
 #ifndef GAUSSQUAD_H
 #define GAUSSQUAD_H
 
-#include "basic.h"
+#include "settings.h"
 
 /** @defgroup gaussquad gaussquad
  *  @brief Construction of one-dimensional quadrature rules.

@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------
- This is the file "clustergeometry.c" of the H2Lib package.
- All rights reserved, Knut Reimer 2009
- ------------------------------------------------------------ */
+ * This is the file "clustergeometry.c" of the H2Lib package.
+ * All rights reserved, Knut Reimer 2009
+ * ------------------------------------------------------------ */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -14,8 +14,8 @@
 #include "settings.h"
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 pclustergeometry
 new_clustergeometry(uint dim, uint nidx)
@@ -39,10 +39,14 @@ new_clustergeometry(uint dim, uint nidx)
   for (i = 0; i < nidx; i++) {
     cf->x[i] = buf;
     buf += dim;
+
     cf->smin[i] = buf;
     buf += dim;
+
     cf->smax[i] = buf;
     buf += dim;
+
+    cf->w[i] = 1.0;
   }
 
   return cf;
@@ -61,16 +65,16 @@ del_clustergeometry(pclustergeometry cf)
   freemem(cf);
 }
 
-
-
 /* ------------------------------------------------------------
- Auxiliary routines
- ------------------------------------------------------------ */
+ * Auxiliary routines
+ * ------------------------------------------------------------ */
 
 void
 update_point_bbox_clustergeometry(pclustergeometry cf, uint size, uint * idx)
 {
   uint      i, j;
+
+  assert(size > 0);
 
   for (j = 0; j < cf->dim; j++) {
     cf->hmin[j] = cf->x[idx[0]][j];
@@ -94,6 +98,8 @@ update_support_bbox_cluster(pclustergeometry cf, pcluster t)
 {
   uint      i, j;
 
+  assert(t->size > 0);
+
   for (j = 0; j < cf->dim; j++) {
     t->bmin[j] = cf->smin[t->idx[0]][j];
     t->bmax[j] = cf->smax[t->idx[0]][j];
@@ -115,6 +121,8 @@ void
 update_bbox_cluster(pcluster t)
 {
   uint      i, j;
+
+  assert(t->son > 0);
 
   for (j = 0; j < t->dim; j++) {
     t->bmin[j] = t->son[0]->bmin[j];

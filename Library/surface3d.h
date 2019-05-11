@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "surface3d.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2010
- ------------------------------------------------------------ */
+ * This is the file "surface3d.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2010
+ * ------------------------------------------------------------ */
 
 /** @file surface3d.h
  *  @author Steffen B&ouml;rm */
@@ -70,8 +71,8 @@ struct _surface3d {
 };
 
 /* ------------------------------------------------------------
- Constructor and destructor
- ------------------------------------------------------------ */
+ * Constructor and destructor
+ * ------------------------------------------------------------ */
 
 /**
  * @brief create a new @ref surface3d object with a certain number of
@@ -108,8 +109,25 @@ HEADER_PREFIX void
 del_surface3d(psurface3d gr);
 
 /* ------------------------------------------------------------
- Debugging
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
+
+/** @brief Compute geometrical properties of a surface grid.
+ *
+ *  @param gr Grid
+ *  @param hmin Will be filled with minimal edge length.
+ *  @param hmax Will be filled with maximal edge length.
+ *  @param anglemin Will be filled with minimal interior angle.
+ *  @param angleedge Will be will with maximal angle across edges
+ *         between triangles. */
+HEADER_PREFIX void
+getproperties_surface3d(pcsurface3d gr,
+		        preal hmin, preal hmax,
+			preal anglemin, preal angleedge);
+
+/* ------------------------------------------------------------
+ * Debugging
+ * ------------------------------------------------------------ */
 
 /**
  * @brief print geometrical information to stdout.
@@ -159,9 +177,28 @@ isoriented_surface3d(pcsurface3d gr);
 HEADER_PREFIX void
 scale_surface3d(psurface3d gr, real *a, real *b);
 
+/**
+ * @brief Translate a geometry @p gr by a vector @f$t \in \mathbb R^3@f$.
+ *
+ * @param gr Geometry that should be translated.
+ * @param t Translation vector @f$t@f$.
+ */
+HEADER_PREFIX void
+translate_surface3d(psurface3d gr, real *t);
+
+/**
+ * @brief Merge to meshes into a single mesh.
+ *
+ * @param gr1 First mesh to be merged.
+ * @param gr2 Second mesh to be merged.
+ * @return New surface mesh containing all elements form @p gr1 and @p gr2.
+ */
+HEADER_PREFIX psurface3d
+merge_surface3d(pcsurface3d gr1, pcsurface3d gr2);
+
 /* ------------------------------------------------------------
- File I/O
- ------------------------------------------------------------ */
+ * File I/O
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Write geometrical information of a surface mesh into a given file
@@ -248,9 +285,39 @@ read_nc_surface3d(const char *filename);
 HEADER_PREFIX psurface3d
 read_netgen_surface3d(const char *filename);
 
+/**
+ * @brief Read geometrical information of a surface mesh from a given file
+ * using the gmsh format.
+ *
+ * @attention The normal vectors <tt>n</tt> and the gram determinants <tt>g</tt>
+ * are not yet initialized. Consider calling @ref prepare_surface3d before using
+ * the geometry read by this function.
+ *
+ * @param filename Filename for the geometry.
+ * @return A new @ref surface3d object with the geometrical information read from
+ * the file is returned.
+ */
+HEADER_PREFIX psurface3d
+read_gmsh_surface3d(const char *filename);
+
+/**
+ * @brief Read geometrical information of a surface mesh from a given file
+ * using the unv format.
+ *
+ * @attention The normal vectors <tt>n</tt> and the gram determinants <tt>g</tt>
+ * are not yet initialized. Consider calling @ref prepare_surface3d before using
+ * the geometry read by this function.
+ *
+ * @param filename Filename for the geometry.
+ * @return A new @ref surface3d object with the geometrical information read from
+ * the file is returned.
+ */
+HEADER_PREFIX psurface3d
+read_unv_surface3d(char *filename);
+
 /* ------------------------------------------------------------
- Mesh refinement
- ------------------------------------------------------------ */
+ * Mesh refinement
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Apply a red refinement to a surface mesh.

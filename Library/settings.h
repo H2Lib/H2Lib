@@ -16,8 +16,14 @@
  *  @{ */
 
 #include <math.h>
+#include <stdbool.h>
+#include <stddef.h>
 #ifdef USE_COMPLEX
 #include <complex.h>
+#endif
+
+#ifdef USE_SIMD
+#include "simd.h"
 #endif
 
 /* ------------------------------------------------------------
@@ -26,7 +32,7 @@
 
 /** @brief Prefix for inline functions. */
 #ifdef __cplusplus
-#define INLINE_PREFIX extern "C" inline
+#define INLINE_PREFIX inline
 #else
 #define INLINE_PREFIX static
 #endif
@@ -48,8 +54,6 @@
 /* ------------------------------------------------------------
  * Types
  * ------------------------------------------------------------ */
-
-#include<stdbool.h>
 
 /** @brief Unsigned integer type.
  *
@@ -73,7 +77,7 @@ extern const uint u_one;
  *
  *  This type is used to access components of particularly large
  *  arrays, e.g., matrices in column-major array representation. */
-typedef unsigned longindex;
+typedef size_t longindex;
 
 /** @brief @ref real floating point type.
  *
@@ -83,6 +87,41 @@ typedef unsigned longindex;
 typedef float real;
 #else
 typedef double real;
+#endif
+
+/**
+ * @brief Fallback vector length for float if vectorization is not enabled.
+ */
+#ifndef VFLOAT
+#define VFLOAT 1
+#endif
+
+/**
+ * @brief Fallback vector length for double if vectorization is not enabled.
+ */
+#ifndef VDOUBLE
+#define VDOUBLE 1
+#endif
+
+/**
+ * @brief Fallback vector length for real if vectorization is not enabled.
+ */
+#ifndef VREAL
+#define VREAL 1
+#endif
+
+#ifdef USE_FLOAT
+/** Relative tolerance for run-time checks. */
+#define H2_CHECK_TOLERANCE 1.0e-6
+
+/** Bound for determining when a number is essentially zero. */
+#define H2_ALMOST_ZERO 1e-30
+#else
+/** Relative tolerance for run-time checks. */
+#define H2_CHECK_TOLERANCE 1.0e-12
+
+/** Bound for determining when a number is essentially zero. */
+#define H2_ALMOST_ZERO 1e-300
 #endif
 
 /**
@@ -127,6 +166,13 @@ typedef double field;
 #endif
 #endif
 
+/**
+ * @brief Fallback vector length for field if vectorization is not enabled.
+ */
+#ifndef VFIELD
+#define VFIELD 1
+#endif
+
 /** @brief Pointer to @ref field array. */
 typedef field *pfield;
 
@@ -145,6 +191,13 @@ extern const field f_minusone;
 #ifdef USE_COMPLEX
 /** @brief @ref field constant for the imaginary number. */
 extern const field f_i;
+#endif
+
+#ifndef USE_COMPLEX
+#ifdef I
+#undef I
+#endif
+#define I 0.0
 #endif
 
 /** @brief String constant that expresses that a matrix should @b not be
@@ -278,11 +331,15 @@ extern const char *_h2_novectors;
  */
 typedef enum {
   /** @brief Enum value representing an @ref _amatrix "amatrix". */
-  AMATRIX = 0,//!< AMATRIX
+  AMATRIX = 0, //!< AMATRIX
   /** @brief Enum value representing an @ref _hmatrix "hmatrix". */
-  HMATRIX = 1,//!< HMATRIX
+  HMATRIX = 1, //!< HMATRIX
   /** @brief Enum value representing an @ref _h2matrix "h2matrix". */
-  H2MATRIX = 2//!< H2MATRIX
+  H2MATRIX = 2, //!< H2MATRIX
+  /** @brief Enum value representing an @ref _sparsematrix "sparsematrix". */
+  SPARSEMATRIX = 3, //!< SPARSEMATRIX
+  /** @brief Enum value representing an @ref _dh2matrix "dh2matrix". */
+  DH2MATRIX = 4 //!< DH2MATRIX
 } matrixtype;
 
 /** @} */

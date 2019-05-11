@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "uniform.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "uniform.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 /** @file uniform.h
  *  @author Steffen B&ouml;rm */
@@ -83,8 +84,8 @@ struct _uniform {
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Create a new @ref _uniform "uniform" object.
@@ -113,8 +114,8 @@ HEADER_PREFIX void
 del_uniform(puniform u);
 
 /* ------------------------------------------------------------
- Reference management
- ------------------------------------------------------------ */
+ * Reference management
+ * ------------------------------------------------------------ */
 
 /** @brief Append this @ref _uniform "uniform" object to the block row list.
  *
@@ -171,8 +172,8 @@ HEADER_PREFIX void
 unref_col_uniform(puniform u);
 
 /* ------------------------------------------------------------
- Statistics
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 /** @brief Get size of a given @ref _uniform "uniform object.
  *
@@ -182,8 +183,8 @@ HEADER_PREFIX size_t
 getsize_uniform(pcuniform u);
 
 /* ------------------------------------------------------------
- Simple utility functions
- ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Sets the coupling matrix to zero.
@@ -193,56 +194,84 @@ getsize_uniform(pcuniform u);
 HEADER_PREFIX void
 clear_uniform(puniform u);
 
-/**
- * @brief Computes the euclidean-norm of the coupling matrix and or the product
- * of weight matrices with the coupling matrix.
+/** @brief Copy a uniform matrix @f$G@f$.
  *
- * Depending on given row- and column-@ref _clusteroperator "clusteroperators"
- * this functions computed one of the following four values via
- * vector iteration:
- * @f[
- * \lVert S_b \rVert_2, \quad \lVert C_t S_b \rVert_2, \quad
- * \lVert S_b C_s^* \rVert_2 \quad \text{or} \quad \lVert C_t S_b C_s^* \rVert_2
- * @f]
- *
- * @param u @ref _uniform "uniform" object.
- * @param rw Row @ref _clusteroperator "clusteroperator". If <tt>rw == NULL</tt>
- * then @f$ C_t @f$ is omitted in the computation of the norm.
- * @param cw Column @ref _clusteroperator "clusteroperator". If <tt>cw == NULL</tt>
- * then @f$ C_s @f$ is omitted in the computation of the norm.
- *
- * @return Approximation of the euclidean-norm of one of the above mentioned
- * matrices.
- */
-HEADER_PREFIX real
-norm2_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw);
+ *  @param trans Set if @f$G^*@f$ should be copied instead of @f$G@f$.
+ *  @param src Source matrix.
+ *  @param trg target matrix. */
+HEADER_PREFIX void
+copy_uniform(bool trans, pcuniform src, puniform trg);
 
-/**
- * @brief Computes the frobenius-norm of the coupling matrix and or the product
- * of weight matrices with the coupling matrix.
+/** @brief Clone a uniform matrix.
  *
- * Depending on given row- and column-@ref _clusteroperator "clusteroperators"
- * this functions computed one of the following four values:
- * @f[
- * \lVert S_b \rVert_F, \quad \lVert C_t S_b \rVert_F, \quad
- * \lVert S_b C_s^* \rVert_F \quad \text{or} \quad \lVert C_t S_b C_s^* \rVert_F
- * @f]
+ *  @param src Source matrix.
+ *  @returns Clone of the source matrix. */
+HEADER_PREFIX puniform
+clone_uniform(pcuniform src);
+
+/** @brief Scale a uniform matrix.
  *
- * @param u @ref _uniform "uniform" object.
- * @param rw Row @ref _clusteroperator "clusteroperator". If <tt>rw == NULL</tt>
- * then @f$ C_t @f$ is omitted in the computation of the norm.
- * @param cw Column @ref _clusteroperator "clusteroperator". If <tt>cw == NULL</tt>
- * then @f$ C_s @f$ is omitted in the computation of the norm.
+ *  @param alpha Scaling factor @f$\alpha@f$.
+ *  @param u Target matrix @f$S@f$, will be overwritten by @f$\alpha S@f$. */
+HEADER_PREFIX void
+scale_uniform(field alpha, puniform u);
+
+/** @brief Fill a uniform matrix with random coefficients.
  *
- * @return Approximation of the frobenius-norm of one of the above mentioned
- * matrices.
- */
-HEADER_PREFIX real
-normfrob_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw);
+ *  @param u Target matrix @f$S@f$. */
+HEADER_PREFIX void
+random_uniform(puniform u);
+
+///**
+// * @brief Computes the euclidean-norm of the coupling matrix and or the product
+// * of weight matrices with the coupling matrix.
+// *
+// * Depending on given row- and column-@ref _clusteroperator "clusteroperators"
+// * this functions computed one of the following four values via
+// * vector iteration:
+// * @f[
+// * \lVert S_b \rVert_2, \quad \lVert C_t S_b \rVert_2, \quad
+// * \lVert S_b C_s^* \rVert_2 \quad \text{or} \quad \lVert C_t S_b C_s^* \rVert_2
+// * @f]
+// *
+// * @param u @ref _uniform "uniform" object.
+// * @param rw Row @ref _clusteroperator "clusteroperator". If <tt>rw == NULL</tt>
+// * then @f$ C_t @f$ is omitted in the computation of the norm.
+// * @param cw Column @ref _clusteroperator "clusteroperator". If <tt>cw == NULL</tt>
+// * then @f$ C_s @f$ is omitted in the computation of the norm.
+// *
+// * @return Approximation of the euclidean-norm of one of the above mentioned
+// * matrices.
+// */
+//HEADER_PREFIX real
+//norm2_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw);
+//
+///**
+// * @brief Computes the frobenius-norm of the coupling matrix and or the product
+// * of weight matrices with the coupling matrix.
+// *
+// * Depending on given row- and column-@ref _clusteroperator "clusteroperators"
+// * this functions computed one of the following four values:
+// * @f[
+// * \lVert S_b \rVert_F, \quad \lVert C_t S_b \rVert_F, \quad
+// * \lVert S_b C_s^* \rVert_F \quad \text{or} \quad \lVert C_t S_b C_s^* \rVert_F
+// * @f]
+// *
+// * @param u @ref _uniform "uniform" object.
+// * @param rw Row @ref _clusteroperator "clusteroperator". If <tt>rw == NULL</tt>
+// * then @f$ C_t @f$ is omitted in the computation of the norm.
+// * @param cw Column @ref _clusteroperator "clusteroperator". If <tt>cw == NULL</tt>
+// * then @f$ C_s @f$ is omitted in the computation of the norm.
+// *
+// * @return Approximation of the frobenius-norm of one of the above mentioned
+// * matrices.
+// */
+//HEADER_PREFIX real
+//normfrob_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw);
 
 /* ------------------------------------------------------------
- Matrix-vector multiplication
- ------------------------------------------------------------ */
+ * Matrix-vector multiplication
+ * ------------------------------------------------------------ */
 
 /** @brief Matrix-vector multiplication
  *  @f$y \gets y + \alpha u x@f$ or @f$y \gets y + \alpha u^* x@f$.
@@ -261,8 +290,8 @@ HEADER_PREFIX void
 mvm_uniform_avector(field alpha, bool trans, pcuniform u, pcavector x, pavector y);
 
 /* ------------------------------------------------------------
- Conversion operations
- ------------------------------------------------------------ */
+ * Conversion operations
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Addition of two @ref _uniform "uniform" matrices in different
@@ -331,6 +360,55 @@ project_inplace_uniform(puniform u, pclusterbasis rb, pcclusteroperator ro,
 HEADER_PREFIX void
 add_rkmatrix_uniform(pcrkmatrix r, puniform unew);
 
-/** @} */
+#endif
+
+/* ------------------------------------------------------------
+ * Access methods
+ * ------------------------------------------------------------ */
+
+/* Avoid problems with incomplete type definitions */
+#if defined(CLUSTERBASIS_TYPE_COMPLETE) && !defined(UNIFORM_COMPLETE)
+#define UNIFORM_COMPLETE
+
+#ifdef __GNUC__
+INLINE_PREFIX uint
+getrows_uniform(pcuniform) __attribute__ ((const,unused));
+INLINE_PREFIX uint
+getcols_uniform(pcuniform) __attribute__ ((const,unused));
+INLINE_PREFIX pamatrix
+getS_uniform(puniform) __attribute__ ((unused));
+#endif
+
+/** @brief Get the number of rows of a @ref uniform matrix @f$G=V S W^*@f$.
+ *
+ *  @param u Matrix @f$G@f$.
+ *  @return Number of rows of @f$G@f$, i.e., number of rows of @f$V@f$. */
+INLINE_PREFIX uint
+getrows_uniform(pcuniform u)
+{
+  return u->rb->t->size;
+}
+
+/** @brief Get the number of columns of a @ref uniform matrix @f$G=V S W^*@f$.
+ *
+ *  @param u Matrix @f$G@f$.
+ *  @returns Number of columns of @f$G@f$, i.e., number of rows of @f$W@f$. */
+INLINE_PREFIX uint
+getcols_uniform(pcuniform u)
+{
+  return u->cb->t->size;
+}
+
+/** @brief Get the factor S of a @ref uniform matrix @f$G=V S W^*@f$.
+ *
+ * @param u Matrix @f$G@f$.
+ * @returns Factor @f$S@f$. */
+INLINE_PREFIX pamatrix
+getS_uniform(puniform u)
+{
+  return &u->S;
+}
 
 #endif
+
+/** @} */

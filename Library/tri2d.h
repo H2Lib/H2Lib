@@ -1,11 +1,11 @@
 
 /* ------------------------------------------------------------
- * This is the file "tet3d.h" of the H2Lib package.
- * All rights reserved, ??? 2015
+ * This is the file "tri2d.h" of the H2Lib package.
+ * All rights reserved, Dirk Boysen 2015
  * ------------------------------------------------------------ */
 
 /** @file tri2d.h
- * @author ?????*/
+ *  @author Dirk Boysen */
 
 #ifndef TRI2D_H
 #define TRI2D_H
@@ -64,7 +64,7 @@ struct _tri2d {
   uint triangles;
 
   /** @brief coordinates of vertices*/
-  real (*x)[2];			
+  real (*x)[2];
   
   /** @brief Start and end points of edges*/
   uint (*e)[2];			
@@ -130,12 +130,6 @@ new_lshape_tri2d();
  *  @returns @ref tri2d mesh representing the U-shape. */
 HEADER_PREFIX ptri2d
 new_ushape_tri2d();
-
-HEADER_PREFIX ptri2d
-new_bridge_tri2d(bool fixed);
-
-HEADER_PREFIX ptri2d
-new_tee_tri2d(bool fixed);
 
 /* ------------------------------------------------------------
    File I/O

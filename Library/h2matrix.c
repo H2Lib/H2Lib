@@ -2,6 +2,7 @@
  * This is the file "h2matrix.c" of the H2Lib package.
  * All rights reserved, Steffen Boerm 2009
  * ------------------------------------------------------------ */
+
 #include <stdio.h>
 
 #include "h2matrix.h"
@@ -317,6 +318,19 @@ getsize_h2matrix(pch2matrix h2)
 }
 
 size_t
+gettotalsize_h2matrix(pch2matrix h2)
+{
+  size_t    sz;
+
+  sz = getsize_h2matrix(h2);
+  sz += getsize_clusterbasis(h2->rb);
+  if (h2->rb != h2->cb)
+    sz += getsize_clusterbasis(h2->cb);
+
+  return sz;
+}
+
+size_t
 getnearsize_h2matrix(pch2matrix h2)
 {
   size_t    sz;
@@ -378,6 +392,42 @@ clear_h2matrix(ph2matrix h2)
     clear_amatrix(&h2->u->S);
   else if (h2->f)
     clear_amatrix(h2->f);
+}
+
+void
+scale_h2matrix(field alpha, ph2matrix h2)
+{
+  uint      rsons = h2->rsons;
+  uint      csons = h2->csons;
+  uint      i, j;
+
+  if (h2->son) {
+    for (j = 0; j < csons; j++)
+      for (i = 0; i < rsons; i++)
+	scale_h2matrix(alpha, h2->son[i + j * rsons]);
+  }
+  else if (h2->u)
+    scale_uniform(alpha, h2->u);
+  else if (h2->f)
+    scale_amatrix(alpha, h2->f);
+}
+
+void
+random_h2matrix(ph2matrix h2)
+{
+  uint      rsons = h2->rsons;
+  uint      csons = h2->csons;
+  uint      i, j;
+
+  if (h2->son) {
+    for (j = 0; j < csons; j++)
+      for (i = 0; i < rsons; i++)
+	random_h2matrix(h2->son[i + j * rsons]);
+  }
+  else if (h2->u)
+    random_uniform(h2->u);
+  else if (h2->f)
+    random_amatrix(h2->f);
 }
 
 /* ------------------------------------------------------------
@@ -475,48 +525,34 @@ build_from_h2matrix_block(pch2matrix G)
  * ------------------------------------------------------------ */
 
 static void
-enumerate(pcblock b, uint bname, ph2matrix h2, ph2matrix *h2n)
+enumerate(uint bname, ph2matrix h2, ph2matrix *h2n)
 {
   uint      bname1;
   uint      i, j;
-
-  assert(h2->rb->t == b->rc);
-  assert(h2->cb->t == b->cc);
 
   h2n[bname] = h2;
 
   bname1 = bname + 1;
 
-  if (h2 == 0 || h2->son == 0)
-    for (j = 0; j < b->csons; j++)
-      for (i = 0; i < b->rsons; i++) {
-	enumerate(b->son[i + j * b->rsons], bname1, 0, h2n);
+  for (j = 0; j < h2->csons; j++) {
+    for (i = 0; i < h2->rsons; i++) {
+      enumerate(bname1, h2->son[i + j * h2->rsons], h2n);
 
-	bname1 += b->son[i + j * b->rsons]->desc;
-      }
-  else {
-    assert(b->rsons == h2->rsons);
-    assert(b->csons == h2->csons);
-
-    for (j = 0; j < b->csons; j++)
-      for (i = 0; i < b->rsons; i++) {
-	enumerate(b->son[i + j * b->rsons], bname1, h2->son[i + j * b->rsons],
-		  h2n);
-
-	bname1 += b->son[i + j * b->rsons]->desc;
-      }
+      bname1 += h2->son[i + j * h2->rsons]->desc;
+    }
   }
-  assert(bname1 == bname + b->desc);
+
+  assert(bname1 == bname + h2->desc);
 }
 
 ph2matrix *
-enumerate_h2matrix(pcblock b, ph2matrix h2)
+enumerate_h2matrix(ph2matrix h2)
 {
   ph2matrix *h2n;
 
-  h2n = (ph2matrix *) allocmem((size_t) sizeof(ph2matrix) * b->desc);
+  h2n = (ph2matrix *) allocmem((size_t) sizeof(ph2matrix) * h2->desc);
 
-  enumerate(b, 0, h2, h2n);
+  enumerate(0, h2, h2n);
 
   return h2n;
 }
@@ -1927,161 +1963,18 @@ project_hmatrix_h2matrix(ph2matrix h2, phmatrix h)
  * ------------------------------------------------------------ */
 
 real
-norm2_h2matrix(pch2matrix a)
+norm2_h2matrix(pch2matrix H2)
 {
-  uint      rows = a->rb->t->size;
-  uint      cols = a->cb->t->size;
-
-  avector   tmp1, tmp2;
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_h2matrix_avector(1.0, a, x, y);
-
-    clear_avector(x);
-    addevaltrans_h2matrix_avector(1.0, a, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
-}
-
-real
-norm2diff_amatrix_h2matrix(pch2matrix a, pcamatrix b)
-{
-  pavector  x, y;
-  avector   tmp1, tmp2;
-  uint      rows, cols;
-  uint      i;
-  real      norm;
-
-  rows = a->rb->t->size;
-  cols = a->cb->t->size;
-
-  assert(b->rows == rows);
-  assert(b->cols == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_h2matrix_avector(1.0, a, x, y);
-    addeval_amatrix_avector(-1.0, b, x, y);
-
-    clear_avector(x);
-    addevaltrans_h2matrix_avector(1.0, a, y, x);
-    addevaltrans_amatrix_avector(-1.0, b, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
-}
-
-real
-norm2diff_hmatrix_h2matrix(pch2matrix a, pchmatrix b)
-{
-  pavector  x, y;
-  avector   tmp1, tmp2;
-  uint      rows, cols;
-  uint      i;
-  real      norm;
-
-  rows = a->rb->t->size;
-  cols = a->cb->t->size;
-
-  assert(b->rc->size == rows);
-  assert(b->cc->size == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_h2matrix_avector(1.0, a, x, y);
-    addeval_hmatrix_avector(-1.0, b, x, y);
-
-    clear_avector(x);
-    addevaltrans_h2matrix_avector(1.0, a, y, x);
-    addevaltrans_hmatrix_avector(-1.0, b, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+  return norm2_matrix((mvm_t) mvm_h2matrix_avector, (void *) H2,
+		      H2->rb->t->size, H2->cb->t->size);
 }
 
 real
 norm2diff_h2matrix(pch2matrix a, pch2matrix b)
 {
-  pavector  x, y;
-  avector   tmp1, tmp2;
-  uint      rows, cols;
-  uint      i;
-  real      norm;
-
-  rows = a->rb->t->size;
-  cols = a->cb->t->size;
-
-  assert(b->rb->t->size == rows);
-  assert(b->cb->t->size == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_h2matrix_avector(1.0, a, x, y);
-    addeval_h2matrix_avector(-1.0, b, x, y);
-
-    clear_avector(x);
-    addevaltrans_h2matrix_avector(1.0, a, y, x);
-    addevaltrans_h2matrix_avector(-1.0, b, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+  return norm2diff_matrix((mvm_t) mvm_h2matrix_avector, (void *) a,
+			  (mvm_t) mvm_h2matrix_avector, (void *) b,
+			  a->rb->t->size, a->cb->t->size);
 }
 
 /* ------------------------------------------------------------
@@ -2761,7 +2654,6 @@ cairodraw(cairo_t * cr, pch2matrix G, bool storage, uint levels)
   uint      rsize, csize;
   uint      roff, coff;
   uint      i, j;
-
 
   if (G->son && levels != 1) {
     rsons = G->rsons;

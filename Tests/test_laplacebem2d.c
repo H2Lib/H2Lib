@@ -1,6 +1,8 @@
 #include "basic.h"
 #include "krylov.h"
+#include "krylovsolvers.h"
 #include "laplacebem2d.h"
+#include "matrixnorms.h"
 
 static uint problems = 0;
 
@@ -58,55 +60,31 @@ static void
 solve_cg_bem2d(matrixtype type, void *A, pavector b, pavector x,
 	       real accuracy, uint steps)
 {
-  addeval_t addevalA;
-  pavector  r, p, a;
-  uint      i, n;
-  real      norm;
-
-  switch (type) {
-  case AMATRIX:
-    addevalA = (addeval_t) addeval_amatrix_avector;
-    break;
-  case HMATRIX:
-    addevalA = (addeval_t) addeval_hmatrix_avector;
-    break;
-  case H2MATRIX:
-    addevalA = (addeval_t) addeval_h2matrix_avector;
-    break;
-  default:
-    printf("ERROR: unknown matrix type!\n");
-    abort();
-    break;
-  }
+  uint      n, iter;
 
   n = b->dim;
   assert(x->dim == n);
 
-  r = new_avector(n);
-  p = new_avector(n);
-  a = new_avector(n);
-  random_avector(x);
+  random_real_avector(x);
 
-  init_cg(addevalA, A, b, x, r, p, a);
-
-  for (i = 1; i < steps; i++) {
-    step_cg(addevalA, A, b, x, r, p, a);
-    norm = norm2_avector(r);
-#ifndef NDEBUG
-    printf("  Residual: %.5e\t Iterations: %u\r", norm, i);
-    fflush(stdout);
-#endif
-    if (norm <= accuracy) {
-      break;
-    }
+  switch (type) {
+  case AMATRIX:
+    iter = solve_cg_amatrix_avector((pcamatrix) A, b, x, accuracy, steps);
+    break;
+  case HMATRIX:
+    iter = solve_cg_hmatrix_avector((pchmatrix) A, b, x, accuracy, steps);
+    break;
+  case H2MATRIX:
+    iter = solve_cg_h2matrix_avector((pch2matrix) A, b, x, accuracy, steps);
+    break;
+  default:
+    iter = 0;
+    printf("ERROR: unknown matrix type!\n");
+    abort();
+    break;
   }
-#ifndef NDEBUG
-  printf("  Residual: %.5e\t Iterations: %u\n", norm2_avector(r), i);
-#endif
-
-  del_avector(r);
-  del_avector(p);
-  del_avector(a);
+  printf("CG iterations:\n");
+  printf("  %d\n", iter);
 
 }
 

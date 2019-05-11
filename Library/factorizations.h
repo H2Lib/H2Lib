@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------
- This is the file "factorizations.h" of the H2Lib package.
- All rights reserved, Steffen Boerm 2010
- ------------------------------------------------------------ */
+ * This is the file "factorizations.h" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2010
+ * ------------------------------------------------------------ */
 
 /** @file factorizations.h
  *  @author Steffen B&ouml;rm
@@ -24,8 +24,8 @@
 #include "truncation.h"
 
 /* ------------------------------------------------------------
- Diagonal matrices
- ------------------------------------------------------------ */
+ * Diagonal matrices
+ * ------------------------------------------------------------ */
 
 /** @brief Solve @f$A x = b@f$ and variants for a diagonal matrix @f$A@f$.
  *
@@ -77,8 +77,8 @@ diageval_realavector_amatrix(field alpha, bool atrans, pcrealavector a,
     bool xtrans, pamatrix x);
 
 /* ------------------------------------------------------------
- Triangular matrices
- ------------------------------------------------------------ */
+ * Triangular matrices
+ * ------------------------------------------------------------ */
 
 /** @brief Solve @f$A x = b@f$ for a triangular matrix @f$A@f$.
  *
@@ -167,8 +167,8 @@ HEADER_PREFIX void
 copy_upper_amatrix(pcamatrix a, bool aunit, pamatrix b);
 
 /* ------------------------------------------------------------
- Triangular decompositions
- ------------------------------------------------------------ */
+ * Triangular decompositions
+ * ------------------------------------------------------------ */
 
 /** @brief Compute the LR decomposition @f$A=LR@f$ of a matrix.
  *
@@ -181,6 +181,29 @@ copy_upper_amatrix(pcamatrix a, bool aunit, pamatrix b);
 HEADER_PREFIX uint
 lrdecomp_amatrix(pamatrix a);
 
+/** @brief Compute the LR decomposition @f$A=LR@f$ of a matrix
+ *         using a block-based algorithm.
+ *
+ *  @param a Original matrix @f$A@f$.
+ *         Lower part gets overwritten by @f$L@f$.
+ *  @param blocksize Minimal block size.
+ *
+ *  @returns Zero if successful, number of first failed step otherwise. */
+HEADER_PREFIX uint
+lrdecomp_blocks_amatrix(pamatrix a, uint blocksize);
+
+/** @brief Compute the LR decomposition @f$A=LR@f$ of a matrix
+ *         using a block-based algorithm.
+ *
+ *  If OpenMP is enabled and supports tasks, the function will try
+ *  to utilize multiple threads.
+ *
+ *  @param a Original matrix @f$A@f$.
+ *         Lower part gets overwritten by @f$L@f$.
+ *  @param blocksize Minimal block size. */
+HEADER_PREFIX void
+lrdecomp_tasks_amatrix(pamatrix a, uint blocksize);
+
 /** @brief Solve the linear system @f$A x = b@f$ using
  *         a LR factorization.
  *
@@ -188,7 +211,26 @@ lrdecomp_amatrix(pamatrix a);
  *         as provided by @ref lrdecomp_amatrix.
  *  @param x Right-hand side @f$b@f$, gets overwritten by @f$x@f$. */
 HEADER_PREFIX void
-lrsolve_amatrix_avector(pcamatrix a, pavector x);
+lrsolve_n_amatrix_avector(pcamatrix a, pavector x);
+
+/** @brief Solve the linear system @f$A^* x = b@f$ using
+ *         a LR factorization.
+ *
+ *  @param a LR factorization of @f$A@f$,
+ *         as provided by @ref lrdecomp_amatrix.
+ *  @param x Right-hand side @f$b@f$, gets overwritten by @f$x@f$. */
+HEADER_PREFIX void
+lrsolve_t_amatrix_avector(pcamatrix a, pavector x);
+
+/** @brief Solve the linear system @f$A x = b@f$ or @f$A^* x = b@f$ using
+ *         a LR factorization.
+ *
+ *  @param atrans Set if @f$A^*@f$ instead of @f$A@f$ is to be used.
+ *  @param a LR factorization of @f$A@f$,
+ *         as provided by @ref lrdecomp_amatrix.
+ *  @param x Right-hand side @f$b@f$, gets overwritten by @f$x@f$. */
+HEADER_PREFIX void
+lrsolve_amatrix_avector(bool atrans, pcamatrix a, pavector x);
 
 /** @brief Solve the linear system @f$A X = B@f$ using
  *         a LR factorization.
@@ -199,8 +241,37 @@ lrsolve_amatrix_avector(pcamatrix a, pavector x);
 HEADER_PREFIX void
 lrsolve_amatrix(pcamatrix a, pamatrix x);
 
+/** @brief Evaluate @f$x \gets A x@f$ using a LR factorization.
+ *
+ *  @param a LR factorization of @f$A@f$,
+ *         as provided by @ref lrdecomp_amatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+lreval_n_amatrix_avector(pcamatrix a, pavector x);
+
+/** @brief Evaluate @f$x \gets A^* x@f$ using a LR factorization.
+ *
+ *  @param a LR factorization of @f$A@f$,
+ *         as provided by @ref lrdecomp_amatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+lreval_t_amatrix_avector(pcamatrix a, pavector x);
+
+/** @brief Evaluate @f$x \gets A x@f$ or @f$x \gets A^* x@f$ using a
+ *         LR factorization.
+ *
+ *  @param atrans Set if @f$A^*@f$ instead of @f$A@f$ is to be used.
+ *  @param a LR factorization of @f$A@f$,
+ *         as provided by @ref lrdecomp_amatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+lreval_amatrix_avector(bool atrans, pcamatrix a, pavector x);
+
 /** @brief Compute the Cholesky decomposition @f$A=LL^*@f$ of a
- *         self-adjoint positiv definite matrix.
+ *         self-adjoint positive definite matrix.
  *
  *  @param a Original matrix @f$A@f$.
  *         Lower part gets overwritten by @f$L@f$.
@@ -208,6 +279,31 @@ lrsolve_amatrix(pcamatrix a, pamatrix x);
  *  @returns Zero if successful, number of first failed step otherwise. */
 HEADER_PREFIX uint
 choldecomp_amatrix(pamatrix a);
+
+/** @brief Compute the Cholesky decomposition @f$A=LL^*@f$ of a
+ *         self-adjoint positive definite matrix using a block-based
+ *         algorithm.
+ *
+ *  @param a Original matrix @f$A@f$.
+ *         Lower part gets overwritten by @f$L@f$.
+ *  @param blocksize Minimal block size.
+ *
+ *  @returns Zero if successful, number of first failed step otherwise. */
+HEADER_PREFIX uint
+choldecomp_blocks_amatrix(pamatrix a, uint blocksize);
+
+/** @brief Compute the Cholesky decomposition @f$A=LL^*@f$ of a
+ *         self-adjoint positive definite matrix using a block-based
+ *         algorithm.
+ *
+ *  If OpenMP is enabled and supports tasks, the function will try
+ *  to utilize multiple threads.
+ *
+ *  @param a Original matrix @f$A@f$.
+ *         Lower part gets overwritten by @f$L@f$.
+ *  @param blocksize Minimal block size. */
+HEADER_PREFIX void
+choldecomp_tasks_amatrix(pamatrix a, uint blocksize);
 
 /** @brief Solve the linear system @f$A x = b@f$ using
  *         a Cholesky factorization.
@@ -226,6 +322,15 @@ cholsolve_amatrix_avector(pcamatrix a, pavector x);
  *  @param x Right-hand side @f$B@f$, gets overwritten by @f$X@f$. */
 HEADER_PREFIX void
 cholsolve_amatrix(pcamatrix a, pamatrix x);
+
+/** @brief Evaluate @f$x \gets A x@f$ using a Cholesky factorization.
+ *
+ *  @param a Cholesky factorization of @f$A@f$
+ *         as provided by @ref choldecomp_amatrix.
+ *  @param x Right-hand side vector @f$x@f$, that gets overwritten by
+ *     the result. */
+HEADER_PREFIX void
+choleval_amatrix_avector(pcamatrix a, pavector x);
 
 /** @brief Compute the LDLT decomposition @f$A=LDL^*@f$ of a
  *         self-adjoint matrix.
@@ -258,8 +363,8 @@ HEADER_PREFIX void
 ldltsolve_amatrix(pcamatrix a, pamatrix x);
 
 /* ------------------------------------------------------------
- Orthogonal decompositions
- ------------------------------------------------------------ */
+ * Orthogonal decompositions
+ * ------------------------------------------------------------ */
 
 /** @brief Compute the QR decomposition @f$A=QR@f$ of a matrix.
  *

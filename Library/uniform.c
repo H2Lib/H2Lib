@@ -161,94 +161,44 @@ clear_uniform(puniform u)
   clear_amatrix(&u->S);
 }
 
-real
-norm2_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw)
+void
+copy_uniform(bool trans, pcuniform src, puniform trg)
 {
-  amatrix   tmp1, tmp2;
-  pamatrix  ur, urc;
-  real      norm;
+  if (trans) {
+    assert(trg->rb == src->cb);
+    assert(trg->cb == src->rb);
 
-  if (rw) {
-    if (cw) {
-      ur = init_amatrix(&tmp1, rw->krow, u->cb->k);
-      urc = init_amatrix(&tmp2, rw->krow, cw->krow);
-
-      clear_amatrix(ur);
-      addmul_amatrix(1.0, false, &rw->C, false, &u->S, ur);
-      clear_amatrix(urc);
-      addmul_amatrix(1.0, false, ur, true, &cw->C, urc);
-
-      uninit_amatrix(ur);
-    }
-    else {
-      urc = init_amatrix(&tmp2, rw->krow, u->cb->k);
-
-      clear_amatrix(urc);
-      addmul_amatrix(1.0, false, &rw->C, false, &u->S, urc);
-    }
+    copy_amatrix(true, &src->S, &trg->S);
   }
   else {
-    if (cw) {
-      urc = init_amatrix(&tmp2, u->rb->k, cw->krow);
+    assert(trg->rb == src->rb);
+    assert(trg->cb == src->cb);
 
-      clear_amatrix(urc);
-      addmul_amatrix(1.0, false, &u->S, true, &cw->C, urc);
-    }
-    else
-      urc = (pamatrix) &u->S;
+    copy_amatrix(false, &src->S, &trg->S);
   }
-
-  norm = norm2_amatrix(urc);
-
-  if (urc != &u->S)
-    uninit_amatrix(urc);
-
-  return norm;
 }
 
-real
-normfrob_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw)
+puniform
+clone_uniform(pcuniform src)
 {
-  amatrix   tmp1, tmp2;
-  pamatrix  ur, urc;
-  real      norm;
+  puniform  u;
 
-  if (rw) {
-    if (cw) {
-      ur = init_amatrix(&tmp1, rw->krow, u->cb->k);
-      urc = init_amatrix(&tmp2, rw->krow, cw->krow);
+  u = new_uniform(src->rb, src->cb);
+  copy_uniform(false, src, u);
 
-      clear_amatrix(ur);
-      addmul_amatrix(1.0, false, &rw->C, false, &u->S, ur);
-      clear_amatrix(urc);
-      addmul_amatrix(1.0, false, ur, true, &cw->C, urc);
+  return u;
+}
 
-      uninit_amatrix(ur);
-    }
-    else {
-      urc = init_amatrix(&tmp2, rw->krow, u->cb->k);
+void
+scale_uniform(field alpha, puniform u)
+{
+  scale_amatrix(alpha, &u->S);
+}
 
-      clear_amatrix(urc);
-      addmul_amatrix(1.0, false, &rw->C, false, &u->S, urc);
-    }
-  }
-  else {
-    if (cw) {
-      urc = init_amatrix(&tmp2, u->rb->k, cw->krow);
-
-      clear_amatrix(urc);
-      addmul_amatrix(1.0, false, &u->S, true, &cw->C, urc);
-    }
-    else
-      urc = (pamatrix) &u->S;
-  }
-
-  norm = normfrob_amatrix(urc);
-
-  if (urc != &u->S)
-    uninit_amatrix(urc);
-
-  return norm;
+void
+random_uniform(puniform u)
+{
+  random_amatrix(&u->S);
 }
 
 /* ------------------------------------------------------------

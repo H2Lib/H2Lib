@@ -1,4 +1,3 @@
-
 /* ------------------------------------------------------------
  * This is the file "harith.c" of the H2Lib package.
  * All rights reserved, Steffen Boerm 2014
@@ -343,13 +342,15 @@ add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
 {
   amatrix   tmp1, tmp2, tmp3, tmp4;
   realavector tmp5;
-  pamatrix  z, u, vt, u1, vt1;
+  pamatrix  z, z1, u, vt, u1, vt1;
   prealavector sigma;
+  pavector  tau;
   uint      rows, cols, k, knew;
 
 #ifdef HARITH_AMATRIX_QUICK_EXIT
-  if (normfrob_amatrix(a) == 0.0)
+  if (normfrob2_amatrix(a) == 0.0) {
     return;
+  }
 #endif
 
   if (atrans) {
@@ -364,45 +365,140 @@ add_amatrix_rkmatrix(field alpha, bool atrans, pcamatrix a, pctruncmode tm,
   rows = b->A.rows;
   cols = b->B.rows;
 
-  z = init_amatrix(&tmp1, rows, cols);
+  if (rows > cols) {
+    z = init_amatrix(&tmp1, rows, cols);
 
-  /* Compute sum */
-  if (atrans)
-    copy_amatrix(true, a, z);
-  else
-    copy_amatrix(false, a, z);
+    /* Compute sum */
+    if (atrans)
+      copy_amatrix(true, a, z);
+    else
+      copy_amatrix(false, a, z);
 
-  if(alpha != 1.0)
-    scale_amatrix(alpha, z);
+    if (alpha != 1.0)
+      scale_amatrix(alpha, z);
 
-  addmul_amatrix(1.0, false, &b->A, true, &b->B, z);
+    addmul_amatrix(1.0, false, &b->A, true, &b->B, z);
 
-  /* Find singular value decomposition of Z */
-  k = UINT_MIN(rows, cols);
-  u = init_amatrix(&tmp2, rows, k);
-  vt = init_amatrix(&tmp3, k, cols);
-  sigma = init_realavector(&tmp5, k);
-  svd_amatrix(z, sigma, u, vt);
+    k = UINT_MIN(rows, cols);
+    tau = new_avector(k);
+    qrdecomp_amatrix(z, tau);
+    z1 = new_amatrix(k, k);
+    copy_upper_amatrix(z, false, z1);
 
-  /* Determine rank */
-  knew = findrank_truncmode(tm, eps, sigma);
+    u = init_amatrix(&tmp2, k, k);
+    vt = init_amatrix(&tmp3, k, k);
+    sigma = init_realavector(&tmp5, k);
+    svd_amatrix(z1, sigma, u, vt);
 
-  /* Set new rank */
-  setrank_rkmatrix(b, knew);
+    /* Determine rank */
+    knew = findrank_truncmode(tm, eps, sigma);
 
-  /* Scale singular vectors */
-  diageval_realavector_amatrix(1.0, true, sigma, true, u);
+    /* Set new rank */
+    setrank_rkmatrix(b, knew);
 
-  /* Copy singular vectors */
-  clear_amatrix(&b->A);
-  u1 = init_sub_amatrix(&tmp4, u, rows, 0, knew, 0);
-  copy_amatrix(false, u1, &b->A);
-  uninit_amatrix(u1);
+    /* Copy singular vectors */
+    clear_amatrix(&b->A);
+    u1 = init_sub_amatrix(&tmp4, u, k, 0, knew, 0);
+    copy_sub_amatrix(false, u1, &b->A);
+    qreval_amatrix(false, z, tau, &b->A);
+    uninit_amatrix(u1);
 
-  clear_amatrix(&b->B);
-  vt1 = init_sub_amatrix(&tmp4, vt, knew, 0, cols, 0);
-  copy_amatrix(true, vt1, &b->B);
-  uninit_amatrix(vt1);
+    clear_amatrix(&b->B);
+    vt1 = init_sub_amatrix(&tmp4, vt, knew, 0, k, 0);
+    diageval_realavector_amatrix(1.0, false, sigma, false, vt1);
+    copy_amatrix(true, vt1, &b->B);
+    uninit_amatrix(vt1);
+
+    del_avector(tau);
+    del_amatrix(z1);
+  }
+  else if (cols > rows) {
+    z = init_amatrix(&tmp1, cols, rows);
+
+    /* Compute sum */
+    if (atrans)
+      copy_amatrix(false, a, z);
+    else
+      copy_amatrix(true, a, z);
+
+    if (alpha != 1.0)
+      scale_amatrix(alpha, z);
+
+    addmul_amatrix(1.0, false, &b->B, true, &b->A, z);
+
+    k = UINT_MIN(rows, cols);
+    tau = new_avector(k);
+    qrdecomp_amatrix(z, tau);
+    z1 = new_amatrix(k, k);
+    copy_upper_amatrix(z, false, z1);
+
+    u = init_amatrix(&tmp2, k, k);
+    vt = init_amatrix(&tmp3, k, k);
+    sigma = init_realavector(&tmp5, k);
+    svd_amatrix(z1, sigma, u, vt);
+
+    /* Determine rank */
+    knew = findrank_truncmode(tm, eps, sigma);
+
+    /* Set new rank */
+    setrank_rkmatrix(b, knew);
+
+    /* Copy singular vectors */
+    clear_amatrix(&b->A);
+    vt1 = init_sub_amatrix(&tmp4, vt, knew, 0, k, 0);
+    copy_amatrix(true, vt1, &b->A);
+    uninit_amatrix(vt1);
+
+    clear_amatrix(&b->B);
+    u1 = init_sub_amatrix(&tmp4, u, k, 0, knew, 0);
+    diageval_realavector_amatrix(1.0, true, sigma, true, u1);
+    copy_sub_amatrix(false, u1, &b->B);
+    qreval_amatrix(false, z, tau, &b->B);
+    uninit_amatrix(u1);
+
+    del_avector(tau);
+    del_amatrix(z1);
+
+  }
+  else {
+    z = init_amatrix(&tmp1, rows, cols);
+
+    /* Compute sum */
+    if (atrans)
+      copy_amatrix(true, a, z);
+    else
+      copy_amatrix(false, a, z);
+
+    if (alpha != 1.0)
+      scale_amatrix(alpha, z);
+
+    addmul_amatrix(1.0, false, &b->A, true, &b->B, z);
+
+    /* Find singular value decomposition of Z */
+    k = UINT_MIN(rows, cols);
+    u = init_amatrix(&tmp2, rows, k);
+    vt = init_amatrix(&tmp3, k, cols);
+    sigma = init_realavector(&tmp5, k);
+    svd_amatrix(z, sigma, u, vt);
+
+    /* Determine rank */
+    knew = findrank_truncmode(tm, eps, sigma);
+
+    /* Set new rank */
+    setrank_rkmatrix(b, knew);
+
+    /* Copy singular vectors */
+    clear_amatrix(&b->A);
+    u1 = init_sub_amatrix(&tmp4, u, rows, 0, knew, 0);
+    diageval_realavector_amatrix(1.0, true, sigma, true, u1);
+    copy_amatrix(false, u1, &b->A);
+    uninit_amatrix(u1);
+
+    clear_amatrix(&b->B);
+    vt1 = init_sub_amatrix(&tmp4, vt, knew, 0, cols, 0);
+    copy_amatrix(true, vt1, &b->B);
+    uninit_amatrix(vt1);
+  }
 
   /* Clean up */
   uninit_realavector(sigma);
@@ -6049,7 +6145,7 @@ lrdecomp_hmatrix(phmatrix a, pctruncmode tm, real eps)
 }
 
 void
-lrsolve_hmatrix_avector(bool atrans, pchmatrix a, pavector x)
+lrsolve_n_hmatrix_avector(pchmatrix a, pavector x)
 {
   avector   tmp;
   pavector  xp;
@@ -6065,18 +6161,109 @@ lrsolve_hmatrix_avector(bool atrans, pchmatrix a, pavector x)
   for (i = 0; i < n; i++)
     xp->v[i] = x->v[idx[i]];
 
-  if (atrans) {
-    uppersolve_hmatrix_avector(false, true, a, xp);
-    lowersolve_hmatrix_avector(true, true, a, xp);
-  }
-  else {
-    lowersolve_hmatrix_avector(true, false, a, xp);
-    uppersolve_hmatrix_avector(false, false, a, xp);
-  }
+  lowersolve_hmatrix_avector(true, false, a, xp);
+  uppersolve_hmatrix_avector(false, false, a, xp);
 
   for (i = 0; i < n; i++)
     x->v[idx[i]] = xp->v[i];
   uninit_avector(xp);
+}
+
+void
+lrsolve_t_hmatrix_avector(pchmatrix a, pavector x)
+{
+  avector   tmp;
+  pavector  xp;
+  const uint *idx;
+  uint      i, n;
+
+  assert(x->dim == a->rc->size);
+
+  n = a->rc->size;
+  idx = a->rc->idx;
+
+  xp = init_avector(&tmp, n);
+  for (i = 0; i < n; i++)
+    xp->v[i] = x->v[idx[i]];
+
+  uppersolve_hmatrix_avector(false, true, a, xp);
+  lowersolve_hmatrix_avector(true, true, a, xp);
+
+  for (i = 0; i < n; i++)
+    x->v[idx[i]] = xp->v[i];
+  uninit_avector(xp);
+}
+
+void
+lrsolve_hmatrix_avector(bool atrans, pchmatrix a, pavector x)
+{
+  if (atrans) {
+    lrsolve_t_hmatrix_avector(a, x);
+  }
+  else {
+    lrsolve_n_hmatrix_avector(a, x);
+  }
+}
+
+void
+lreval_n_hmatrix_avector(pchmatrix a, pavector x)
+{
+  avector   tmp;
+  pavector  xp;
+  const uint *idx;
+  uint      i, n;
+
+  assert(x->dim == a->rc->size);
+
+  n = a->rc->size;
+  idx = a->rc->idx;
+
+  xp = init_avector(&tmp, n);
+  for (i = 0; i < n; i++)
+    xp->v[i] = x->v[idx[i]];
+
+  uppereval_hmatrix_avector(false, false, a, xp);
+  lowereval_hmatrix_avector(true, false, a, xp);
+
+  for (i = 0; i < n; i++)
+    x->v[idx[i]] = xp->v[i];
+  uninit_avector(xp);
+}
+
+void
+lreval_t_hmatrix_avector(pchmatrix a, pavector x)
+{
+  avector   tmp;
+  pavector  xp;
+  const uint *idx;
+  uint      i, n;
+
+  assert(x->dim == a->rc->size);
+
+  n = a->rc->size;
+  idx = a->rc->idx;
+
+  xp = init_avector(&tmp, n);
+  for (i = 0; i < n; i++)
+    xp->v[i] = x->v[idx[i]];
+
+  lowereval_hmatrix_avector(true, true, a, xp);
+  uppereval_hmatrix_avector(false, true, a, xp);
+
+  for (i = 0; i < n; i++)
+    x->v[idx[i]] = xp->v[i];
+  uninit_avector(xp);
+}
+
+void
+lreval_hmatrix_avector(bool atrans, pchmatrix a, pavector x)
+{
+  if (atrans) {
+    lreval_t_hmatrix_avector(a, x);
+  }
+  else {
+    lreval_n_hmatrix_avector(a, x);
+  }
 }
 
 void
@@ -6136,6 +6323,31 @@ cholsolve_hmatrix_avector(pchmatrix a, pavector x)
 
   lowersolve_hmatrix_avector(false, false, a, xp);
   lowersolve_hmatrix_avector(false, true, a, xp);
+
+  for (i = 0; i < n; i++)
+    x->v[idx[i]] = xp->v[i];
+  uninit_avector(xp);
+}
+
+void
+choleval_hmatrix_avector(pchmatrix a, pavector x)
+{
+  avector   tmp;
+  pavector  xp;
+  const uint *idx;
+  uint      i, n;
+
+  assert(x->dim == a->rc->size);
+
+  n = a->rc->size;
+  idx = a->rc->idx;
+
+  xp = init_avector(&tmp, n);
+  for (i = 0; i < n; i++)
+    xp->v[i] = x->v[idx[i]];
+
+  lowereval_hmatrix_avector(false, true, a, xp);
+  lowereval_hmatrix_avector(false, false, a, xp);
 
   for (i = 0; i < n; i++)
     x->v[idx[i]] = xp->v[i];

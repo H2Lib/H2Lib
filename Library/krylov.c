@@ -1,14 +1,163 @@
+
 /* ------------------------------------------------------------
- This is the file "krylov.c" of the H2Lib package.
- All rights reserved, Steffen Boerm 2010
- ------------------------------------------------------------ */
+ * This is the file "krylov.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2010
+ * ------------------------------------------------------------ */
 
 #include "krylov.h"
 #include "factorizations.h"
 
 /* ------------------------------------------------------------
- Standard conjugate gradient method
- ------------------------------------------------------------ */
+ * Vector iteration for norm2 and norm2diff estimation
+ * ------------------------------------------------------------ */
+
+real
+norm2_matrix(mvm_t mvm, void *A, uint rows, uint cols)
+{
+  avector   tmp1, tmp2;
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  x = init_avector(&tmp1, cols);
+  y = init_avector(&tmp2, rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  i = 0;
+  while (i < NORM_STEPS && norm > 0.0) {
+    scale_avector(1.0 / norm, x);
+
+    clear_avector(y);
+    mvm(1.0, false, A, x, y);
+
+    clear_avector(x);
+    mvm(1.0, true, A, y, x);
+
+    norm = norm2_avector(x);
+    i++;
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
+}
+
+real
+norm2diff_matrix(mvm_t mvmA, void *A, mvm_t mvmB, void *B, uint rows,
+		 uint cols)
+{
+  avector   tmp1, tmp2;
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  x = init_avector(&tmp1, cols);
+  y = init_avector(&tmp2, rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  i = 0;
+  while (i < NORM_STEPS && norm > 0.0) {
+    scale_avector(1.0 / norm, x);
+
+    clear_avector(y);
+    mvmA(1.0, false, A, x, y);
+    mvmB(-1.0, false, B, x, y);
+
+    clear_avector(x);
+    mvmA(1.0, true, A, y, x);
+    mvmB(-1.0, true, B, y, x);
+
+    norm = norm2_avector(x);
+    i++;
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
+}
+
+real
+norm2diff_pre_matrix(mvm_t mvmA, void *A, prcd_t evalB, prcd_t evaltransB,
+		     void *B, uint rows, uint cols)
+{
+  avector   tmp1, tmp2;
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  x = init_avector(&tmp1, cols);
+  y = init_avector(&tmp2, rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  i = 0;
+  while (i < NORM_STEPS && norm > 0.0) {
+    scale_avector(1.0 / norm, x);
+
+    copy_avector(x, y);
+    evalB(B, y);
+    mvmA(-1.0, false, A, x, y);
+
+    copy_avector(y, x);
+    evaltransB(B, x);
+    mvmA(-1.0, true, A, y, x);
+
+    norm = norm2_avector(x);
+    i++;
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
+}
+
+real
+norm2diff_id_pre_matrix(mvm_t mvmA, void *A, prcd_t solveB,
+			prcd_t solvetransB, void *B, uint rows, uint cols)
+{
+  avector   tmp1, tmp2;
+  pavector  x, y;
+  real      norm;
+  uint      i;
+
+  x = init_avector(&tmp1, cols);
+  y = init_avector(&tmp2, rows);
+
+  random_avector(x);
+  norm = norm2_avector(x);
+  i = 0;
+  while (i < NORM_STEPS && norm > 0.0) {
+    scale_avector(1.0 / norm, x);
+
+    clear_avector(y);
+    mvmA(1.0, false, A, x, y);
+    solveB(B, y);
+    add_avector(-1.0, x, y);
+
+    clear_avector(x);
+    add_avector(-1.0, y, x);
+
+    solvetransB(B, y);
+    mvmA(1.0, true, A, y, x);
+
+    norm = norm2_avector(x);
+    i++;
+  }
+
+  uninit_avector(y);
+  uninit_avector(x);
+
+  return REAL_SQRT(norm);
+}
+
+/* ------------------------------------------------------------
+ * Standard conjugate gradient method
+ * ------------------------------------------------------------ */
 
 void
 init_cg(addeval_t addeval, void *matrix, pcavector b, pavector x,
@@ -56,8 +205,8 @@ evalfunctional_cg(addeval_t addeval, void *matrix, pcavector b,
 }
 
 /* ------------------------------------------------------------
- Preconditioned conjugate gradient method
- ------------------------------------------------------------ */
+ * Preconditioned conjugate gradient method
+ * ------------------------------------------------------------ */
 
 void
 init_pcg(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata, pcavector b,	/* Right-hand side */
@@ -112,8 +261,292 @@ step_pcg(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata, pcavector b,
 }
 
 /* ------------------------------------------------------------
- GMRES method with Householder QR
+ * Standard Uzawa method
+ * ------------------------------------------------------------ */
+
+void
+init_uzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21,
+	   void *matrix_A21, pcavector b1, pcavector b2, pavector x1,
+	   pavector x2, pavector r2, pavector p2, pavector a1, pavector s2)
+{
+  (void) a1;
+  (void) s2;
+
+  /* x1 = A_{11}^{-1} (b_1 - A_{12} x_2) */
+  copy_avector(b1, x1);
+  mvm_A21(-1.0, true, matrix_A21, x2, x1);
+  solve_A11(matrix_A11, x1);
+
+  /* r2 = A_{21} x_1 - b_2 */
+  clear_avector(r2);
+  mvm_A21(1.0, false, matrix_A21, x1, r2);
+  add_avector(-1.0, b2, r2);
+
+  /* p2 = r2 */
+  copy_avector(r2, p2);
+}
+
+void
+step_uzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21,
+	   void *matrix_A21, pcavector b1, pcavector b2, pavector x1,
+	   pavector x2, pavector r2, pavector p2, pavector a1, pavector s2)
+{
+  field     gamma, lambda, mu;
+
+  (void) b1;
+  (void) b2;
+
+  /* a1 = A_{11}^{-1} p_2 */
+  clear_avector(a1);
+  mvm_A21(1.0, true, matrix_A21, p2, a1);
+  solve_A11(matrix_A11, a1);
+
+  /* s = A_{21} a */
+  clear_avector(s2);
+  mvm_A21(1.0, false, matrix_A21, a1, s2);
+
+  /* gamma = <s, p_2> */
+  gamma = dotprod_avector(s2, p2);
+
+  /* lambda = <p_2, r_2> / gamma */
+  lambda = dotprod_avector(p2, r2) / gamma;
+
+  /* x_2 = x_2 + lambda p_2 */
+  add_avector(lambda, p2, x2);
+
+  /* r_2 = r_2 - lambda s */
+  add_avector(-lambda, s2, r2);
+
+  /* x_1 = x_1 - lambda a */
+  add_avector(-lambda, a1, x1);
+
+  /* mu = <r_2, s> / gamma */
+  mu = dotprod_avector(s2, r2) / CONJ(gamma);
+
+  /* p_2 = r_2 - mu p_2 */
+  scale_avector(-mu, p2);
+  add_avector(1.0, r2, p2);
+}
+
+/* ------------------------------------------------------------
+ * Standard Uzawa method wit symmetric preconditioning
+ * ------------------------------------------------------------ */
+
+void
+init_puzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21,
+	    void *matrix_A21, prcd_t prcd, void *pdata, pcavector b1,
+	    pcavector b2, pavector x1, pavector x2, pavector r2, pavector q2,
+	    pavector p2, pavector a1, pavector s2)
+{
+  (void) a1;
+  (void) s2;
+
+  /* x1 = A_{11}^{-1} (b_1 - A_{12} x_2) */
+  copy_avector(b1, x1);
+  mvm_A21(-1.0, true, matrix_A21, x2, x1);
+  solve_A11(matrix_A11, x1);
+
+  /* r2 = A_{21} x_1 - b_2 */
+  clear_avector(r2);
+  mvm_A21(1.0, false, matrix_A21, x1, r2);
+  add_avector(-1.0, b2, r2);
+
+  /* q2 = r2 */
+  copy_avector(r2, q2);
+
+  /*Apply preconditioner */
+  if (prcd)
+    prcd(pdata, q2);
+
+  /* p2 = q2 */
+  copy_avector(q2, p2);
+}
+
+void
+step_puzawa(prcd_t solve_A11, void *matrix_A11, mvm_t mvm_A21,
+	    void *matrix_A21, prcd_t prcd, void *pdata, pcavector b1,
+	    pcavector b2, pavector x1, pavector x2, pavector r2, pavector q2,
+	    pavector p2, pavector a1, pavector s2)
+{
+  field     gamma, lambda, mu;
+
+  (void) b1;
+  (void) b2;
+
+  /* a1 = A_{11}^{-1} p_2 */
+  clear_avector(a1);
+  mvm_A21(1.0, true, matrix_A21, p2, a1);
+  solve_A11(matrix_A11, a1);
+
+  /* s = A_{21} a */
+  clear_avector(s2);
+  mvm_A21(1.0, false, matrix_A21, a1, s2);
+
+  /* gamma = <s, p_2> */
+  gamma = dotprod_avector(s2, p2);
+
+  /* lambda = <p_2, r_2> / gamma */
+  lambda = dotprod_avector(p2, r2) / gamma;
+
+  /* x_2 = x_2 + lambda p_2 */
+  add_avector(lambda, p2, x2);
+
+  /* r_2 = r_2 - lambda s */
+  add_avector(-lambda, s2, r2);
+
+  /* q2 = r2 */
+  copy_avector(r2, q2);
+
+  /*Apply preconditioner */
+  if (prcd)
+    prcd(pdata, q2);
+
+  /* x_1 = x_1 - lambda a */
+  add_avector(-lambda, a1, x1);
+
+  /* mu = <r_2, s> / gamma */
+  mu = dotprod_avector(s2, q2) / CONJ(gamma);
+
+  /* p_2 = q_2 - mu p_2 */
+  scale_avector(-mu, p2);
+  add_avector(1.0, q2, p2);
+}
+
+/* ------------------------------------------------------------
+ Biconjugate gradient method
  ------------------------------------------------------------ */
+
+/* cf. Yousef Saad, Iterative Methods for Sparse Linear Systems,
+ Section 7.3 */
+
+void
+init_bicg(addeval_t addeval, addeval_t addevaltrans, void *matrix, pcavector b,	/* Right-hand side */
+	  pavector x,		/* Approximate solution */
+	  pavector r,		/* Residual b-Ax */
+	  pavector rt,		/* Adjoint residual */
+	  pavector p,		/* Search direction */
+	  pavector pt,		/* Adjoint search direction */
+	  pavector a, pavector at)
+{
+  (void) a;
+  (void) at;
+  (void) addevaltrans;
+
+  copy_avector(b, r);		/* r = b - A x */
+  addeval(-1.0, matrix, x, r);
+
+  copy_avector(r, rt);		/* r^* = r */
+
+  copy_avector(r, p);		/* p = r */
+
+  copy_avector(rt, pt);		/* p^* = r^* */
+}
+
+void
+step_bicg(addeval_t addeval, addeval_t addevaltrans, void *matrix, pcavector b,	/* Right-hand side */
+	  pavector x,		/* Approximate solution */
+	  pavector r,		/* Residual b-Ax */
+	  pavector rt,		/* Adjoint residual */
+	  pavector p,		/* Search direction */
+	  pavector pt,		/* Adjoint search direction */
+	  pavector a, pavector at)
+{
+  field     alpha, beta, gamma, mu;
+
+  (void) b;
+
+  clear_avector(a);		/* a = A p */
+  addeval(1.0, matrix, p, a);
+
+  clear_avector(at);		/* a^* = A^* p^* */
+  addevaltrans(1.0, matrix, pt, at);
+
+  gamma = dotprod_avector(a, pt);
+  mu = dotprod_avector(r, rt);
+  alpha = mu / gamma;
+
+  add_avector(alpha, p, x);	/* x = x + alpha p */
+
+  add_avector(-alpha, a, r);	/* r = r - alpha a */
+
+  add_avector(-alpha, at, rt);	/* r^* = r^* - alpha a^* */
+
+  beta = dotprod_avector(r, rt) / mu;
+
+  scale_avector(beta, p);	/* p = r + beta p */
+  add_avector(1.0, r, p);
+
+  scale_avector(beta, pt);	/* p^* = r^* + beta p^* */
+  add_avector(1.0, rt, pt);
+}
+
+/* ------------------------------------------------------------
+ * Stabilized biconjugate gradient method
+ * ------------------------------------------------------------ */
+
+/* cf. Yousef Saad, Iterative Methods for Sparse Linear Systems,
+ Section 7.4.2
+ Slight modification: the intermediate vector s is stored in r. */
+
+void
+init_bicgstab(addeval_t addeval, void *matrix, pcavector b,	/* Right-hand side */
+	      pavector x,	/* Approximate solution */
+	      pavector r,	/* Residual b-Ax */
+	      pavector rt,	/* Adjoint residual */
+	      pavector p,	/* Search direction */
+	      pavector a, pavector as)
+{
+  (void) a;
+  (void) as;
+
+  copy_avector(b, r);		/* r = b - A x */
+  addeval(-1.0, matrix, x, r);
+
+  copy_avector(r, rt);		/* r^* = r */
+
+  copy_avector(r, p);		/* p = r */
+}
+
+void
+step_bicgstab(addeval_t addeval, void *matrix, pcavector b,	/* Right-hand side */
+	      pavector x,	/* Approximate solution */
+	      pavector r,	/* Residual b-Ax */
+	      pavector rt,	/* Adjoint residual */
+	      pavector p,	/* Search direction */
+	      pavector a, pavector as)
+{
+  field     alpha, beta, omega, mu;
+
+  (void) b;
+
+  clear_avector(a);		/* a = A p */
+  addeval(1.0, matrix, p, a);
+
+  mu = dotprod_avector(r, rt);
+  alpha = mu / dotprod_avector(a, rt);
+
+  add_avector(-alpha, a, r);	/* r = r - alpha a */
+
+  clear_avector(as);		/* as = A r */
+  addeval(1.0, matrix, r, as);
+
+  omega = dotprod_avector(as, r) / dotprod_avector(as, as);
+
+  add_avector(alpha, p, x);	/* x = x + alpha p + omega s */
+  add_avector(omega, r, x);
+
+  add_avector(-omega, as, r);	/* r = r - omega as */
+
+  beta = dotprod_avector(r, rt) / mu * alpha / omega;
+
+  scale_avector(beta, p);	/* p = r + beta (p - omega a) */
+  add_avector(1.0, r, p);
+  add_avector(-beta * omega, a, p);
+}
+
+/* ------------------------------------------------------------
+ * GMRES method with Householder QR
+ * ------------------------------------------------------------ */
 
 static    field
 findapply_givens(pfield a, pfield b)
@@ -334,9 +767,64 @@ residualnorm_gmres(pcavector rhat, uint k)
   return ABS(rhat->v[k]);
 }
 
+/* Simple convenience wrapper for GMRES solver */
+uint
+solve_gmres(addeval_t addeval, void *A, pavector b, pavector x,
+	    real accuracy, uint max_steps)
+{
+  pavector  rhat, q, tau;
+  pamatrix  qr;
+  uint      i = 0, j = 0, n, kk, kmax;
+  real      norm = 10.0 * accuracy;
+
+  kmax = 500;
+
+  n = b->dim;
+  assert(x->dim == n);
+
+  qr = new_zero_amatrix(n, kmax);
+  rhat = new_avector(n);
+  q = new_avector(n);
+  tau = new_avector(kmax);
+  random_avector(x);
+
+  init_gmres(addeval, A, b, x, rhat, q, &kk, qr, tau);
+
+  for (i = 0; i < max_steps; i += kmax) {
+    for (j = 0; j < kmax && i + j < max_steps; ++j) {
+      step_gmres(addeval, A, b, x, rhat, q, &kk, qr, tau);
+      norm = residualnorm_gmres(rhat, kk);
+#ifndef NDEBUG
+      printf("  Residual: %.5e\t Iterations: %u\r", norm, j + i);
+      fflush(stdout);
+#endif
+      if (norm <= accuracy) {
+	finish_gmres(addeval, A, b, x, rhat, q, &kk, qr, tau);
+	break;
+      }
+    }
+    if (norm <= accuracy) {
+      break;
+    }
+    else {
+      finish_gmres(addeval, A, b, x, rhat, q, &kk, qr, tau);
+    }
+  }
+#ifndef NDEBUG
+  printf("\n");
+#endif
+
+  del_avector(rhat);
+  del_avector(q);
+  del_avector(tau);
+  del_amatrix(qr);
+
+  return i + j;
+}
+
 /* ------------------------------------------------------------
- Preconditioned GMRES method with Householder QR
- ------------------------------------------------------------ */
+ * Preconditioned GMRES method with Householder QR
+ * ------------------------------------------------------------ */
 
 void
 init_pgmres(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata, pcavector b,	/* Right-hand side */

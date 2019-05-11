@@ -1,6 +1,8 @@
 #include "basic.h"
 #include "krylov.h"
+#include "krylovsolvers.h"
 #include "laplacebem3d.h"
+#include "matrixnorms.h"
 
 #ifdef USE_CAIRO
 #include <cairo.h>
@@ -10,166 +12,36 @@ static uint problems = 0;
 
 #define IS_IN_RANGE(a, b, c) (((a) <= (b)) && ((b) <= (c)))
 
-/* Compute the L_2-error for constant basis functions */
-real
-L2gamma_c_diff_norm2(pbem3d bem, pavector x, boundary_func3d rhs, void *data)
-{
-  uint      n = x->dim;
-  pcsurface3d gr = bem->gr;
-  const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
-  const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
-  const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
-  const real *gr_g = gr->g;
-  real     *xq = bem->sq->x_single;
-  real     *yq = bem->sq->y_single;
-  uint      nq = bem->sq->n_single;
-  real     *wq = bem->sq->w_single + 3 * nq;
-  field    *xv = x->v;
-
-  const real *A, *B, *C, *N;
-  real      X[3];
-  real      sum, tx, sx, Ax, Bx, Cx;
-  uint      t, q;
-
-  real      norm;
-
-  norm = 0.0;
-  for (t = 0; t < n; ++t) {
-    A = gr_x[gr_t[t][0]];
-    B = gr_x[gr_t[t][1]];
-    C = gr_x[gr_t[t][2]];
-    N = gr_n[t];
-
-    sum = 0.0;
-    for (q = 0; q < nq; ++q) {
-      tx = xq[q];
-      sx = yq[q];
-      Ax = 1.0 - tx;
-      Bx = tx - sx;
-      Cx = sx;
-
-      X[0] = A[0] * Ax + B[0] * Bx + C[0] * Cx;
-      X[1] = A[1] * Ax + B[1] * Bx + C[1] * Cx;
-      X[2] = A[2] * Ax + B[2] * Bx + C[2] * Cx;
-
-      sum += wq[q] * REAL_SQR(rhs(X, N, data) - xv[t]);
-    }
-    norm += gr_g[t] * sum;
-  }
-  norm = REAL_SQRT(norm);
-
-  return norm;
-}
-
-/* Compute the L_2-error for linear basis functions */
-real
-L2gamma_l_diff_norm2(pbem3d bem, pavector x, boundary_func3d rhs, void *data)
-{
-  pcsurface3d gr = bem->gr;
-  uint triangles = gr->triangles;
-  const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
-  const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
-  const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
-  const real *gr_g = gr->g;
-  real     *xq = bem->sq->x_single;
-  real     *yq = bem->sq->y_single;
-  uint      nq = bem->sq->n_single;
-  real     *wq = bem->sq->w_single + 3 * nq;
-  field    *xv = x->v;
-
-  const real *A, *B, *C, *N;
-  real      X[3];
-  real      sum, bf, tx, sx, Ax, Bx, Cx;
-  uint      t, q;
-
-  real      norm;
-
-  assert(x->dim == gr->vertices);
-
-  norm = 0.0;
-  for (t = 0; t < triangles; ++t) {
-    A = gr_x[gr_t[t][0]];
-    B = gr_x[gr_t[t][1]];
-    C = gr_x[gr_t[t][2]];
-    N = gr_n[t];
-
-    sum = 0.0;
-    for (q = 0; q < nq; ++q) {
-      tx = xq[q];
-      sx = yq[q];
-      Ax = 1.0 - tx;
-      Bx = tx - sx;
-      Cx = sx;
-
-      X[0] = A[0] * Ax + B[0] * Bx + C[0] * Cx;
-      X[1] = A[1] * Ax + B[1] * Bx + C[1] * Cx;
-      X[2] = A[2] * Ax + B[2] * Bx + C[2] * Cx;
-
-      bf = xv[gr_t[t][0]] * Ax + xv[gr_t[t][1]] * Bx + xv[gr_t[t][2]] * Cx;
-
-      sum += wq[q] * REAL_SQR(rhs(X, N, data) - bf);
-    }
-    norm += gr_g[t] * sum;
-  }
-  norm = REAL_SQRT(norm);
-
-  return norm;
-}
-
 /* Simple convenience wrapper for conjugate gradient solver */
 static void
 solve_cg_bem3d(matrixtype type, void *A, pavector b, pavector x,
 	       real accuracy, uint steps)
 {
-  addeval_t addevalA;
-  pavector  r, p, a;
-  uint      i, n;
-  real      norm;
-
-  switch (type) {
-  case AMATRIX:
-    addevalA = (addeval_t) addeval_amatrix_avector;
-    break;
-  case HMATRIX:
-    addevalA = (addeval_t) addeval_hmatrix_avector;
-    break;
-  case H2MATRIX:
-    addevalA = (addeval_t) addeval_h2matrix_avector;
-    break;
-  default:
-    printf("ERROR: unknown matrix type!\n");
-    abort();
-    break;
-  }
+  uint      n, iter;
 
   n = b->dim;
   assert(x->dim == n);
 
-  r = new_avector(n);
-  p = new_avector(n);
-  a = new_avector(n);
-  random_avector(x);
+  random_real_avector(x);
 
-  init_cg(addevalA, A, b, x, r, p, a);
-
-  for (i = 1; i < steps; i++) {
-    step_cg(addevalA, A, b, x, r, p, a);
-    norm = norm2_avector(r);
-#ifndef NDEBUG
-    printf("  Residual: %.5e\t Iterations: %u\r", norm, i);
-    fflush(stdout);
-#endif
-    if (norm <= accuracy) {
-      break;
-    }
+  switch (type) {
+  case AMATRIX:
+    iter = solve_cg_amatrix_avector((pcamatrix) A, b, x, accuracy, steps);
+    break;
+  case HMATRIX:
+    iter = solve_cg_hmatrix_avector((pchmatrix) A, b, x, accuracy, steps);
+    break;
+  case H2MATRIX:
+    iter = solve_cg_h2matrix_avector((pch2matrix) A, b, x, accuracy, steps);
+    break;
+  default:
+    iter = 0;
+    printf("ERROR: unknown matrix type!\n");
+    abort();
+    break;
   }
-#ifndef NDEBUG
-  printf("  Residual: %.5e\t Iterations: %u\n", norm2_avector(r), i);
-#endif
-
-  del_avector(r);
-  del_avector(p);
-  del_avector(a);
+  printf("CG iterations:\n");
+  printf("  %d\n", iter);
 
 }
 
@@ -209,11 +81,11 @@ test_system(matrixtype mattype, const char *apprxtype,
     assert(mattype == H2MATRIX);
     assemble_bem3d_h2matrix_row_clusterbasis(bem_slp, ((ph2matrix) V)->rb);
     assemble_bem3d_h2matrix_col_clusterbasis(bem_slp, ((ph2matrix) V)->cb);
-    assemble_bem3d_h2matrix(bem_slp, brootV, (ph2matrix) V);
+    assemble_bem3d_h2matrix(bem_slp, (ph2matrix) V);
 
     assemble_bem3d_h2matrix_row_clusterbasis(bem_dlp, ((ph2matrix) KM)->rb);
     assemble_bem3d_h2matrix_col_clusterbasis(bem_dlp, ((ph2matrix) KM)->cb);
-    assemble_bem3d_h2matrix(bem_dlp, brootKM, (ph2matrix) KM);
+    assemble_bem3d_h2matrix(bem_dlp, (ph2matrix) KM);
 
     errorV = norm2diff_amatrix_h2matrix((ph2matrix) V, Vfull)
       / norm2_amatrix(Vfull);
@@ -231,21 +103,20 @@ test_system(matrixtype mattype, const char *apprxtype,
   printf("Solving Dirichlet problem:\n");
 
   if (basis_dirichlet == BASIS_LINEAR_BEM3D) {
-    projectl2_bem3d_linear_avector(bem_dlp,
-				   (exterior ==
-				    true ?
-				    eval_dirichlet_fundamental2_laplacebem3d :
-				    eval_dirichlet_fundamental_laplacebem3d),
-				   f, NULL);
+    projectL2_bem3d_l_avector(bem_dlp,
+			      (exterior ==
+			       true ? eval_dirichlet_fundamental2_laplacebem3d
+			       : eval_dirichlet_fundamental_laplacebem3d), f,
+			      NULL);
   }
   else {
-    projectl2_bem3d_const_avector(bem_dlp,
-				  (exterior ==
-				   true ?
-				   eval_dirichlet_fundamental2_laplacebem3d :
-				   eval_dirichlet_fundamental_laplacebem3d),
-				  f, NULL);
+    projectL2_bem3d_c_avector(bem_dlp,
+			      (exterior ==
+			       true ? eval_dirichlet_fundamental2_laplacebem3d
+			       : eval_dirichlet_fundamental_laplacebem3d), f,
+			      NULL);
   }
+
   clear_avector(b);
   if (mattype == HMATRIX) {
     addeval_hmatrix_avector(1.0, (phmatrix) KM, f, b);
@@ -258,39 +129,27 @@ test_system(matrixtype mattype, const char *apprxtype,
   solve_cg_bem3d(mattype, V, b, x, eps_solve, steps);
 
   if (basis_neumann == BASIS_LINEAR_BEM3D) {
-    error_solve = L2gamma_l_diff_norm2(bem_slp, x,
-				       (exterior ==
-					true ?
-					eval_neumann_fundamental2_laplacebem3d
-					:
-					eval_neumann_fundamental_laplacebem3d),
-				       NULL);
+    error_solve = normL2diff_l_bem3d(bem_slp, x,
+				     (exterior ==
+				      true ?
+				      eval_neumann_fundamental2_laplacebem3d :
+				      eval_neumann_fundamental_laplacebem3d),
+				     NULL);
   }
   else {
-    error_solve = L2gamma_c_diff_norm2(bem_slp, x,
-				       (exterior ==
-					true ?
-					eval_neumann_fundamental2_laplacebem3d
-					:
-					eval_neumann_fundamental_laplacebem3d),
-				       NULL);
+    error_solve = normL2diff_c_bem3d(bem_slp, x,
+				     (exterior ==
+				      true ?
+				      eval_neumann_fundamental2_laplacebem3d :
+				      eval_neumann_fundamental_laplacebem3d),
+				     NULL);
   }
 
-  clear_avector(x);
-  if (basis_neumann == BASIS_LINEAR_BEM3D) {
-    error_solve = error_solve
-      / L2gamma_l_diff_norm2(bem_slp, x,
-			     (exterior ==
-			      true ? eval_neumann_fundamental2_laplacebem3d :
-			      eval_neumann_fundamental_laplacebem3d), NULL);
-  }
-  else {
-    error_solve = error_solve
-      / L2gamma_c_diff_norm2(bem_slp, x,
-			     (exterior ==
-			      true ? eval_neumann_fundamental2_laplacebem3d :
-			      eval_neumann_fundamental_laplacebem3d), NULL);
-  }
+  error_solve = error_solve
+    / normL2_bem3d(bem_slp,
+		   (exterior ==
+		    true ? eval_neumann_fundamental2_laplacebem3d :
+		    eval_neumann_fundamental_laplacebem3d), NULL);
 
   printf("rel. error neumann : %.5e       %s\n", error_solve,
 	 (IS_IN_RANGE(low, error_solve, high) ? "    okay" : "NOT okay"));
@@ -307,9 +166,8 @@ test_system(matrixtype mattype, const char *apprxtype,
 
 void
 test_suite(pcsurface3d gr, uint q, uint clf, real eta,
-	   basisfunctionbem3d basis_neumann,
-	   basisfunctionbem3d basis_dirichlet, bool exterior, real error_min,
-	   real error_max)
+	   basisfunctionbem3d row_basis, basisfunctionbem3d col_basis,
+	   bool exterior, real error_min, real error_max)
 {
   pbem3d    bem_slp, bem_dlp;
   pcluster  rootn, rootd;
@@ -325,16 +183,15 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
   real      delta;
   real      eps_aca;
 
-  nn = basis_neumann == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
-  nd = basis_dirichlet == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
+  nn = row_basis == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
+  nd = col_basis == BASIS_LINEAR_BEM3D ? gr->vertices : gr->triangles;
 
-  bem_slp = new_slp_laplace_bem3d(gr, q, q + 2, basis_neumann);
-  bem_dlp =
-    new_dlp_laplace_bem3d(gr, q, q + 2, basis_neumann, basis_dirichlet,
-			  exterior ? -0.5 : 0.5);
+  bem_slp = new_slp_laplace_bem3d(gr, q, q + 2, row_basis, row_basis);
+  bem_dlp = new_dlp_laplace_bem3d(gr, q, q + 2, row_basis, col_basis,
+				  exterior ? -0.5 : 0.5);
 
-  rootn = build_bem3d_cluster(bem_slp, clf, basis_neumann);
-  rootd = build_bem3d_cluster(bem_dlp, clf, basis_dirichlet);
+  rootn = build_bem3d_cluster(bem_slp, clf, row_basis);
+  rootd = build_bem3d_cluster(bem_dlp, clf, col_basis);
 
   brootV = build_nonstrict_block(rootn, rootn, &eta, admissible_max_cluster);
   brootKM = build_nonstrict_block(rootn, rootd, &eta, admissible_max_cluster);
@@ -356,20 +213,20 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
   setup_hmatrix_aprx_inter_row_bem3d(bem_slp, rootn, rootn, brootV, m);
   setup_hmatrix_aprx_inter_row_bem3d(bem_dlp, rootn, rootd, brootKM, m);
   test_system(HMATRIX, "Interpolation row", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   setup_hmatrix_aprx_inter_col_bem3d(bem_slp, rootn, rootn, brootV, m);
   setup_hmatrix_aprx_inter_col_bem3d(bem_dlp, rootn, rootd, brootKM, m);
   test_system(HMATRIX, "Interpolation column", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   setup_hmatrix_aprx_inter_mixed_bem3d(bem_slp, rootn, rootn, brootV, m);
   setup_hmatrix_aprx_inter_mixed_bem3d(bem_dlp, rootn, rootd, brootKM, m);
   test_system(HMATRIX, "Interpolation mixed", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   /*
    * Test Green
@@ -384,23 +241,23 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
   setup_hmatrix_aprx_green_row_bem3d(bem_dlp, rootn, rootd, brootKM, m, l,
 				     delta, build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Green row", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
   setup_hmatrix_aprx_green_col_bem3d(bem_slp, rootn, rootn, brootV, m, l,
 				     delta, build_bem3d_cube_quadpoints);
   setup_hmatrix_aprx_green_col_bem3d(bem_dlp, rootn, rootd, brootKM, m, l,
 				     delta, build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Green column", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   setup_hmatrix_aprx_green_mixed_bem3d(bem_slp, rootn, rootn, brootV, m, l,
 				       delta, build_bem3d_cube_quadpoints);
   setup_hmatrix_aprx_green_mixed_bem3d(bem_dlp, rootn, rootd, brootKM, m, l,
 				       delta, build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Green mixed", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   /*
    * Test Greenhybrid
@@ -418,8 +275,8 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
 					   l, delta, eps_aca,
 					   build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Greenhybrid row", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   setup_hmatrix_aprx_greenhybrid_col_bem3d(bem_slp, rootn, rootn, brootV, m,
 					   l, delta, eps_aca,
@@ -428,8 +285,8 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
 					   l, delta, eps_aca,
 					   build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Greenhybrid column", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   setup_hmatrix_aprx_greenhybrid_mixed_bem3d(bem_slp, rootn, rootn, brootV, m,
 					     l, delta, eps_aca,
@@ -438,8 +295,8 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
 					     m, l, delta, eps_aca,
 					     build_bem3d_cube_quadpoints);
   test_system(HMATRIX, "Greenhybrid mixed", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
 
   /*
    * Test ACA / PACA / HCA
@@ -451,19 +308,19 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
   setup_hmatrix_aprx_aca_bem3d(bem_slp, rootn, rootn, brootV, eps_aca);
   setup_hmatrix_aprx_aca_bem3d(bem_dlp, rootn, rootd, brootKM, eps_aca);
   test_system(HMATRIX, "ACA full pivoting", Vfull, KMfull, brootV, bem_slp, V,
-	      brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      brootKM, bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
   setup_hmatrix_aprx_paca_bem3d(bem_slp, rootn, rootn, brootV, eps_aca);
   setup_hmatrix_aprx_paca_bem3d(bem_dlp, rootn, rootd, brootKM, eps_aca);
   test_system(HMATRIX, "ACA partial pivoting", Vfull, KMfull, brootV, bem_slp,
-	      V, brootKM, bem_dlp, KM, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V, brootKM, bem_dlp, KM, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   setup_hmatrix_aprx_hca_bem3d(bem_slp, rootn, rootn, brootV, m, eps_aca);
   setup_hmatrix_aprx_hca_bem3d(bem_dlp, rootn, rootd, brootKM, m, eps_aca);
   test_system(HMATRIX, "HCA2", Vfull, KMfull, brootV, bem_slp, V, brootKM,
-	      bem_dlp, KM, basis_neumann, basis_dirichlet, exterior,
-	      error_min, error_max);
+	      bem_dlp, KM, row_basis, col_basis, exterior, error_min,
+	      error_max);
   /*
    * H2-matrix
    */
@@ -493,7 +350,7 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
   setup_h2matrix_aprx_inter_bem3d(bem_slp, Vrb, Vcb, brootV, m);
   setup_h2matrix_aprx_inter_bem3d(bem_dlp, KMrb, KMcb, brootKM, m);
   test_system(H2MATRIX, "Interpolation", Vfull, KMfull, brootV, bem_slp, V2,
-	      brootKM, bem_dlp, KM2, basis_neumann, basis_dirichlet, exterior,
+	      brootKM, bem_dlp, KM2, row_basis, col_basis, exterior,
 	      error_min, error_max);
 
   /*
@@ -512,7 +369,7 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
 					delta, eps_aca,
 					build_bem3d_cube_quadpoints);
   test_system(H2MATRIX, "Greenhybrid", Vfull, KMfull, brootV, bem_slp, V2,
-	      brootKM, bem_dlp, KM2, basis_neumann, basis_dirichlet, exterior,
+	      brootKM, bem_dlp, KM2, row_basis, col_basis, exterior,
 	      error_min, error_max);
 
   setup_h2matrix_aprx_greenhybrid_ortho_bem3d(bem_slp, Vrb, Vcb, brootV, m, l,
@@ -522,8 +379,8 @@ test_suite(pcsurface3d gr, uint q, uint clf, real eta,
 					      l, delta, eps_aca,
 					      build_bem3d_cube_quadpoints);
   test_system(H2MATRIX, "Greenhybrid ortho", Vfull, KMfull, brootV, bem_slp,
-	      V2, brootKM, bem_dlp, KM2, basis_neumann, basis_dirichlet,
-	      exterior, error_min, error_max);
+	      V2, brootKM, bem_dlp, KM2, row_basis, col_basis, exterior,
+	      error_min, error_max);
 
   del_h2matrix(V2);
   del_h2matrix(KM2);

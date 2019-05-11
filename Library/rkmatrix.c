@@ -158,6 +158,20 @@ copy_rkmatrix(bool atrans, pcrkmatrix a, prkmatrix b)
   }
 }
 
+void
+scale_rkmatrix(field alpha, prkmatrix r)
+{
+  scale_amatrix(alpha, &r->A);
+}
+
+void
+random_rkmatrix(prkmatrix r, uint kmax)
+{
+  setrank_rkmatrix(r, kmax);
+  random_amatrix(&r->A);
+  random_amatrix(&r->B);
+}
+
 /* ------------------------------------------------------------
  Matrix-vector multiplication
  ------------------------------------------------------------ */
@@ -224,72 +238,16 @@ mvm_rkmatrix_avector(field alpha, bool rtrans, pcrkmatrix r, pcavector x,
 }
 
 real
-norm2_rkmatrix(pcrkmatrix r)
+norm2_rkmatrix(pcrkmatrix R)
 {
-  avector   tmp1, tmp2;
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  x = init_avector(&tmp1, r->B.rows);
-  y = init_avector(&tmp2, r->A.rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  i = 0;
-  while (i < NORM_STEPS && norm > 0.0) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    mvm_rkmatrix_avector(1.0, false, r, x, y);
-
-    clear_avector(x);
-    mvm_rkmatrix_avector(1.0, true, r, y, x);
-
-    norm = norm2_avector(x);
-    i++;
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+  return norm2_matrix((mvm_t) mvm_rkmatrix_avector, (void *) R, R->A.rows,
+		      R->B.rows);
 }
 
 real
 norm2diff_rkmatrix(pcrkmatrix ra, pcrkmatrix rb)
 {
-  avector   tmp1, tmp2;
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  assert(ra->A.rows == rb->A.rows);
-  assert(ra->B.rows == rb->B.rows);
-
-  x = init_avector(&tmp1, ra->B.rows);
-  y = init_avector(&tmp2, ra->A.rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  i = 0;
-  while (i < NORM_STEPS && norm > 0.0) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    mvm_rkmatrix_avector(1.0, false, ra, x, y);
-    mvm_rkmatrix_avector(-1.0, false, rb, x, y);
-
-    clear_avector(x);
-    mvm_rkmatrix_avector(1.0, true, ra, y, x);
-    mvm_rkmatrix_avector(-1.0, true, rb, y, x);
-
-    norm = norm2_avector(x);
-    i++;
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+  return norm2diff_matrix((mvm_t) mvm_rkmatrix_avector, (void *) ra,
+			  (mvm_t) mvm_rkmatrix_avector, (void *) rb,
+			  ra->A.rows, ra->B.rows);
 }

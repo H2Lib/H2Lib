@@ -1,5 +1,4 @@
 
-
 /* ------------------------------------------------------------
  * This is the file "tri2dp1.h" of the H2Lib package.
  * All rights reserved, Nadine Albrecht 2015

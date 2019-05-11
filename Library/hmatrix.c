@@ -14,8 +14,8 @@
 #include "basic.h"
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 phmatrix
 init_hmatrix(phmatrix hm, pccluster rc, pccluster cc)
@@ -218,8 +218,8 @@ del_hmatrix(phmatrix hm)
 }
 
 /* ------------------------------------------------------------
- Reference counting
- ------------------------------------------------------------ */
+ * Reference counting
+ * ------------------------------------------------------------ */
 
 void
 ref_hmatrix(phmatrix *ptr, phmatrix hm)
@@ -245,8 +245,8 @@ unref_hmatrix(phmatrix hm)
 }
 
 /* ------------------------------------------------------------
- Statistics
- ------------------------------------------------------------ */
+ * Statistics
+ * ------------------------------------------------------------ */
 
 size_t
 getsize_hmatrix(pchmatrix hm)
@@ -312,8 +312,8 @@ getfarsize_hmatrix(pchmatrix hm)
 }
 
 /* ------------------------------------------------------------
- Simple utility functions
- ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 void
 clear_hmatrix(phmatrix hm)
@@ -456,8 +456,8 @@ random_hmatrix(phmatrix hm, uint kmax)
 }
 
 /* ------------------------------------------------------------
- Build H-matrix based on block tree
- ------------------------------------------------------------ */
+ * Build H-matrix based on block tree
+ * ------------------------------------------------------------ */
 
 phmatrix
 build_from_block_hmatrix(pcblock b, uint k)
@@ -533,8 +533,8 @@ build_from_hmatrix_block(pchmatrix G)
 }
 
 /* ------------------------------------------------------------
- Matrix-vector multiplication
- ------------------------------------------------------------ */
+ * Matrix-vector multiplication
+ * ------------------------------------------------------------ */
 
 void
 mvm_hmatrix_avector(field alpha, bool atrans, pchmatrix a, pcavector x,
@@ -910,8 +910,8 @@ addevalsymm_hmatrix_avector(field alpha, pchmatrix hm, pcavector x,
 }
 
 /* ------------------------------------------------------------
- Enumeration
- ------------------------------------------------------------ */
+ * Enumeration
+ * ------------------------------------------------------------ */
 
 static void
 enumerate(pcblock b, uint bname, phmatrix hm, phmatrix *hn)
@@ -961,160 +961,27 @@ enumerate_hmatrix(pcblock b, phmatrix hm)
 }
 
 /* ------------------------------------------------------------
- Simple utility functions
- ------------------------------------------------------------ */
+ * Simple utility functions
+ * ------------------------------------------------------------ */
 
 real
-norm2_hmatrix(pchmatrix a)
+norm2_hmatrix(pchmatrix H)
 {
-  avector   tmp1, tmp2;
-  uint      rows = a->rc->size;
-  uint      cols = a->cc->size;
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_hmatrix_avector(1.0, a, x, y);
-
-    clear_avector(x);
-    addevaltrans_hmatrix_avector(1.0, a, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
-}
-
-real
-norm2diff_amatrix_hmatrix(pchmatrix a, pcamatrix b)
-{
-  avector   tmp1, tmp2;
-  uint      rows = a->rc->size;
-  uint      cols = a->cc->size;
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  assert(b->rows == rows);
-  assert(b->cols == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_hmatrix_avector(1.0, a, x, y);
-    addeval_amatrix_avector(-1.0, b, x, y);
-
-    clear_avector(x);
-    addevaltrans_hmatrix_avector(1.0, a, y, x);
-    addevaltrans_amatrix_avector(-1.0, b, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
-}
-
-real
-norm2diff_sparsematrix_hmatrix(pcsparsematrix G2, pchmatrix G1)
-{
-  avector   tmp1, tmp2;
-  uint      rows = G1->rc->size;
-  uint      cols = G1->cc->size;
-
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  assert(G2->rows == rows);
-  assert(G2->cols == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_hmatrix_avector(1.0, G1, x, y);
-    addeval_sparsematrix_avector(-1.0, G2, x, y);
-
-    clear_avector(x);
-    addevaltrans_hmatrix_avector(1.0, G1, y, x);
-    addevaltrans_sparsematrix_avector(-1.0, G2, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+  return norm2_matrix((mvm_t) mvm_hmatrix_avector, (void *) H, H->rc->size,
+		      H->cc->size);
 }
 
 real
 norm2diff_hmatrix(pchmatrix a, pchmatrix b)
 {
-  avector   tmp1, tmp2;
-  uint      rows = a->rc->size;
-  uint      cols = a->cc->size;
-  pavector  x, y;
-  real      norm;
-  uint      i;
-
-  assert(b->rc->size == rows);
-  assert(b->cc->size == cols);
-
-  x = init_avector(&tmp1, cols);
-  y = init_avector(&tmp2, rows);
-
-  random_avector(x);
-  norm = norm2_avector(x);
-  for (i = 0; i < NORM_STEPS && norm > 0.0; i++) {
-    scale_avector(1.0 / norm, x);
-
-    clear_avector(y);
-    addeval_hmatrix_avector(1.0, a, x, y);
-    addeval_hmatrix_avector(-1.0, b, x, y);
-
-    clear_avector(x);
-    addevaltrans_hmatrix_avector(1.0, a, y, x);
-    addevaltrans_hmatrix_avector(-1.0, b, y, x);
-
-    norm = norm2_avector(x);
-  }
-
-  uninit_avector(y);
-  uninit_avector(x);
-
-  return REAL_SQRT(norm);
+  return norm2diff_matrix((mvm_t) mvm_hmatrix_avector, (void *) a,
+			  (mvm_t) mvm_hmatrix_avector, (void *) b,
+			  a->rc->size, a->cc->size);
 }
 
 /* ------------------------------------------------------------
- File I/O
- ------------------------------------------------------------ */
+ * File I/O
+ * ------------------------------------------------------------ */
 
 #ifdef USE_NETCDF
 static void
@@ -2205,21 +2072,23 @@ read_hlib_hmatrix(const char *filename)
 {
   phmatrix  G;
   FILE     *in;
-  char      buf[80];
+  char      buf[80], *res;
   pcluster  rc, cc;
   uint      lineno;
 
   in = fopen(filename, "r");
   assert(in != 0);
 
-  fgets(buf, 80, in);
+  res = fgets(buf, 80, in);
+  assert(res != NULL);
   lineno = 1;
 
   rc = 0;
   cc = 0;
   G = read_hlib_part(in, 0, 0, &rc, &cc, 0, 0, &lineno);
 
-  fgets(buf, 80, in);
+  res = fgets(buf, 80, in);
+  assert(res != NULL);
   lineno++;
 
   fclose(in);
@@ -2446,8 +2315,8 @@ read_hlibsymm_hmatrix(const char *filename)
 }
 
 /* ------------------------------------------------------------
- Drawing
- ------------------------------------------------------------ */
+ * Drawing
+ * ------------------------------------------------------------ */
 
 #ifdef USE_CAIRO
 static void

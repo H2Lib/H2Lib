@@ -1,8 +1,7 @@
-
 /* ------------------------------------------------------------
-   This is the file "macrosurface3d.h" of the H2Lib package.
-   All rights reserved, Steffen Boerm 2010
-   ------------------------------------------------------------ */
+ This is the file "macrosurface3d.h" of the H2Lib package.
+ All rights reserved, Steffen Boerm 2010
+ ------------------------------------------------------------ */
 
 /** @file macrosurface3d.h
  *  @author Steffen B&ouml;rm
@@ -94,14 +93,12 @@ struct _macrosurface3d {
    *  of a refined triangulation produced by evaluating @f$\Phi_i@f$ in
    *  the vertices and along the edges of the macro triangulation
    *  in adjacent triangles match. */
-  void (*phi)(uint i,
-	      real xr1, real xr2, void *phidata,
-	      real xt[3]);
+  void (*phi)(uint i, real xr1, real xr2, void *phidata, real xt[3]);
 
   /** @brief Pointer that will be passed to the <tt>phi</tt> callback
    *  function. */
   void *phidata;
-};  
+};
 
 /* ------------------------------------------------------------
  * Constructor and destructor
@@ -131,6 +128,48 @@ del_macrosurface3d(pmacrosurface3d mg);
  *  @returns A @ref macrosurface3d representation of the unit sphere. */
 HEADER_PREFIX pmacrosurface3d
 new_sphere_macrosurface3d();
+
+/**
+ * @brief Creates a new @ref _macrosurface3d "macrosurface3d" object for a
+ * parabolic mirror.
+ *
+ * The geometry is derived from @ref new_sphere_macrosurface3d by deforming
+ * half of the sphere parabolically towards the other have of the geometry.
+ *
+ * @return A @ref macrosurface3d "macrosurface3d" representation of a
+ * parabolic mirror.
+ */
+HEADER_PREFIX pmacrosurface3d
+new_parabolic_mirror_macrosurface3d();
+
+/**
+ * @brief Creates a new @ref _macrosurface3d "macrosurface3d" object for a
+ * cuboid.
+ *
+ * The cuboid is described as
+ * @f[
+ * [a_x, b_x] \times [a_y, b_y] \times [a_z, b_z].
+ * @f]
+ *
+ * @param ax Minimal extend in x-direction.
+ * @param bx Maximal extend in x-direction.
+ * @param ay Minimal extend in y-direction.
+ * @param by Maximal extend in y-direction.
+ * @param az Minimal extend in z-direction.
+ * @param bz Maximal extend in z-direction.
+ * @return A @ref macrosurface3d "macrosurface3d" representation of a cuboid.
+ */
+HEADER_PREFIX pmacrosurface3d
+new_cuboid_macrosurface3d(real ax, real bx, real ay, real by, real az, real bz);
+
+/**
+ * @brief Creates a new @ref _macrosurface3d "macrosurface3d" object for a unit
+ * cube.
+ *
+ * @return A @ref macrosurface3d "macrosurface3d" representation of a cube.
+ */
+HEADER_PREFIX pmacrosurface3d
+new_cube_macrosurface3d();
 
 /** @brief Create a @ref macrosurface3d object for a cylinder.
  *

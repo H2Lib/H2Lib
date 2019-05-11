@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 
 #include "amatrix.h"
@@ -589,7 +590,8 @@ main()
   pamatrix  a, acopy, l, ld, dlt, ldltcopy, r, q, qr, X, B;
   pavector  x, b, tau, lvec, dvec;
   field    *data;
-  uint      rows, cols, rhs, i;
+  uint      rows, cols, rhs, i, j;
+  uint     *colpiv;
   real      error;
 
   rows = 8;
@@ -826,6 +828,90 @@ main()
   del_amatrix(a);
 
   (void) printf("----------------------------------------\n"
+		"Check random %u x %u Cholesky factorization\n", rows, rows);
+
+  (void) printf("Creating random invertible matrix\n");
+  a = new_amatrix(rows, rows);
+  random_spd_amatrix(a, 1.0);
+
+  (void) printf("Creating %d random solutions and right-hand sides\n",
+		rhs + 1);
+  x = new_avector(rows);
+  random_avector(x);
+  b = new_avector(rows);
+
+  X = new_amatrix(rows, rhs);
+  random_amatrix(X);
+  B = new_amatrix(rows, rhs);
+  clear_amatrix(B);
+  addmul_amatrix(alpha, false, a, false, X, B);
+
+  (void) printf("Copying matrix\n");
+  acopy = new_amatrix(rows, rows);
+  copy_amatrix(false, a, acopy);
+
+  (void) printf("Computing Cholesky factorization\n");
+  choldecomp_amatrix(a);
+
+  (void) printf("Solving avector\n");
+  clear_avector(b);
+  mvm_amatrix_avector(alpha, false, acopy, x, b);
+  cholsolve_amatrix_avector(a, b);
+  add_avector(-alpha, x, b);
+  error = norm2_avector(b);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  (void) printf("Computing Cholesky factorization by block algorithm\n");
+  copy_amatrix(false, acopy, a);
+  choldecomp_blocks_amatrix(a, 4);
+
+  (void) printf("Solving avector\n");
+  clear_avector(b);
+  mvm_amatrix_avector(alpha, false, acopy, x, b);
+  cholsolve_amatrix_avector(a, b);
+  add_avector(-alpha, x, b);
+  error = norm2_avector(b);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  (void)
+    printf("Computing Cholesky factorization by parallelized algorithm\n");
+  copy_amatrix(false, acopy, a);
+  choldecomp_tasks_amatrix(a, 4);
+
+  (void) printf("Solving avector\n");
+  clear_avector(b);
+  mvm_amatrix_avector(alpha, false, acopy, x, b);
+  cholsolve_amatrix_avector(a, b);
+  add_avector(-alpha, x, b);
+  error = norm2_avector(b);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  (void) printf("Solving amatrix\n");
+  cholsolve_amatrix(a, B);
+  add_amatrix(-alpha, false, X, B);
+  error = norm2_amatrix(B);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  del_amatrix(B);
+  del_amatrix(X);
+  del_avector(b);
+  del_avector(x);
+  del_amatrix(acopy);
+  del_amatrix(a);
+
+  (void) printf("----------------------------------------\n"
 		"Check random %u x %u LR factorization\n", rows, rows);
 
   (void) printf("Creating random invertible matrix\n");
@@ -837,8 +923,6 @@ main()
   x = new_avector(rows);
   random_avector(x);
   b = new_avector(rows);
-  clear_avector(b);
-  mvm_amatrix_avector(alpha, false, a, x, b);
 
   X = new_amatrix(rows, rhs);
   random_amatrix(X);
@@ -854,7 +938,39 @@ main()
   lrdecomp_amatrix(a);
 
   (void) printf("Solving avector\n");
-  lrsolve_amatrix_avector(a, b);
+  clear_avector(b);
+  mvm_amatrix_avector(alpha, false, acopy, x, b);
+  lrsolve_n_amatrix_avector(a, b);
+  add_avector(-alpha, x, b);
+  error = norm2_avector(b);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  (void) printf("Computing LR factorization by block algorithm\n");
+  copy_amatrix(false, acopy, a);
+  lrdecomp_blocks_amatrix(a, 4);
+
+  (void) printf("Solving avector\n");
+  clear_avector(b);
+  mvm_amatrix_avector(alpha, false, acopy, x, b);
+  lrsolve_n_amatrix_avector(a, b);
+  add_avector(-alpha, x, b);
+  error = norm2_avector(b);
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  (void) printf("Computing LR factorization by parallelized algorithm\n");
+  copy_amatrix(false, acopy, a);
+  lrdecomp_tasks_amatrix(a, 4);
+
+  (void) printf("Solving avector\n");
+  clear_avector(b);
+  mvm_amatrix_avector(alpha, false, acopy, x, b);
+  lrsolve_n_amatrix_avector(a, b);
   add_avector(-alpha, x, b);
   error = norm2_avector(b);
   (void) printf("  Accuracy %g, %sokay\n", error,
@@ -1030,6 +1146,86 @@ main()
   del_avector(tau);
   del_avector(b);
   del_avector(x);
+  del_amatrix(acopy);
+  del_amatrix(a);
+
+  /* Check column-pivoted QR factorizations */
+  (void) printf("----------------------------------------\n"
+		"Check column-pivoted QR factorization\n");
+  a = new_amatrix(rows, cols);
+  random_amatrix(a);
+
+  colpiv = (uint *) allocmem(sizeof(uint) * cols);
+  tau = new_avector(cols);
+  acopy = clone_amatrix(a);
+
+  qrdecomp_pivot_amatrix(a, tau, colpiv);
+
+  r = new_amatrix(rows, cols);
+  copy_colpiv_amatrix(false, acopy, colpiv, r);
+  qreval_amatrix(true, a, tau, r);
+
+  clear_lower_amatrix(a, true);
+
+  add_amatrix(-1.0, false, a, r);
+  error = normfrob_amatrix(r);
+
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  del_amatrix(r);
+  del_amatrix(acopy);
+  del_avector(tau);
+  freemem(colpiv);
+  del_amatrix(a);
+
+  /* Check rank-revealing QR factorization */
+  (void) printf("----------------------------------------\n"
+		"Check rank-revealing QR factorization\n");
+  a = new_amatrix(rows, cols);
+  for (j = 0; j < cols; j++)
+    for (i = 0; i < rows; i++)
+      a->a[i + j * a->ld] = j;
+
+  acopy = clone_amatrix(a);
+
+  colpiv = (uint *) allocmem(sizeof(uint) * cols);
+  tau = new_avector(cols);
+  j = qrdecomp_rank_amatrix(a, tau, 0, tolerance, colpiv);
+
+  (void) printf("  Detected rank %u, %sokay\n", j,
+		(j == 1 ? "" : "    NOT "));
+  if (j != 1)
+    problems++;
+
+  (void) printf("  Chosen pivot %u, %sokay\n", colpiv[0],
+		(colpiv[0] == cols - 1 ? "" : "    NOT "));
+  if (colpiv[0] != cols - 1)
+    problems++;
+
+  r = new_amatrix(j, cols);
+  copy_upper_amatrix(a, false, r);
+
+  q = new_amatrix(rows, j);
+  qrexpand_amatrix(a, tau, q);
+
+  clear_amatrix(a);
+  copy_colpiv_amatrix(false, acopy, colpiv, a);
+
+  addmul_amatrix(-1.0, false, q, false, r, a);
+  error = normfrob_amatrix(a);
+
+  (void) printf("  Accuracy %g, %sokay\n", error,
+		(error < tolerance ? "" : "    NOT "));
+  if (error >= tolerance)
+    problems++;
+
+  del_amatrix(q);
+  del_amatrix(r);
+  del_avector(tau);
+  freemem(colpiv);
   del_amatrix(acopy);
   del_amatrix(a);
 

@@ -16,156 +16,161 @@
  *  @brief Fundamental types and macros for OpenCL computations.
  *  @{ */
 
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-
-#if USE_OPENCL
-/** @cond DEBUG */
-#define OCL_SYNTAX_HIGHLIGHT 1
-/** @endcond */
-#endif
-
-#if OCL_SYNTAX_HIGHLIGHT
-/** @cond DEBUG */
-#define __kernel
-#define __global
-#define __local
-#define __constant
-/** @endcond */
-#endif
-
-/** @brief @ref real floating point type.
- *
- *  This type is used, e.g., for geometric coordinates, norms
- *  and diagonal elements of self-adjoint matrices. */
-#ifdef USE_FLOAT
-typedef float real;
-#else
-typedef double real;
-#endif
-
-/** @brief Field type.
- *
- *  This type is used in the linear algebra modules to represent
- *  the coefficients of matrices and vectors. */
-#ifdef USE_FLOAT
-#ifdef USE_COMPLEX
-typedef float2 field;
-#else
-typedef float field;
-#endif
-#else
-#ifdef USE_COMPLEX
-typedef double2 field;
-#else
-typedef double field;
-#endif
-#endif
-
-/** @brief Define the imaginary unit. */
-#ifdef USE_FLOAT
-#ifdef USE_COMPLEX
-#define I ((field)(0.0f,1.0f))
-#else
-
-#endif
-#else
-#ifdef USE_COMPLEX
-#define I ((field)(0.0,1.0))
-#else
-#endif
-#endif
-
-/** @brief @ref real constant zero */
-__constant static real r_zero;
-
-/** @brief @ref real constant one */
-__constant static real r_one;
-
-/** @brief @ref real constant minus one */
-__constant static real r_minusone;
-
-/** @brief @ref real constant two */
-__constant static real r_two;
-
-/** @brief @ref field constant zero */
-__constant static field f_zero;
-
-/** @brief @ref field constant one */
-__constant static field f_one;
-
-/** @brief @ref field constant minus one */
-__constant static field f_minusone;
-
-#ifdef USE_FLOAT
-__constant static real r_zero = 0.0f;
-__constant static real r_one = 1.0f;
-__constant static real r_minusone = -1.0f;
-__constant static real r_two = 2.0f;
-
-#ifdef USE_COMPLEX
-__constant static field f_zero = (field) (0.0f,0.0f);
-__constant static field f_one = (field) (1.0f, 0.0f);
-__constant static field f_minusone = (field) (-1.0f, 0.0f);
-#else
-__constant static field f_zero = 0.0f;
-__constant static field f_one = 1.0f;
-__constant static field f_minusone = -1.0f;
-#endif
-#else
-__constant static real r_zero = 0.0;
-__constant static real r_one = 1.0;
-__constant static real r_minusone = -1.0;
-__constant static real r_two = 2.0;
-
-#ifdef USE_COMPLEX
-__constant static field f_zero = (field) (0.0, 0.0);
-__constant static field f_one = (field) (1.0, 0.0);
-__constant static field f_minusone = (field) (-1.0, 0.0);
-#else
-__constant static field f_zero = 0.0;
-__constant static field f_one = 1.0;
-__constant static field f_minusone = -1.0;
-#endif
-#endif
-
-/****************************************************
- * basis operations on complex numbers
- ****************************************************/
-
-#ifdef USE_COMPLEX
 /**
- * @brief Returns the real part of a complex number z.
- *
- * @param z Complex number given by z = a + b * I
- * @return Real part of z: Re(z) = a.
+ * Source code of "clsettings.h" inside a string.
  */
-inline real REAL(field z) {
-  return z.x;
-}
-
-/**
- * @brief Returns the imaginary part of a complex number z.
- *
- * @param z Complex number given by z = a + b * I
- * @return Imaginary part of z: IM(z) = b.
- */
-inline real IMAG(field z) {
-  return z.y;
-}
-
-/**
- * @brief Performs a complex multiplication of two complex numbers x and y.
- *
- * @param x 1st factor of the complex product.
- * @param y 2nd factor of the complex product.
- * @return Returns the product @f$ x \times y@f$.
- */
-inline field cmul(field x, field y) {
-  return (field) (x.x * y.x - x.y * y.y, x.x * y.y + x.y * y.x);
-}
-#else
-
-#endif
+const char clsettings_src[] = { "\n"
+"#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n"
+"\n"
+"#if USE_OPENCL\n"
+"/** @cond DEBUG */\n"
+"#define OCL_SYNTAX_HIGHLIGHT 1\n"
+"/** @endcond */\n"
+"#endif\n"
+"\n"
+"#if OCL_SYNTAX_HIGHLIGHT\n"
+"/** @cond DEBUG */\n"
+"#define __kernel\n"
+"#define __global\n"
+"#define __local\n"
+"#define __constant\n"
+"/** @endcond */\n"
+"#endif\n"
+"\n"
+"/** @brief @ref real floating point type.\n"
+" *\n"
+" *  This type is used, e.g., for geometric coordinates, norms\n"
+" *  and diagonal elements of self-adjoint matrices. */\n"
+"#ifdef USE_FLOAT\n"
+"typedef float real;\n"
+"#else\n"
+"typedef double real;\n"
+"#endif\n"
+"\n"
+"/** @brief Field type.\n"
+" *\n"
+" *  This type is used in the linear algebra modules to represent\n"
+" *  the coefficients of matrices and vectors. */\n"
+"#ifdef USE_FLOAT\n"
+"#ifdef USE_COMPLEX\n"
+"typedef float2 field;\n"
+"#else\n"
+"typedef float field;\n"
+"#endif\n"
+"#else\n"
+"#ifdef USE_COMPLEX\n"
+"typedef double2 field;\n"
+"#else\n"
+"typedef double field;\n"
+"#endif\n"
+"#endif\n"
+"\n"
+"/** @brief Define the imaginary unit. */\n"
+"#ifdef USE_FLOAT\n"
+"#ifdef USE_COMPLEX\n"
+"#define I ((field)(0.0f,1.0f))\n"
+"#else\n"
+"\n"
+"#endif\n"
+"#else\n"
+"#ifdef USE_COMPLEX\n"
+"#define I ((field)(0.0,1.0))\n"
+"#else\n"
+"#endif\n"
+"#endif\n"
+"\n"
+"/** @brief @ref real constant zero */\n"
+"__constant static real r_zero;\n"
+"\n"
+"/** @brief @ref real constant one */\n"
+"__constant static real r_one;\n"
+"\n"
+"/** @brief @ref real constant minus one */\n"
+"__constant static real r_minusone;\n"
+"\n"
+"/** @brief @ref real constant two */\n"
+"__constant static real r_two;\n"
+"\n"
+"/** @brief @ref field constant zero */\n"
+"__constant static field f_zero;\n"
+"\n"
+"/** @brief @ref field constant one */\n"
+"__constant static field f_one;\n"
+"\n"
+"/** @brief @ref field constant minus one */\n"
+"__constant static field f_minusone;\n"
+"\n"
+"#ifdef USE_FLOAT\n"
+"__constant static real r_zero = 0.0f;\n"
+"__constant static real r_one = 1.0f;\n"
+"__constant static real r_minusone = -1.0f;\n"
+"__constant static real r_two = 2.0f;\n"
+"\n"
+"#ifdef USE_COMPLEX\n"
+"__constant static field f_zero = (field) (0.0f,0.0f);\n"
+"__constant static field f_one = (field) (1.0f, 0.0f);\n"
+"__constant static field f_minusone = (field) (-1.0f, 0.0f);\n"
+"#else\n"
+"__constant static field f_zero = 0.0f;\n"
+"__constant static field f_one = 1.0f;\n"
+"__constant static field f_minusone = -1.0f;\n"
+"#endif\n"
+"#else\n"
+"__constant static real r_zero = 0.0;\n"
+"__constant static real r_one = 1.0;\n"
+"__constant static real r_minusone = -1.0;\n"
+"__constant static real r_two = 2.0;\n"
+"\n"
+"#ifdef USE_COMPLEX\n"
+"__constant static field f_zero = (field) (0.0, 0.0);\n"
+"__constant static field f_one = (field) (1.0, 0.0);\n"
+"__constant static field f_minusone = (field) (-1.0, 0.0);\n"
+"#else\n"
+"__constant static field f_zero = 0.0;\n"
+"__constant static field f_one = 1.0;\n"
+"__constant static field f_minusone = -1.0;\n"
+"#endif\n"
+"#endif\n"
+"\n"
+"/****************************************************\n"
+" * basis operations on complex numbers\n"
+" ****************************************************/\n"
+"\n"
+"#ifdef USE_COMPLEX\n"
+"/**\n"
+" * @brief Returns the real part of a complex number z.\n"
+" *\n"
+" * @param z Complex number given by z = a + b * I\n"
+" * @return Real part of z: Re(z) = a.\n"
+" */\n"
+"inline real REAL(field z) {\n"
+"  return z.x;\n"
+"}\n"
+"\n"
+"/**\n"
+" * @brief Returns the imaginary part of a complex number z.\n"
+" *\n"
+" * @param z Complex number given by z = a + b * I\n"
+" * @return Imaginary part of z: IM(z) = b.\n"
+" */\n"
+"inline real IMAG(field z) {\n"
+"  return z.y;\n"
+"}\n"
+"\n"
+"/**\n"
+" * @brief Performs a complex multiplication of two complex numbers x and y.\n"
+" *\n"
+" * @param x 1st factor of the complex product.\n"
+" * @param y 2nd factor of the complex product.\n"
+" * @return Returns the product @f$ x \times y@f$.\n"
+" */\n"
+"inline field cmul(field x, field y) {\n"
+"  return (field) (x.x * y.x - x.y * y.y, x.x * y.y + x.y * y.x);\n"
+"}\n"
+"#else\n"
+"\n"
+"#endif\n"
+};
 
 /**
  * @}

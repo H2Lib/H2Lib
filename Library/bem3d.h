@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------
- This is the file "bem3d.h" of the H2Lib package.
- All rights reserved, Sven Christophersen 2011
- ------------------------------------------------------------ */
+ * This is the file "bem3d.h" of the H2Lib package.
+ * All rights reserved, Sven Christophersen 2011
+ * ------------------------------------------------------------ */
 
 /**
  * @file bem3d.h
@@ -14,25 +14,37 @@
 
 /* C STD LIBRARY */
 #include <stdio.h>
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
 /* CORE 0 */
+#ifdef USE_SIMD
+#include "simd.h"
+#endif
 #include "basic.h"
 /* CORE 1 */
 #include "amatrix.h"
 #include "gaussquad.h"
 #include "factorizations.h"
 #include "krylov.h"
+#include "sparsematrix.h"
 /* CORE 2 */
 #include "cluster.h"
 #include "clustergeometry.h"
+#include "block.h"
 #include "hmatrix.h"
 #include "clusterbasis.h"
 #include "h2matrix.h"
+#include "dcluster.h"
+#include "dblock.h"
+#include "dclusterbasis.h"
+#include "dh2matrix.h"
+#include "krylovsolvers.h"
 /* CORE 3 */
 #include "hcoarsen.h"
 #include "h2update.h"
 #include "aca.h"
 /* SIMPLE */
-/* PARTICLES */
 /* BEM */
 #include "macrosurface3d.h"
 #include "surface3d.h"
@@ -52,8 +64,8 @@
  *  and @ref _h2matrix "h2-matrices".
  *  @{ */
 
-/* ------------------------------------------------------------ *
- * Type definitions                                             *
+/* ------------------------------------------------------------
+ * Type definitions
  * ------------------------------------------------------------ */
 
 /**
@@ -199,6 +211,35 @@ typedef field (*kernel_func3d)(const real *x, const real *y, const real *nx,
     const real *ny, void *data);
 
 /**
+ * @brief Evaluate a modified fundamental solution or its normal derivatives
+ * at points @p x and @p y.
+ *
+ * The modified fundamental solution is defined as
+ * @f[
+ * g_{c}(x,y) = g(x,y) e^{\langle c, x - y \rangle}
+ * @f]
+ *
+ * @param x First evaluation point.
+ * @param y Second evaluation point.
+ * @param nx Normal vector that belongs to @p x.
+ * @param ny Normal vector that belongs to @p y.
+ * @param dir A vector containing the direction @f$c@f$.
+ * @param data Additional data that is needed to evaluate the function.
+ * @return
+ */
+typedef field (*kernel_wave_func3d)(const real *x, const real *y,
+    const real *nx, const real *ny, pcreal dir, void *data);
+
+#ifdef USE_SIMD
+typedef void (*kernel_simd_func3d)(const vreal *x, const vreal *y,
+    const vreal *nx, const vreal *ny, void *data, vreal *res_re, vreal *res_im);
+
+typedef void (*kernel_simd_wave_func3d)(const vreal *x, const vreal *y,
+    const vreal *nx, const vreal *ny, pcreal dir, void *data, vreal *res_re,
+    vreal *res_im);
+#endif
+
+/**
  * This is just an abbreviation for the struct @ref _listnode .
  */
 typedef struct _listnode listnode;
@@ -266,24 +307,14 @@ struct _bem3d {
   psingquad2d sq;
 
   /**
-   * @brief Number of degrees of freedom for neumann data.
-   */
-  uint N_neumann;
-
-  /**
    * @brief Type of basis function for neumann-data.
    */
-  basisfunctionbem3d basis_neumann;
-
-  /**
-   * @brief Number of degrees of freedom for dirichlet data.
-   */
-  uint N_dirichlet;
+  basisfunctionbem3d row_basis;
 
   /**
    * @brief Type of basis function for dirichlet-data.
    */
-  basisfunctionbem3d basis_dirichlet;
+  basisfunctionbem3d col_basis;
 
   /**
    * @brief Mass-matrix of reference basis functions.
@@ -300,17 +331,11 @@ struct _bem3d {
    */
   field alpha;
 
-  /**
-   * @brief Wavevector for Helmholtz type kernels
-   */
-
-  field *kvec;
 
   /**
-   * @brief Wavenumber, which is equal to the 2-norm of the wavevector
-   * <tt>kvec</tt>.
+   * @brief Wavenumber for Helmholtz type problems, possibly complex valued.
    */
-  real k;
+  field k;
 
   /**
    * @brief A constant factor extracted from the kernel function to speed up
@@ -331,7 +356,7 @@ struct _bem3d {
   plistnode *v2t;
 
   /**
-   * @brief Computes nearfield entries of Galkerin matrices.
+   * @brief Computes nearfield entries of Galerkin matrices.
    *
    *   This callback function computes
    *  'nearfield' entries of the underlying problem and integral-operator.
@@ -417,13 +442,39 @@ struct _bem3d {
    * @ref _clusterbasis "clusterbasis" <tt>U->rb</tt>.
    * @param cname Enumerated number of current column @ref _clusterbasis
    * "clusterbasis" <tt>U->cb</tt>.
+   * @param bmame Enumerated number of current @ref _block "block".
+   * From that number an object of type @ref _uniform "uniform" containing the coupling
+   * matrix @f$ S_b @f$ , the row @ref _clusterbasis "clusterbasis" <tt>U->rb</tt>
+   * and the column @ref _clusterbasis "clusterbasis"  <tt>U->cb</tt> can be
+   * derived.
    * @param bem BEM-object containing additional information for computation
    * of the matrix entries.
-   * @param U An Object of type @ref _uniform "uniform" containing the coupling
-   * matrix @f$ S_b @f$ , the row @ref _clusterbasis "clusterbasis" <tt>U->rb</tt>
-   * and the column @ref _clusterbasis "clusterbasis"  <tt>U->cb</tt> .
    */
-  void (*farfield_u)(uint rname, uint cname, pcbem3d bem, puniform U);
+  void (*farfield_u)(uint rname, uint cname, uint bname, pcbem3d bem);
+
+  /**
+   * @brief Computes coupling matrix @f$ S_b^c @f$ for @ref _duniform "duniform"
+   * matrices for some direction @f$c@f$.
+   *
+   * While using @ref _dh2matrix
+   * "Dh2-matrices" the coupling matrices @f$ S_b^c @f$
+   * are computed by this callback function. Coupling matrices are stored in the
+   * struct @ref _duniform "duniform" defining a certain block of the whole
+   * @ref _dh2matrix "Dh2-matrix".
+   *
+   * @param rname Enumerated number of current row @ref _dcluster "dcluster"
+   * @ref _dclusterbasis "dclusterbasis" <tt>U->rb</tt>.
+   * @param cname Enumerated number of current column @ref _dclusterbasis
+   * "dclusterbasis" <tt>U->cb</tt>.
+   * @param bmame Enumerated number of current @ref _dblock "dblock".
+   * From that number an object of type @ref _duniform "duniform" containing
+   * the coupling matrix @f$ S_b @f$ , the row @ref _dclusterbasis "dclusterbasis"
+   * <tt>U->rb</tt> and the column @ref _dclusterbasis "dclusterbasis"
+   * <tt>U->cb</tt> can be derived.
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   */
+  void (*farfield_wave_u)(uint rname, uint cname, uint bname, pcbem3d bem);
 
   /**
    * @brief Computes the the matrix @f$ V_t @f$ for a leaf cluster @f$ t \in
@@ -439,12 +490,29 @@ struct _bem3d {
    * @f$ .
    * @param bem BEM-object containing additional information for computation
    * of the matrix entries.
-   * @param rb current row @ref _clusterbasis "clusterbasis". The Matrix @f$ V_t
-   * @f$ will be saved into <tt>rb->V</tt> .
    * @param rname Enumerated number of current row @ref _clusterbasis
    * "clusterbasis" <tt>rb</tt>.
    */
-  void (*leaf_row)(pcbem3d bem, pclusterbasis rb, uint rname);
+  void (*leaf_row)(uint rname, pcbem3d bem);
+
+  /**
+   * @brief Computes the the matrix @f$ V_{t,c_\iota} @f$ for a leaf cluster @f$ t \in
+   * \mathcal L_{\mathcal I} @f$ and a direction @f$c_\iota@f$.
+   *
+   * @ref leaf_wave_row is used for building up a
+   * @ref _dclusterbasis "dclusterbasis" for the set
+   * @f$ \mathcal L_{\mathcal I} @f$ for  @ref _dh2matrix "Dh2matrices".
+   * For each @f$ t \in \mathcal L_{\mathcal I}@f$ and all directions @f$c_\iota@f$.
+   * @ref leaf_wave_row will construct the matrix @f$ V_{t,c_\iota} @f$ .
+   * In case of nested @ref _dclusterbasis "dclusterbasis" @ref transfer_wave_row
+   * and @ref transfer_wave_wave_row also have to be set to valid functions
+   * constructing suitable transfer matrices @f$ E_{t,c_\iota}@f$ .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param rname Enumerated number of current row @ref _dclusterbasis
+   * "dclusterbasis" <tt>rb</tt>.
+   */
+  void (*leaf_wave_row)(uint rname, pcbem3d bem);
 
   /**
    * @brief Computes the the matrix @f$ W_s @f$ for a leaf cluster @f$ s \in
@@ -460,15 +528,33 @@ struct _bem3d {
    * @f$ .
    * @param bem BEM-object containing additional information for computation
    * of the matrix entries.
-   * @param cb current column @ref _clusterbasis "clusterbasis". The Matrix @f$ W_s
-   * @f$ will be saved into <tt>cb->V</tt> .
    * @param cname Enumerated number of current column @ref _clusterbasis
    * "clusterbasis" <tt>cb</tt>.
    */
-  void (*leaf_col)(pcbem3d bem, pclusterbasis cb, uint cname);
+  void (*leaf_col)(uint cname, pcbem3d bem);
 
   /**
-   * @brief Computes the transfermatrices @f$ E_{t'} @f$ for a cluster @f$ t \in
+   * @brief Computes the the matrix @f$ W_{s, c_\iota} @f$ for a leaf cluster @f$ s \in
+   * \mathcal L_{\mathcal J} @f$ and a direction @f$c_\iota@f$.
+   *
+   * @ref leaf_wave_col is used for building up a
+   * @ref _dclusterbasis "dclusterbasis" for the set
+   * @f$ \mathcal L_{\mathcal J} @f$ for @ref _dh2matrix "Dh2matrices".
+   * For each @f$ s \in \mathcal L_{\mathcal J}@f$ and for all directions
+   * @f$c_\iota@f$ @ref leaf_wave_col will construct the matrix
+   * @f$ W_{s, c_\iota}@f$ .
+   * In case of nested @ref _dclusterbasis "dclusterbasis" @ref transfer_wave_col
+   * and @ref transfer_wave_wave_col also have to be set to valid functions
+   * constructing suitable transfer matrices @f$ F_{s, c_\iota}@f$ .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param cname Enumerated number of current column @ref _dclusterbasis
+   * "dclusterbasis" <tt>cb</tt>.
+   */
+  void (*leaf_wave_col)(uint cname, pcbem3d bem);
+
+  /**
+   * @brief Computes the transfer matrices @f$ E_{t'} @f$ for a cluster @f$ t \in
    * \mathcal T_{\mathcal I} \, , t' \in \operatorname{sons}(t) @f$ .
    *
    * @ref transfer_row will build up the transfer matrices @f$ E_{t'} @f$ , for all
@@ -481,35 +567,149 @@ struct _bem3d {
    * <tt>rb->son[@f$\tau-1@f$]->E</tt> .
    * @param bem BEM-object containing additional information for computation
    * of the matrix entries.
-   * @param rb Current row @ref _clusterbasis "clusterbasis". The Matrices
-   * @f$ E_{t'}, t' \in \operatorname{sons}(t) @f$ will be saved into
-   * <tt>rb->son[t'-1]->E</tt> .
    * @param rname Enumerated number of current row @ref _clusterbasis
    * "clusterbasis" <tt>rb</tt>.
    */
-  void (*transfer_row)(pcbem3d bem, pclusterbasis rb, uint rname);
+  void (*transfer_row)(uint rname, pcbem3d bem);
 
   /**
-   * @brief Computes the transfermatrices @f$ F_{s'} @f$ for a cluster @f$ s \in
+   * @brief Computes the transfer matrices @f$ E_{t', c_\iota} @f$ for
+   * a cluster @f$ t \in \mathcal T_{\mathcal I} \, ,
+   * t' \in \operatorname{sons}(t) @f$ and directions @f$c_\iota@f$.
+   * The father cluster @f$t@f$ is using the wave-Lagrange basis while the
+   * sons @f$t' \in \operatorname{sons}(t)@f$ use the standard Lagrange basis.
+   *
+   * @ref transfer_wave_row will build up the transfer matrices
+   * @f$ E_{t', c_\iota} @f$ , for all @f$ t \in \mathcal T_{\mathcal I}@f$
+   * and @f$ t' \in \operatorname{sons}(t) @f$ and directions @f$c_\iota@f$.
+   * For a cluster @f$ t \in \mathcal T_{\mathcal I} @f$
+   * @ref transfer_wave_row will compute the matrices @f$ E_{t_1, c_1}, \ldots,
+   * E_{t_1, c_d}, \ldots E_{t_\tau, c_1}, \ldots E_{t_\tau, c_d} @f$ ,
+   * @f$ \# \operatorname{sons}(t) = \tau @f$ and
+   * @f$\iota \in \{ 1, \ldots, d \}@f$.
+   * The matrix @f$ E_{t_1, c_1} @f$ is
+   * stored in <tt>rb->son[0]->E + 0</tt>, @f$ E_{t_1, c_2} @f$ is stored in
+   * <tt>rb->son[0]->E + 1</tt>, @f$ \ldots E_{t_\tau, c_d} @f$ is stored in
+   * <tt>rb->son[@f$\tau-1@f$]->E + (d - 1)</tt> .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param rname Enumerated number of current row @ref _dclusterbasis
+   * "dclusterbasis" <tt>rb</tt>.
+   */
+  void (*transfer_wave_row)(uint rname, pcbem3d bem);
+
+  /**
+   * @brief Computes the transfer matrices @f$ E_{t', c_\iota} @f$ for
+   * a cluster @f$ t \in \mathcal T_{\mathcal I} \, ,
+   * t' \in \operatorname{sons}(t) @f$ and directions @f$c_\iota@f$.
+   * Both, the father cluster @f$t@f$ and sons
+   * @f$t' \in \operatorname{sons}(t)@f$ are using the wave-Lagrange basis.
+   *
+   * @ref transfer_wave_wave_row will build up the transfer matrices
+   * @f$ E_{t', c_\iota} @f$ , for all @f$ t \in \mathcal T_{\mathcal I}@f$
+   * and @f$ t' \in \operatorname{sons}(t) @f$ and directions @f$c_\iota@f$.
+   * For a cluster @f$ t \in \mathcal T_{\mathcal I} @f$
+   * @ref transfer_wave_wave_row will compute the matrices @f$ E_{t_1, c_1}, \ldots,
+   * E_{t_1, c_d}, \ldots E_{t_\tau, c_1}, \ldots E_{t_\tau, c_d} @f$ ,
+   * @f$ \# \operatorname{sons}(t) = \tau @f$ and
+   * @f$\iota \in \{ 1, \ldots, d \}@f$.
+   * The matrix @f$ E_{t_1, c_1} @f$ is
+   * stored in <tt>rb->son[0]->E + 0</tt>, @f$ E_{t_1, c_2} @f$ is stored in
+   * <tt>rb->son[0]->E + 1</tt>, @f$ \ldots E_{t_\tau, c_d} @f$ is stored in
+   * <tt>rb->son[@f$\tau-1@f$]->E + (d - 1)</tt> .
+   * The used directions @f$c_\iota@f$ correspond to some difference between
+   * directions @f$c^f_\iota@f$ used for the father @f$t@f$ and directions
+   * @f$c^s_\iota @f$.
+   * Therefore it holds
+   * @f[
+   * c_\iota = c^f_\iota - c^s_\iota = c^f_\iota - \operatorname{sondir}(c^f_\iota)
+   * @f]
+   *
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param rname Enumerated number of current row @ref _dclusterbasis
+   * "dclusterbasis" <tt>rb</tt>.
+   */
+  void (*transfer_wave_wave_row)(uint rname, pcbem3d bem);
+
+  /**
+   * @brief Computes the transfer matrices @f$ F_{s'} @f$ for a cluster @f$ s \in
    * \mathcal T_{\mathcal J} \, , s' \in \operatorname{sons}(s) @f$ .
    *
    * @ref transfer_col will build up the transfer matrices @f$ F_{s'} @f$ , for all
    * @f$ s \in \mathcal T_{\mathcal J}@f$ and @f$ s' \in \operatorname{sons}(s) @f$ .
    * For a cluster @f$ s \in \mathcal T_{\mathcal J} @f$ @ref transfer_col will compute
-   * the matrices @f$ F_{s_1}, \ldots, F_{t_\sigma} @f$ ,
+   * the matrices @f$ F_{s_1}, \ldots, F_{s_\sigma} @f$ ,
    * @f$ \# \operatorname{sons}(s) = \sigma @f$ . The matrix @f$ F_{s_1} @f$ is
    * stored in <tt>cb->son[0]->E</tt>, @f$ F_{s_2} @f$ is stored in
    * <tt>cb->son[1]->E</tt>, @f$ \ldots F_{t_\sigma} @f$ is stored in
    * <tt>cb->son[@f$\sigma-1@f$]->E</tt> .
    * @param bem BEM-object containing additional information for computation
    * of the matrix entries.
-   * @param cb Current column @ref _clusterbasis "clusterbasis". The Matrices
-   * @f$ F_{s'}, s' \in \operatorname{sons}(s) @f$ will be saved into
-   * <tt>cb->son[s'-1]->E</tt> .
    * @param cname Enumerated number of current column @ref _clusterbasis
    * "clusterbasis" <tt>cb</tt>.
    */
-  void (*transfer_col)(pcbem3d bem, pclusterbasis cb, uint cname);
+  void (*transfer_col)(uint cname, pcbem3d bem);
+
+  /**
+   * @brief Computes the transfer matrices @f$ F_{s', c_\iota} @f$ for
+   * a cluster @f$ s \in \mathcal T_{\mathcal J} \, ,
+   * s' \in \operatorname{sons}(s) @f$ and directions @f$c_\iota@f$.
+   * The father cluster @f$s@f$ is using the wave-Lagrange basis while the
+   * sons @f$s' \in \operatorname{sons}(s)@f$ use the standard Lagrange basis.
+   *
+   * @ref transfer_wave_col will build up the transfer matrices
+   * @f$ F_{s', c_\iota} @f$ , for all @f$ s \in \mathcal T_{\mathcal J}@f$
+   * and @f$ s' \in \operatorname{sons}(s) @f$ and directions @f$c_\iota@f$.
+   * For a cluster @f$ s \in \mathcal T_{\mathcal J} @f$
+   * @ref transfer_wave_col will compute the matrices @f$ F_{s_1, c_1}, \ldots,
+   * F_{s_1, c_d}, \ldots F_{s_\sigma, c_1}, \ldots F_{s_\sigma, c_d} @f$ ,
+   * @f$ \# \operatorname{sons}(s) = \sigma @f$ and
+   * @f$\iota \in \{ 1, \ldots, d \}@f$.
+   * The matrix @f$ F_{s_1, c_1} @f$ is
+   * stored in <tt>cb->son[0]->E + 0</tt>, @f$ F_{s_1, c_2} @f$ is stored in
+   * <tt>cb->son[0]->E + 1</tt>, @f$ \ldots F_{s_\tau, c_d} @f$ is stored in
+   * <tt>cb->son[@f$\sigma-1@f$]->E + (d - 1)</tt> .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param cname Enumerated number of current column @ref _dclusterbasis
+   * "dclusterbasis" <tt>cb</tt>.
+   */
+  void (*transfer_wave_col)(uint cname, pcbem3d bem);
+
+  /**
+   * @brief Computes the transfer matrices @f$ F_{s', c_\iota} @f$ for
+   * a cluster @f$s \in \mathcal T_{\mathcal J} \, ,
+   * s' \in \operatorname{sons}(s) @f$ and directions @f$c_\iota@f$.
+   * Both, the father cluster @f$s@f$ and sons
+   * @f$s' \in \operatorname{sons}(s)@f$ are using the wave-Lagrange basis.
+   *
+   * @ref transfer_wave_wave_col will build up the transfer matrices
+   * @f$F_{s', c_\iota} @f$ , for all @f$s \in \mathcal T_{\mathcal J}@f$
+   * and @f$s' \in \operatorname{sons}(s) @f$ and directions @f$c_\iota@f$.
+   * For a cluster @f$s \in \mathcal T_{\mathcal J} @f$
+   * @ref transfer_wave_wave_col will compute the matrices @f$F_{s_1, c_1}, \ldots,
+   * F_{s_1, c_d}, \ldots F_{s_\sigma, c_1}, \ldots F_{s_\sigma, c_d} @f$ ,
+   * @f$ \# \operatorname{sons}(s) = \sigma @f$ and
+   * @f$\iota \in \{ 1, \ldots, d \}@f$.
+   * The matrix @f$F_{s_1, c_1} @f$ is
+   * stored in <tt>cb->son[0]->E + 0</tt>, @f$ F_{s_1, c_2} @f$ is stored in
+   * <tt>cb->son[0]->E + 1</tt>, @f$ \ldots F_{t_\sigma, c_d} @f$ is stored in
+   * <tt>cb->son[@f$\sigma-1@f$]->E + (d - 1)</tt> .
+   * The used directions @f$c_\iota@f$ correspond to some difference between
+   * directions @f$c^f_\iota@f$ used for the father @f$t@f$ and directions
+   * @f$c^s_\iota @f$.
+   * Therefore it holds
+   * @f[
+   * c_\iota = c^f_\iota - c^s_\iota = c^f_\iota - \operatorname{sondir}(c^f_\iota)
+   * @f]
+   *
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param cname Enumerated number of current column @ref _dclusterbasis
+   * "dclusterbasis" <tt>cb</tt>.
+   */
+  void (*transfer_wave_wave_col)(uint cname, pcbem3d bem);
 
   /**
    * @brief A collection of necessary data structures for approximating matrices
@@ -568,7 +768,7 @@ struct _bem3d {
 struct _kernelbem3d {
   /**
    * @brief Evaluate the fundamental solution at given point sets <tt>X</tt> and
-   * <tt>Y</tt>
+   * <tt>Y</tt>.
    *
    * This callback will evaluate the fundamental solution @f$ g @f$ at points
    * @f$ x_i, y_j \in \mathbb R^3 @f$ and store the result into matrix V
@@ -590,6 +790,36 @@ struct _kernelbem3d {
    */
   void (*fundamental)(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
       pamatrix V);
+
+  /**
+   * @brief Evaluate the modified fundamental solution in direction
+   * @f$c_\iota@f$ at given point sets <tt>X</tt> and <tt>Y</tt>.
+   *
+   * This callback will evaluate the modified fundamental solution @f$ g_{c_\iota} @f$
+   * with direction @f$c_\iota@f$ at points
+   * @f$ x_i, y_j \in \mathbb R^3 @f$ and store the result into matrix V
+   * at position @f$ V_{ij} @f$ .
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param X An array of 3D-vectors. <tt>X[i][0]</tt> will be the first
+   * component of the i-th vector. Analogous <tt>X[i][1]</tt> will be the second
+   * component of the i-th vector. The length of this array is determined by
+   * <tt>V->rows</tt> .
+   * @param Y An array of 3D-vectors. <tt>Y[i][0]</tt> will be the first
+   * component of the i-th vector. Analogous <tt>Y[i][1]</tt> will be the second
+   * component of the i-th vector. The length of this array is determined by
+   * <tt>V->cols</tt> .
+   * @param dir Direction @f$c_\iota@f$ in which the modified fundamental
+   * solution should be evaluated.
+   * @param V V will contain the results of the kernel evaluations. It applies
+   * @f[
+   * V_{ij} = g_{c_\iota}(\vec x_i, \vec y_j)
+   *        = g(\vec x_i, \vec y_j)
+   *           e^{-\langle c_\iota, \vec x_i - \vec y_j \rangle}.
+   * @f]
+   */
+  void (*fundamental_wave)(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
+      pcreal dir, pamatrix V);
 
   /**
    * @brief Evaluate the normal derivative of the fundamental solution in respect
@@ -927,8 +1157,49 @@ struct _kernelbem3d {
    * in matrix index
    * @f$ j = j_x + j_y \cdot m_x  + j_z \cdot m_x \cdot m_y@f$ .
    */
-  void (*lagrange_row)(const uint *idx, pcavector px, pcavector py,
-      pcavector pz, pcbem3d bem, pamatrix V);
+  void (*lagrange_row)(const uint *idx, pcrealavector px, pcrealavector py,
+      pcrealavector pz, pcbem3d bem, pamatrix V);
+
+  /**
+   * @brief Integrate the modified Lagrange polynomials in direction @f$c_\iota@f$
+   * or their derivatives within the 1st component.
+   *
+   * This callback will evaluate the integral
+   * @f[
+   * \int_\Gamma \varphi(\vec x) \, \mathcal L_{c_\iota}(\vec x) \, \mathrm d \vec x
+   * = \int_\Gamma \varphi(\vec x) \, \mathcal L(\vec x) \,
+   *     e^{\langle c_\iota, \vec x \rangle} \, \mathrm d \vec x
+   * @f]
+   * with @f$ \mathcal L @f$ being a Lagrange polynomial or its derivative.
+   * @param idx This array describes the permutation of the degrees of freedom.
+   * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+   * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+   *  -1 @f$
+   * instead.
+   * @param px A Vector of type @ref _avector "avector" that contains interpolation
+   * points in x-direction.
+   * @param py A Vector of type @ref _avector "avector" that contains interpolation
+   * points in y-direction.
+   * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+   * points in z-direction.
+   * @param dir Direction @f$c_\iota@f$ in which the modified Lagrange
+   * polynomials should be evaluated.
+   * @param bem BEM-object containing additional information for computation
+   of the matrix entries.
+   * @param V V will contain the results of the integral evaluations. It applies
+   * @f[
+   * V_{ij} = \int_\Gamma \varphi_i(\vec x) \, \mathcal L_{c_\iota, \, j}(\vec x) \,
+   * \mathrm d \vec x .
+   * @f]
+   * The index @f$ j @f$ is computed in a tensor way. Having @f$ m_x @f$ Points
+   * in x-direction, @f$ m_y @f$ Points in y-direction and @f$ m_y @f$ Points in
+   * z-direction, then using the @f$
+   * j_x @f$ -th, the @f$ j_y @f$ -th and the @f$ j_z @f$ -th point will result
+   * in matrix index
+   * @f$ j = j_x + j_y \cdot m_x  + j_z \cdot m_x \cdot m_y@f$ .
+   */
+  void (*lagrange_wave_row)(const uint *idx, pcrealavector px, pcrealavector py,
+      pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix V);
 
   /**
    * @brief Integrate the Lagrange polynomials or their derivatives within the
@@ -964,8 +1235,49 @@ struct _kernelbem3d {
    * in matrix index
    * @f$ j = j_x + j_y \cdot m_x  + j_z \cdot m_x \cdot m_y@f$ .
    */
-  void (*lagrange_col)(const uint *idx, pcavector px, pcavector py,
-      pcavector pz, pcbem3d bem, pamatrix W);
+  void (*lagrange_col)(const uint *idx, pcrealavector px, pcrealavector py,
+      pcrealavector pz, pcbem3d bem, pamatrix W);
+
+  /**
+   * @brief Integrate the modified Lagrange polynomials in direction @f$c_\iota@f$
+   * or their derivatives within the 2nd component.
+   *
+   * This callback will evaluate the integral
+   * @f[
+   * \int_\Gamma  \mathcal L_{c_\iota}(\vec y) \, \psi(\vec y) \, \mathrm d \vec y
+   * =  \int_\Gamma  \mathcal L(\vec y) \,
+   *   e^{\langle c_\iota, \vec y \rangle} \,\psi(\vec y) \, \mathrm d \vec y
+   * @f]
+   * with @f$ \mathcal L @f$ being a Lagrange polynomial or its derivative.
+   * @param idx This array describes the permutation of the degrees of freedom.
+   * Its length is determined by <tt>W->rows</tt> . In case <tt>idx == NULL</tt>
+   * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{W->rows}
+   *  -1 @f$
+   * instead.
+   * @param px A Vector of type @ref _avector "avector" that contains interpolation
+   * points in x-direction.
+   * @param py A Vector of type @ref _avector "avector" that contains interpolation
+   * points in y-direction.
+   * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+   * points in z-direction.
+   * @param dir Direction @f$c_\iota@f$ in which the modified Lagrange
+   * polynomials should be evaluated.
+   * @param bem BEM-object containing additional information for computation
+   * of the matrix entries.
+   * @param W W will contain the results of the integral evaluations. It applies
+   * @f[
+   * W_{ij} = \int_\Gamma \mathcal L_{c_\iota,\, j}(\vec y) \, \psi_i(\vec y) \,
+   * \mathrm d \vec y .
+   * @f]
+   * The index @f$ j @f$ is computed in a tensor way. Having @f$ m_x @f$ Points
+   * in x-direction, @f$ m_y @f$ Points in y-direction and @f$ m_y @f$ Points in
+   * z-direction, then using the @f$
+   * j_x @f$ -th, the @f$ j_y @f$ -th and the @f$ j_z @f$ -th point will result
+   * in matrix index
+   * @f$ j = j_x + j_y \cdot m_x  + j_z \cdot m_x \cdot m_y@f$ .
+   */
+  void (*lagrange_wave_col)(const uint *idx, pcrealavector px, pcrealavector py,
+      pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix W);
 };
 
 /**
@@ -976,7 +1288,7 @@ struct _kernelbem3d {
  * linear basis function in @ref bem3d.
  */
 struct _listnode {
-  /** @brief Dataelement to be stored. here the number of a triangle. */
+  /** @brief Data element to be stored. here the number of a triangle. */
   uint data;
   /** @brief Pointer to the next @ref _listnode element. */
   plistnode next;
@@ -1016,8 +1328,8 @@ struct _vert_list {
 };
 
 /* ------------------------------------------------------------
- Constructors and destructors
- ------------------------------------------------------------ */
+ * Constructors and destructors
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Create a new list to store a number of vertex indices.
@@ -1028,16 +1340,16 @@ struct _vert_list {
  * @param next Pointer to successor.
  * @return A new list with successor <tt>next</tt> is returned.
  */
-HEADER_PREFIX
-pvert_list new_vert_list(pvert_list next);
+HEADER_PREFIX pvert_list
+new_vert_list(pvert_list next);
 
 /**
  * @brief Recursively deletes a @ref vert_list.
  *
  * @param vl @ref vert_list to be deleted.
  */
-HEADER_PREFIX
-void del_vert_list(pvert_list vl);
+HEADER_PREFIX void
+del_vert_list(pvert_list vl);
 
 /**
  * @brief Create a new list to store a number of triangles indices.
@@ -1048,16 +1360,16 @@ void del_vert_list(pvert_list vl);
  * @param next Pointer to successor.
  * @return A new list with successor <tt>next</tt> is returned.
  */
-HEADER_PREFIX
-ptri_list new_tri_list(ptri_list next);
+HEADER_PREFIX ptri_list
+new_tri_list(ptri_list next);
 
 /**
  * @brief Recursively deletes a @ref tri_list.
  *
  * @param tl @ref tri_list to be deleted.
  */
-HEADER_PREFIX
-void del_tri_list(ptri_list tl);
+HEADER_PREFIX void
+del_tri_list(ptri_list tl);
 
 /**
  * @brief Main constructor for @ref _bem3d "bem3d" objects.
@@ -1067,10 +1379,16 @@ void del_tri_list(ptri_list tl);
  * constructor. Instead use a problem specific constructor such as @ref
  * new_slp_laplace_bem3d or @ref new_dlp_laplace_bem3d .
  * @param gr 3D geometry described as polyedric surface mesh.
+ * @param row_basis Type of basis functions that are used for the test space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
+ * @param col_basis Type of basis functions that are used for the trial space.
+ *        Can be one of the values defined in @ref basisfunctionbem3d.
  * @return returns a valid @ref _bem3d "bem3d" object that will be used for
  * almost all computations concerning a BEM-application.
  */
-HEADER_PREFIX pbem3d new_bem3d(pcsurface3d gr);
+HEADER_PREFIX pbem3d
+new_bem3d(pcsurface3d gr, basisfunctionbem3d row_basis,
+    basisfunctionbem3d col_basis);
 
 /**
  * @brief Destructor for @ref _bem3d "bem3d" objects.
@@ -1078,11 +1396,12 @@ HEADER_PREFIX pbem3d new_bem3d(pcsurface3d gr);
  * Delete a @ref _bem3d "bem3d" object.
  * @param bem @ref _bem3d "bem3d" object to be deleted.
  */
-HEADER_PREFIX void del_bem3d(pbem3d bem);
+HEADER_PREFIX void
+del_bem3d(pbem3d bem);
 
 /* ------------------------------------------------------------
- Methods to build clustertrees
- ------------------------------------------------------------ */
+ * Methods to build clustertrees
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Creates a @ref _clustergeometry "clustergeometry" object for a BEM-Problem
@@ -1101,8 +1420,8 @@ HEADER_PREFIX void del_bem3d(pbem3d bem);
  * object that can be used to construct a clustertree along with the array
  * of degrees of freedom idx.
  */
-HEADER_PREFIX pclustergeometry build_bem3d_const_clustergeometry(pcbem3d bem,
-    uint **idx);
+HEADER_PREFIX pclustergeometry
+build_bem3d_const_clustergeometry(pcbem3d bem, uint **idx);
 
 /**
  * @brief Creates a @ref _clustergeometry "clustergeometry" object for a BEM-Problem
@@ -1122,8 +1441,8 @@ HEADER_PREFIX pclustergeometry build_bem3d_const_clustergeometry(pcbem3d bem,
  * object that can be used to construct a clustertree along with the array
  * of degrees of freedom idx.
  */
-HEADER_PREFIX pclustergeometry build_bem3d_linear_clustergeometry(pcbem3d bem,
-    uint **idx);
+HEADER_PREFIX pclustergeometry
+build_bem3d_linear_clustergeometry(pcbem3d bem, uint **idx);
 
 /**
  * @brief Creates a @ref _clustergeometry "clustergeometry" object for a BEM-Problem
@@ -1148,8 +1467,8 @@ HEADER_PREFIX pclustergeometry build_bem3d_linear_clustergeometry(pcbem3d bem,
  * object that can be used to construct a clustertree along with the array
  * of degrees of freedom idx.
  */
-HEADER_PREFIX pclustergeometry build_bem3d_clustergeometry(pcbem3d bem,
-    uint **idx, basisfunctionbem3d basis);
+HEADER_PREFIX pclustergeometry
+build_bem3d_clustergeometry(pcbem3d bem, uint **idx, basisfunctionbem3d basis);
 
 /**
  * @brief Creates a @ref _cluster "clustertree" for specified basis functions.
@@ -1171,12 +1490,12 @@ HEADER_PREFIX pclustergeometry build_bem3d_clustergeometry(pcbem3d bem,
  *@return A suitable clustertree for basis functions defined by basis and
  * using @ref build_adaptive_cluster to build up the tree.
  */
-HEADER_PREFIX pcluster build_bem3d_cluster(pcbem3d bem, uint clf,
-    basisfunctionbem3d basis);
+HEADER_PREFIX pcluster
+build_bem3d_cluster(pcbem3d bem, uint clf, basisfunctionbem3d basis);
 
-/****************************************************
- * Nearfield quadrature rountines
- ****************************************************/
+/* ------------------------------------------------------------
+ * Nearfield quadrature routines
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Compute general entries of a boundary integral operator with
@@ -1204,6 +1523,11 @@ HEADER_PREFIX pcluster build_bem3d_cluster(pcbem3d bem, uint clf,
 HEADER_PREFIX void
 assemble_cc_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_cc_simd_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief Compute general entries of a boundary integral operator with
@@ -1234,6 +1558,11 @@ assemble_cc_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 HEADER_PREFIX void
 assemble_cc_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_cc_simd_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief Compute general entries of a boundary integral operator with
@@ -1262,6 +1591,11 @@ assemble_cc_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 HEADER_PREFIX void
 assemble_cl_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_cl_simd_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief Compute general entries of a boundary integral operator with
@@ -1293,6 +1627,80 @@ assemble_cl_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 HEADER_PREFIX void
 assemble_cl_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_cl_simd_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise linear basis functions for Test and piecewise contant basis
+ * functions for Ansatz functions.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_lc_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_lc_simd_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
+
+/**
+ * @brief Compute general entries of a boundary integral operator with
+ * piecewise linear basis functions for Test and piecewise contant basis
+ * functions for Ansatz functions.
+ *
+ * @attention This routines assumes that all pairs of triangles are disjoint and
+ * therefore optimizes the quadrature routine.
+ *
+ * @param ridx Defines the indices of row boundary elements used. If
+ * <tt>ridx</tt> equals NULL, then Elements <tt>0, ..., N->rows-1</tt> are used.
+ * @param cidx Defines the indices of column boundary elements used.
+ * If <tt>cidx</tt> equals NULL, then Elements <tt>0, ..., N->cols-1</tt> are
+ * used.
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param ntrans Is a boolean flag to indicates the way of storing the entries
+ * in matrix <tt>N</tt> . If <tt>ntrans == true</tt> the matrix entries will
+ * be stored in a transposed way.
+ * @param N For <tt>ntrans == false</tt> the matrix entries are computed as:
+ * @f[ N_{ij} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, ,@f]
+ * otherwise they are stored as
+ * @f[ N_{ji} = \int_\Gamma \int_\Gamma \varphi_i(x) \, g(x,y) \, \psi_j(y) \,
+ * \mathrm d y \, \mathrm d x \, .@f]
+ * @param kernel Defines the kernel function @f$g@f$ to be used within the
+ *        computation.
+ */
+HEADER_PREFIX void
+assemble_lc_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_lc_simd_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief Compute general entries of a boundary integral operator with
@@ -1320,6 +1728,11 @@ assemble_cl_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 HEADER_PREFIX void
 assemble_ll_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_ll_simd_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief Compute general entries of a boundary integral operator with
@@ -1350,24 +1763,77 @@ assemble_ll_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 HEADER_PREFIX void
 assemble_ll_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     bool ntrans, pamatrix N, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+assemble_ll_simd_far_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
+    bool ntrans, pamatrix N, kernel_simd_func3d kernel);
+#endif
 
-/****************************************************
- * Compute single integrals with kernel functions
- ****************************************************/
+/* ------------------------------------------------------------
+ * Evaluate kernel function at given points
+ * ------------------------------------------------------------ */
 
 /**
+ * @brief Evaluate a kernel function @f$g@f$ at some points @f$x_i@f$
+ * and @f$y_j@f$.
  *
- * @param bem
- * @param X
- * @param Y
- * @param NX
- * @param NY
- * @param V
- * @param kernel
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param X An array of 3D-vectors. <tt>X[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>X[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>V->rows</tt> .
+ * @param Y An array of 3D-vectors. <tt>Y[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Y[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>V->cols</tt> .
+ * @param NX An array of normal vectors corresponding to the vectors @p X.
+ * These are only needed
+ * @param NY An array of normal vectors corresponding to the vectors @p Y.
+ * @param V In the entry @f$V_{ij}@f$ the evaluation of @f$g(x_i, x_j)@f$ will
+ * be stored.
+ * @param kernel A @ref kernel_func3d "kernel function" @f$g(x,y)@f$ that has to
+ * be evaluated at points @f$x_i@f$ and @f$y_j@f$.
  */
 HEADER_PREFIX void
 fill_bem3d(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
     const real (*NX)[3], const real (*NY)[3], pamatrix V, kernel_func3d kernel);
+
+/**
+ * @brief Evaluate a modified kernel function @f$g_c@f$ at some points @f$x_i@f$
+ * and @f$y_j@f$ for some direction @f$c@f$.
+ *
+ * The function @f$g_c@f$ can be decomposed as @f$g_c(x,y) =
+ * g(x,y) e^{-\langle c, x - y \rangle}@f$.
+ *
+ * @param bem @ref _bem3d "Bem3d" object, that contains additional
+ *        Information for the computation of the matrix entries.
+ * @param X An array of 3D-vectors. <tt>X[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>X[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>V->rows</tt> .
+ * @param Y An array of 3D-vectors. <tt>Y[j][0]</tt> will be the first
+ * component of the j-th vector. Analogously <tt>Y[j][1]</tt> will be the second
+ * component of the j-th vector. The length of this array is determined by
+ * <tt>V->cols</tt> .
+ * @param NX An array of normal vectors corresponding to the vectors @p X.
+ * These are only needed
+ * @param NY An array of normal vectors corresponding to the vectors @p Y.
+ * @param V In the entry @f$V_{ij}@f$ the evaluation of @f$g_c(x_i, x_j)@f$ will
+ * be stored.
+ * @param dir Direction @f$c_\iota@f$ in which the modified kernel function
+ * should be evaluated.
+ * @param kernel A @ref kernel_wave_func3d "modified kernel function"
+ * @f$g_c(x,y)@f$ that has to be evaluated at points @f$x_i@f$ and @f$y_j@f$.
+ */
+HEADER_PREFIX void
+fill_wave_bem3d(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
+    const real (*NX)[3], const real (*NY)[3], pamatrix V, pcreal dir,
+    kernel_wave_func3d kernel);
+
+/* ------------------------------------------------------------
+ * Compute single integrals with kernel functions
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function will integrate a kernel function @f$g@f$ on
@@ -1398,6 +1864,11 @@ fill_bem3d(pcbem3d bem, const real (*X)[3], const real (*Y)[3],
 HEADER_PREFIX void
 fill_row_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
     kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+fill_row_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem,
+    pamatrix V, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief This function will integrate a kernel function @f$g@f$ on
@@ -1428,6 +1899,11 @@ fill_row_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
 HEADER_PREFIX void
 fill_col_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
     kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+fill_col_simd_c_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem,
+    pamatrix V, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief This function will integrate a kernel function @f$g@f$ on
@@ -1520,6 +1996,11 @@ fill_col_l_bem3d(const uint * idx, const real (*Z)[3], pcbem3d bem, pamatrix V,
 HEADER_PREFIX void
 fill_dnz_row_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
     pcbem3d bem, pamatrix V, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+fill_dnz_row_simd_c_bem3d(const uint * idx, const real (*Z)[3],
+    const real (*N)[3], pcbem3d bem, pamatrix V, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief This function will integrate a normal derivative of a kernel function
@@ -1552,6 +2033,11 @@ fill_dnz_row_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
 HEADER_PREFIX void
 fill_dnz_col_c_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
     pcbem3d bem, pamatrix V, kernel_func3d kernel);
+#ifdef USE_SIMD
+HEADER_PREFIX void
+fill_dnz_col_simd_c_bem3d(const uint * idx, const real (*Z)[3],
+    const real (*N)[3], pcbem3d bem, pamatrix V, kernel_simd_func3d kernel);
+#endif
 
 /**
  * @brief This function will integrate a normal derivative of a kernel function
@@ -1618,8 +2104,8 @@ fill_dnz_col_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
     pcbem3d bem, pamatrix V, kernel_func3d kernel);
 
 /* ------------------------------------------------------------
- Initializerfunctions for h-matrix approximations
- ------------------------------------------------------------ */
+ * Initializer functions for h-matrix approximations
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Initialize the @ref _bem3d "bem" object for on the fly recompression
@@ -1651,12 +2137,13 @@ fill_dnz_col_l_bem3d(const uint * idx, const real (*Z)[3], const real (*N)[3],
  * @param accur_coarsen The accuracy the coarsen technique will use to determine
  * the coarsened block structure.
  */
-HEADER_PREFIX void setup_hmatrix_recomp_bem3d(pbem3d bem, bool recomp,
-    real accur_recomp, bool coarsen, real accur_coarsen);
+HEADER_PREFIX void
+setup_hmatrix_recomp_bem3d(pbem3d bem, bool recomp, real accur_recomp,
+    bool coarsen, real accur_coarsen);
 
 /* ------------------------------------------------------------
- Interpolation
- ------------------------------------------------------------ */
+ * Interpolation
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function initializes the @ref _bem3d "bem3d" object for approximating
@@ -1687,8 +2174,9 @@ HEADER_PREFIX void setup_hmatrix_recomp_bem3d(pbem3d bem, bool recomp,
  * @param tree Root of the @ref _block "blocktree".
  * @param m Number of Chebyshev interpolation points in each spatial dimension.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_inter_row_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, uint m);
+HEADER_PREFIX void
+setup_hmatrix_aprx_inter_row_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m);
 
 /**
  * @brief This function initializes the @ref _bem3d "bem3d" object for approximating
@@ -1719,8 +2207,9 @@ HEADER_PREFIX void setup_hmatrix_aprx_inter_row_bem3d(pbem3d bem, pccluster rc,
  * @param tree Root of the @ref _block "blocktree".
  * @param m Number of Chebyshev interpolation points in each spatial dimension.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_inter_col_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, uint m);
+HEADER_PREFIX void
+setup_hmatrix_aprx_inter_col_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m);
 
 /**
  * @brief This function initializes the @ref _bem3d "bem3d" object for approximating
@@ -1745,12 +2234,14 @@ HEADER_PREFIX void setup_hmatrix_aprx_inter_col_bem3d(pbem3d bem, pccluster rc,
  * @param tree Root of the @ref _block "blocktree".
  * @param m Number of Chebyshev interpolation points in each spatial dimension.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_inter_mixed_bem3d(pbem3d bem,
-    pccluster rc, pccluster cc, pcblock tree, uint m);
+HEADER_PREFIX void
+setup_hmatrix_aprx_inter_mixed_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m);
 
 /* ------------------------------------------------------------
- Green
- ------------------------------------------------------------ */
+ * Green
+ * ------------------------------------------------------------ */
+
 /**
  * @brief creating hmatrix approximation using green's method with row
  * @ref _cluster "cluster" .
@@ -1811,9 +2302,9 @@ HEADER_PREFIX void setup_hmatrix_aprx_inter_mixed_bem3d(pbem3d bem,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_green_row_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, uint m, uint l, real delta,
-    quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_hmatrix_aprx_green_row_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m, uint l, real delta, quadpoints3d quadpoints);
 
 /**
  * @brief creating hmatrix approximation using green's method with column
@@ -1877,9 +2368,9 @@ HEADER_PREFIX void setup_hmatrix_aprx_green_row_bem3d(pbem3d bem, pccluster rc,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_green_col_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, uint m, uint l, real delta,
-    quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_hmatrix_aprx_green_col_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m, uint l, real delta, quadpoints3d quadpoints);
 
 /**
  * @brief creating hmatrix approximation using green's method with one of row or
@@ -1917,13 +2408,13 @@ HEADER_PREFIX void setup_hmatrix_aprx_green_col_bem3d(pbem3d bem, pccluster rc,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_green_mixed_bem3d(pbem3d bem,
-    pccluster rc, pccluster cc, pcblock tree, uint m, uint l, real delta,
-    quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_hmatrix_aprx_green_mixed_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m, uint l, real delta, quadpoints3d quadpoints);
 
 /* ------------------------------------------------------------
- Greenhybrid
- ------------------------------------------------------------ */
+ * Greenhybrid
+ * ------------------------------------------------------------ */
 
 /**
  * @brief creating hmatrix approximation using green's method with row
@@ -1982,9 +2473,10 @@ HEADER_PREFIX void setup_hmatrix_aprx_green_mixed_bem3d(pbem3d bem,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_row_bem3d(pbem3d bem,
-    pccluster rc, pccluster cc, pcblock tree, uint m, uint l, real delta,
-    real accur, quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_hmatrix_aprx_greenhybrid_row_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m, uint l, real delta, real accur,
+    quadpoints3d quadpoints);
 
 /**
  * @brief creating hmatrix approximation using green's method with column
@@ -2043,9 +2535,10 @@ HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_row_bem3d(pbem3d bem,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_col_bem3d(pbem3d bem,
-    pccluster rc, pccluster cc, pcblock tree, uint m, uint l, real delta,
-    real accur, quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_hmatrix_aprx_greenhybrid_col_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m, uint l, real delta, real accur,
+    quadpoints3d quadpoints);
 
 /**
  * @brief creating hmatrix approximation using green's method with row or column
@@ -2086,13 +2579,14 @@ HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_col_bem3d(pbem3d bem,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_mixed_bem3d(pbem3d bem,
-    pccluster rc, pccluster cc, pcblock tree, uint m, uint l, real delta,
-    real accur, quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_hmatrix_aprx_greenhybrid_mixed_bem3d(pbem3d bem, pccluster rc,
+    pccluster cc, pcblock tree, uint m, uint l, real delta, real accur,
+    quadpoints3d quadpoints);
 
 /* ------------------------------------------------------------
- ACA
- ------------------------------------------------------------ */
+ * ACA
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Approximate matrix block with ACA using full pivoting.
@@ -2110,8 +2604,9 @@ HEADER_PREFIX void setup_hmatrix_aprx_greenhybrid_mixed_bem3d(pbem3d bem,
  * @param tree Root of the @ref _block "blocktree".
  * @param accur Assesses the minimum accuracy for the ACA approximation.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_aca_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, real accur);
+HEADER_PREFIX void
+setup_hmatrix_aprx_aca_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, real accur);
 
 /**
  * @brief Approximate matrix block with ACA using partial pivoting.
@@ -2129,12 +2624,13 @@ HEADER_PREFIX void setup_hmatrix_aprx_aca_bem3d(pbem3d bem, pccluster rc,
  * @param tree Root of the @ref _block "blocktree".
  * @param accur Assesses the minimum accuracy for the ACA approximation.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_paca_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, real accur);
+HEADER_PREFIX void
+setup_hmatrix_aprx_paca_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, real accur);
 
 /* ------------------------------------------------------------
- HCA
- ------------------------------------------------------------ */
+ * HCA
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Approximate matrix block with hybrid cross approximation using
@@ -2194,12 +2690,13 @@ HEADER_PREFIX void setup_hmatrix_aprx_paca_bem3d(pbem3d bem, pccluster rc,
  * @param m Number of Chebyshev interpolation points in each spatial dimension.
  * @param accur Assesses the minimum accuracy for the ACA approximation.
  */
-HEADER_PREFIX void setup_hmatrix_aprx_hca_bem3d(pbem3d bem, pccluster rc,
-    pccluster cc, pcblock tree, uint m, real accur);
+HEADER_PREFIX void
+setup_hmatrix_aprx_hca_bem3d(pbem3d bem, pccluster rc, pccluster cc,
+    pcblock tree, uint m, real accur);
 
 /* ------------------------------------------------------------
- Initializerfunctions for h2-matrix approximations
- ------------------------------------------------------------ */
+ * Initializer functions for H2-matrix approximations
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Enables hierarchical recompression for @ref _hmatrix "hmatrices".
@@ -2217,8 +2714,8 @@ HEADER_PREFIX void setup_hmatrix_aprx_hca_bem3d(pbem3d bem, pccluster rc,
  * @param accur_hiercomp The accuracy the hierarchical recompression technique
  * will use to create a compressed @ref _h2matrix "h2matrix.
  */
-HEADER_PREFIX void setup_h2matrix_recomp_bem3d(pbem3d bem, bool hiercomp,
-    real accur_hiercomp);
+HEADER_PREFIX void
+setup_h2matrix_recomp_bem3d(pbem3d bem, bool hiercomp, real accur_hiercomp);
 
 /**
  * @brief Initialize the @ref _bem3d "bem3d" object for approximating
@@ -2272,8 +2769,9 @@ HEADER_PREFIX void setup_h2matrix_recomp_bem3d(pbem3d bem, bool hiercomp,
  * @param tree Root of the @ref _block "blocktree".
  * @param m Number of Chebyshev interpolation points in each spatial dimension.
  */
-HEADER_PREFIX void setup_h2matrix_aprx_inter_bem3d(pbem3d bem,
-    pcclusterbasis rb, pcclusterbasis cb, pcblock tree, uint m);
+HEADER_PREFIX void
+setup_h2matrix_aprx_inter_bem3d(pbem3d bem, pcclusterbasis rb,
+    pcclusterbasis cb, pcblock tree, uint m);
 
 /**
  * @brief  Initialize the @ref _bem3d "bem3d" object for approximating
@@ -2350,9 +2848,10 @@ HEADER_PREFIX void setup_h2matrix_aprx_inter_bem3d(pbem3d bem,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_bem3d(pbem3d bem,
-    pcclusterbasis rb, pcclusterbasis cb, pcblock tree, uint m, uint l,
-    real delta, real accur, quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_h2matrix_aprx_greenhybrid_bem3d(pbem3d bem, pcclusterbasis rb,
+    pcclusterbasis cb, pcblock tree, uint m, uint l, real delta, real accur,
+    quadpoints3d quadpoints);
 
 /**
  * @brief  Initialize the @ref _bem3d "bem3d" object for approximating
@@ -2429,13 +2928,109 @@ HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_bem3d(pbem3d bem,
  * to return valid quadrature points, weight and normalvectors on the
  * parameterization.
  */
-HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_ortho_bem3d(pbem3d bem,
-    pcclusterbasis rb, pcclusterbasis cb, pcblock tree, uint m, uint l,
-    real delta, real accur, quadpoints3d quadpoints);
+HEADER_PREFIX void
+setup_h2matrix_aprx_greenhybrid_ortho_bem3d(pbem3d bem, pcclusterbasis rb,
+    pcclusterbasis cb, pcblock tree, uint m, uint l, real delta, real accur,
+    quadpoints3d quadpoints);
 
 /* ------------------------------------------------------------
- Fill hmatrix
- ------------------------------------------------------------ */
+ * Initializer functions for DH2-matrix approximations
+ * ------------------------------------------------------------ */
+
+/**
+ * @brief Initialize the @ref bem3d object for an interpolation based
+ * @f$\mathcal{DH}^2@f$-matrix approximation.
+ *
+ * @attention The corresponding @ref dclusterbasis object has to be filled with
+ * @ref assemble_bem3d_dh2matrix_row_dclusterbasis and
+ * @ref assemble_bem3d_dh2matrix_col_dclusterbasis.
+ *
+ * All parameters and callback functions for a @f$\mathcal{DH}^2@f$-matrix
+ * approximation based on interpolation are set with this function
+ * and collected in the @ref _bem3d "bem" object.
+ *
+ * @param bem Object filled with the needed parameters and callback functions
+ *        for the approximation.
+ * @param rb @ref dclusterbasis object for the row cluster.
+ * @param cb @ref dclusterbasis object for the column cluster.
+ * @param tree Root of the block tree.
+ * @param m Number of interpolation points in each dimension.
+ */
+HEADER_PREFIX void
+setup_dh2matrix_aprx_inter_bem3d(pbem3d bem, pcdclusterbasis rb,
+    pcdclusterbasis cb, pcdblock tree, uint m);
+
+/** 
+ * @brief Initialize the @ref bem3d object for an interpolation based 
+ * @f$\mathcal{DH}^2@f$-matrix approximation with orthogonal directional 
+ * cluster basis.
+ * 
+ * @attention The corresponding @ref dclusterbasis object has to be filled with
+ * @ref assemble_bem3d_dh2matrix_ortho_row_dclusterbasis and
+ * @ref assemble_bem3d_dh2matrix_ortho_col_dclusterbasis, further for both 
+ * cluster bases a @ref dclusteroperator objects has to be created.
+ * 
+ * All parameters and callback functions for a @f$\mathcal{DH}^2@f$-matrix 
+ * approximation based on interpolation and orthogonalized for smaller
+ * ranks are set with this function and collected in the @ref _bem3d "bem" object.
+ * 
+ * @param bem Object filled with the needed parameters and callback functions
+ *        for the approximation.
+ * @param rb @ref dclusterbasis object for the row cluster. 
+ * @param cb @ref dclusterbasis object for the column cluster.
+ * @param tree Root of the block tree.
+ * @param m Number of interpolation points in each dimension.
+ */
+HEADER_PREFIX void
+setup_dh2matrix_aprx_inter_ortho_bem3d(pbem3d bem, pcdclusterbasis rb,
+    pcdclusterbasis cb, pcdblock tree, uint m);
+
+/** 
+ * @brief Initialize the @ref bem3d object for an interpolation based 
+ * @f$\mathcal{DH}^2@f$-matrix approximation with orthogonal directional 
+ * cluster basis. During the filling process the @f$\mathcal{DH}^2@f$-matrix
+ * will be recompressed with respective to @ref truncmode and the given 
+ * accuracy <tt>eps</tt>.
+ * 
+ * @attention The corresponding @ref dclusterbasis object has to be filled with
+ * @ref assemble_bem3d_dh2matrix_recomp_both_dclusterbasis, further for both 
+ * cluster basis a @ref dclusteroperator object has to be created.
+ * 
+ * All parameters and callback functions for a @f$\mathcal{DH}^2@f$-matrix 
+ * approximation based on interpolation and immediate recompression for smaller
+ * ranks are set with this function and collected in the @ref _bem3d "bem" object.
+ * 
+ * @param bem Object filled with the needed parameters and callback functions
+ *        for the approximation.
+ * @param rb @ref dclusterbasis object for the row cluster. 
+ * @param cb @ref dclusterbasis object for the column cluster.
+ * @param tree Root of the block tree.
+ * @param m Number of interpolation points in each dimension.
+ * @param tm @ref truncmode object for the choosen mode of truncation.
+ * @param eps desired accuracy for the truncation.
+ */
+HEADER_PREFIX void
+setup_dh2matrix_aprx_inter_recomp_bem3d(pbem3d bem, pcdclusterbasis rb,
+    pcdclusterbasis cb, pcdblock tree, uint m, ptruncmode tm, real eps);
+
+/* ------------------------------------------------------------
+ * Fill amatrix
+ * ------------------------------------------------------------ */
+
+/**
+ * @brief Assemble a dense matrix for some boundary integral operator given
+ * by @p bem.
+ *
+ * @param bem @ref _bem3d "Bem" object containing information about the used
+ * Ansatz and trial spaces as well as the boundary integral operator itself.
+ * @param G @ref _amatrix "Amatrix" object to be filled.
+ */
+HEADER_PREFIX void
+assemble_bem3d_amatrix(pbem3d bem, pamatrix G);
+
+/* ------------------------------------------------------------
+ * Fill hmatrix
+ * ------------------------------------------------------------ */
 
 /**
  * @brief Fills a @ref _hmatrix "hmatrix" with a predefined approximation
@@ -2458,7 +3053,8 @@ HEADER_PREFIX void setup_h2matrix_aprx_greenhybrid_ortho_bem3d(pbem3d bem,
  * @param G @ref _hmatrix "hmatrix" to be filled. <tt>b</tt> has to be
  * appropriate to <tt>G</tt>.
  */
-HEADER_PREFIX void assemble_bem3d_hmatrix(pbem3d bem, pblock b, phmatrix G);
+HEADER_PREFIX void
+assemble_bem3d_hmatrix(pbem3d bem, pblock b, phmatrix G);
 
 /**
  * @brief Fills a @ref _hmatrix "hmatrix" with a predefined approximation
@@ -2488,8 +3084,8 @@ HEADER_PREFIX void assemble_bem3d_hmatrix(pbem3d bem, pblock b, phmatrix G);
  * @param G @ref _hmatrix "hmatrix" to be filled. <tt>b</tt> has to be
  * appropriate to <tt>G</tt>.
  */
-HEADER_PREFIX void assemblecoarsen_bem3d_hmatrix(pbem3d bem, pblock b,
-    phmatrix G);
+HEADER_PREFIX void
+assemblecoarsen_bem3d_hmatrix(pbem3d bem, pblock b, phmatrix G);
 
 /**
  * @brief Fills the nearfield blocks of a @ref _hmatrix "hmatrix".
@@ -2505,8 +3101,8 @@ HEADER_PREFIX void assemblecoarsen_bem3d_hmatrix(pbem3d bem, pblock b,
  * @param G @ref _hmatrix "hmatrix" to be filled. <tt>b</tt> has to be
  * appropriate to <tt>G</tt>.
  */
-HEADER_PREFIX void assemble_nearfield_bem3d_hmatrix(pbem3d bem, pblock b,
-    phmatrix G);
+HEADER_PREFIX void
+assemble_bem3d_nearfield_hmatrix(pbem3d bem, pblock b, phmatrix G);
 
 /**
  * @brief Fills the farfield blocks of a @ref _hmatrix "hmatrix" with a
@@ -2528,12 +3124,12 @@ HEADER_PREFIX void assemble_nearfield_bem3d_hmatrix(pbem3d bem, pblock b,
  * @param G @ref _hmatrix "hmatrix" to be filled. <tt>b</tt> has to be
  * appropriate to <tt>G</tt>.
  */
-HEADER_PREFIX void assemble_farfield_bem3d_hmatrix(pbem3d bem, pblock b,
-    phmatrix G);
+HEADER_PREFIX void
+assemble_bem3d_farfield_hmatrix(pbem3d bem, pblock b, phmatrix G);
 
 /* ------------------------------------------------------------
- Fill h2-matrix
- ------------------------------------------------------------ */
+ * Fill H2-matrix
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function computes the matrix entries for the nested @ref _clusterbasis
@@ -2548,7 +3144,7 @@ HEADER_PREFIX void assemble_farfield_bem3d_hmatrix(pbem3d bem, pblock b,
  * V_t = \begin{pmatrix} V_{t_1} & & \\ & \ddots & \\ & & V_{t_\tau} \end{pmatrix}
  * \begin{pmatrix} E_{t_1} \\ \vdots \\ E_{t_\tau} \end{pmatrix}
  * @f]
- * A matrices @f$ E_{t_i} @f$ will be stored within the @ref _clusterbasis
+ * All matrices @f$ E_{t_i} @f$ will be stored within the @ref _clusterbasis
  * "clusterbasis" belonging to the @f$ i @f$-th son.
  *
  * @attention A valid @ref _h2matrix "h2matrix" approximation scheme,
@@ -2560,8 +3156,8 @@ HEADER_PREFIX void assemble_farfield_bem3d_hmatrix(pbem3d bem, pblock b,
  * for computing the entries of @ref _clusterbasis "clusterbasis" <tt>rb</tt> .
  * @param rb Row @ref _clusterbasis "clusterbasis" to be filled.
  */
-HEADER_PREFIX void assemble_bem3d_h2matrix_row_clusterbasis(pcbem3d bem,
-    pclusterbasis rb);
+HEADER_PREFIX void
+assemble_bem3d_h2matrix_row_clusterbasis(pcbem3d bem, pclusterbasis rb);
 
 /**
  * @brief This function computes the matrix entries for the nested @ref _clusterbasis
@@ -2576,7 +3172,7 @@ HEADER_PREFIX void assemble_bem3d_h2matrix_row_clusterbasis(pcbem3d bem,
  * W_s = \begin{pmatrix} W_{s_1} & & \\ & \ddots & \\ & & W_{s_\sigma} \end{pmatrix}
  * \begin{pmatrix} F_{s_1} \\ \vdots \\ F_{s_\sigma} \end{pmatrix}
  * @f]
- * A matrices @f$ F_{s_i} @f$ will be stored within the @ref _clusterbasis
+ * All matrices @f$ F_{s_i} @f$ will be stored within the @ref _clusterbasis
  * "clusterbasis" belonging to the @f$ i @f$-th son.
  *
  * @attention A valid @ref _h2matrix "h2matrix" approximation scheme,
@@ -2585,11 +3181,11 @@ HEADER_PREFIX void assemble_bem3d_h2matrix_row_clusterbasis(pcbem3d bem,
  * "bem3d" object the behavior of this function is undefined.
  *
  * @param bem @ref _bem3d "bem3d" object containing all necessary information
- * for computing the entries of @ref _clusterbasis "clusterbasis" <tt>rb</tt> .
- * @param cb Row @ref _clusterbasis "clusterbasis" to be filled.
+ * for computing the entries of @ref _clusterbasis "clusterbasis" <tt>cb</tt> .
+ * @param cb Column @ref _clusterbasis "clusterbasis" to be filled.
  */
-HEADER_PREFIX void assemble_bem3d_h2matrix_col_clusterbasis(pcbem3d bem,
-    pclusterbasis cb);
+HEADER_PREFIX void
+assemble_bem3d_h2matrix_col_clusterbasis(pcbem3d bem, pclusterbasis cb);
 
 /**
  * @brief Fills a @ref _h2matrix "h2matrix" with a predefined approximation
@@ -2614,28 +3210,25 @@ HEADER_PREFIX void assemble_bem3d_h2matrix_col_clusterbasis(pcbem3d bem,
  *
  * @param bem @ref _bem3d "bem3d" object containing all necessary information
  * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
- * @param b Root of the @ref _block "blocktree".
- * @param G @ref _h2matrix "h2matrix" to be filled. <tt>b</tt> has to be
- * appropriate to <tt>G</tt>.
+ * @param G @ref _h2matrix "h2matrix" to be filled.
  */
-HEADER_PREFIX void assemble_bem3d_h2matrix(pbem3d bem, pblock b, ph2matrix G);
+HEADER_PREFIX void
+assemble_bem3d_h2matrix(pbem3d bem, ph2matrix G);
 
 /**
  * @brief Fills the nearfield part of a @ref _h2matrix "h2matrix".
  *
  * This will traverse the block tree until it reaches its leafs.
- * For an inadmissiböe leaf block the full matrix @f$
+ * For an inadmissible leaf block the full matrix @f$
  * G_{|t \times s} @f$ is computed.
  *
  *
  * @param bem @ref _bem3d "bem3d" object containing all necessary information
  * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
- * @param b Root of the @ref _block "blocktree".
- * @param G @ref _h2matrix "h2matrix" to be filled. <tt>b</tt> has to be
- * appropriate to <tt>G</tt>.
+ * @param G @ref _h2matrix "h2matrix" to be filled.
  */
-HEADER_PREFIX void assemble_nearfield_bem3d_h2matrix(pbem3d bem, pblock b,
-    ph2matrix G);
+HEADER_PREFIX void
+assemble_bem3d_nearfield_h2matrix(pbem3d bem, ph2matrix G);
 
 /**
  * @brief Fills a @ref _h2matrix "h2matrix" with a predefined approximation
@@ -2659,12 +3252,10 @@ HEADER_PREFIX void assemble_nearfield_bem3d_h2matrix(pbem3d bem, pblock b,
  *
  * @param bem @ref _bem3d "bem3d" object containing all necessary information
  * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
- * @param b Root of the @ref _block "blocktree".
- * @param G @ref _h2matrix "h2matrix" to be filled. <tt>b</tt> has to be
- * appropriate to <tt>G</tt>.
+ * @param G @ref _h2matrix "h2matrix" to be filled.
  */
-HEADER_PREFIX void assemble_farfield_bem3d_h2matrix(pbem3d bem, pblock b,
-    ph2matrix G);
+HEADER_PREFIX void
+assemble_bem3d_farfield_h2matrix(pbem3d bem, ph2matrix G);
 
 /**
  * @brief Fills an @ref _h2matrix "h2matrix" with a predefined approximation
@@ -2697,12 +3288,222 @@ HEADER_PREFIX void assemble_farfield_bem3d_h2matrix(pbem3d bem, pblock b,
  * @param G @ref _h2matrix "h2matrix" to be filled. <tt>b</tt> has to be
  * appropriate to <tt>G</tt>.
  */
-HEADER_PREFIX void assemblehiercomp_bem3d_h2matrix(pbem3d bem, pblock b,
-    ph2matrix G);
+HEADER_PREFIX void
+assemblehiercomp_bem3d_h2matrix(pbem3d bem, pblock b, ph2matrix G);
+
+/**
+ * @brief This function computes the matrix entries for the nested @ref _dclusterbasis
+ * "dclusterbasis" @f$ V_t \, , t \in \mathcal T_{\mathcal I} @f$.
+ *
+ * This algorithm completely traverses the clustertree belonging to the given
+ * @ref _dclusterbasis "dclusterbasis" until it reaches its leafs. In each leaf cluster
+ * the matrices @f$ V_{t,c} @f$ for all @f$c@f$ will be constructed and
+ * stored within the @ref _dclusterbasis "dclusterbasis".
+ * In non leaf clusters the transfer matrices @f$ E_{t', c} \, , t'
+ * \in \operatorname{sons}(t) @f$ for all @f$c@f$ will be computed and it holds
+ * @f[
+ * V_{t,c} = \begin{pmatrix} V_{t_1, \operatorname{sondir}(c)} & & \\ & \ddots
+ *   & \\ & & V_{t_\tau, \operatorname{sondir}(c)} \end{pmatrix}
+ * \begin{pmatrix} E_{t_1, \operatorname{sondir}(c)} \\ \vdots \\
+ * E_{t_\tau, \operatorname{sondir}(c)} \end{pmatrix}
+ * @f]
+ * All matrices @f$ E_{t_i, c} @f$ will be stored within the @ref _dclusterbasis
+ * "dclusterbasis" belonging to the @f$ i @f$-th son.
+ *
+ * @attention A valid @ref _dh2matrix "dh2matrix" approximation scheme,
+ * such as @ref setup_dh2matrix_aprx_inter_bem3d must be set before calling
+ * this function. If no approximation technique is set within the @ref _bem3d
+ * "bem3d" object the behavior of this function is undefined.
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _dclusterbasis "dclusterbasis" <tt>rb</tt> .
+ * @param rb Row @ref _dclusterbasis "dclusterbasis" to be filled.
+ */
+HEADER_PREFIX void
+assemble_bem3d_dh2matrix_row_dclusterbasis(pcbem3d bem, pdclusterbasis rb);
+
+/**
+ * @brief This function computes the matrix entries for the nested @ref _dclusterbasis
+ * "dclusterbasis" @f$ W_s \, , s \in \mathcal T_{\mathcal J} @f$.
+ *
+ * This algorithm completely traverses the clustertree belonging to the given
+ * @ref _dclusterbasis "dclusterbasis" until it reaches its leafs.
+ * In each leaf cluster the matrix @f$ W_{s,c} @f$ for all @f$c@f$ will be
+ * constructed and stored within the @ref _dclusterbasis "dclusterbasis".
+ * In non leaf clusters the transfer matrices
+ * @f$ F_{s',c} \, , s' \in \operatorname{sons}(s) @f$ for all @f$c@f$ will
+ * be computed and it holds
+ * @f[
+ * W_{s,c} = \begin{pmatrix} W_{s_1,\operatorname{sondir}(c)} & & \\ & \ddots
+ *   & \\ & & W_{s_\sigma, \operatorname{sondir}(c)} \end{pmatrix}
+ * \begin{pmatrix} F_{s_1, \operatorname{sondir}(c)} \\ \vdots \\
+ *   F_{s_\sigma, \operatorname{sondir}(c)} \end{pmatrix}
+ * @f]
+ * All matrices @f$ F_{s_i, c} @f$ will be stored within the @ref _dclusterbasis
+ * "dclusterbasis" belonging to the @f$ i @f$-th son.
+ *
+ * @attention A valid @ref _dh2matrix "dh2matrix" approximation scheme,
+ * such as @ref setup_dh2matrix_aprx_inter_bem3d must be set before calling
+ * this function. If no approximation technique is set within the @ref _bem3d
+ * "bem3d" object the behavior of this function is undefined.
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _clusterbasis "clusterbasis" <tt>cb</tt> .
+ * @param cb Column @ref _clusterbasis "clusterbasis" to be filled.
+ */
+HEADER_PREFIX void
+assemble_bem3d_dh2matrix_col_dclusterbasis(pcbem3d bem, pdclusterbasis cb);
+
+/** 
+ * @brief Function for filling a directional row cluster basis with orthogonal
+ * matrices.
+ * 
+ * @attention This function should be called together with 
+ *  @ref setup_dh2matrix_aprx_inter_ortho_bem3d .
+ * @remark The needed @ref dclusteroperator object could be easily created 
+ *        with @ref build_from_dclusterbasis_dclusteroperator .
+ * 
+ * After filling the cluster basis according to the choosen order of interpolation, 
+ * the matrices will be orthogonalized. The cluster operator is filled
+ * with the matrices, which describes the basis change.
+ * 
+ * @param bem Corresponding @ref bem3d object filled with the needed parameters 
+ *        and callback functions.
+ * @param rb Directional row cluster basis. 
+ * @param ro @ref dclusteroperator object corresponding to <tt>rb</tt> .
+ */
+
+HEADER_PREFIX void
+assemble_bem3d_dh2matrix_ortho_row_dclusterbasis(pcbem3d bem, pdclusterbasis rb,
+    pdclusteroperator ro);
+
+/** 
+ * @brief Function for filling a directional column cluster basis with orthogonal
+ * matrices.
+ * 
+ * @attention This function should be called together with 
+ *  @ref setup_dh2matrix_aprx_inter_ortho_bem3d .
+ * @remark The needed @ref dclusteroperator object could be easily created 
+ *        with @ref build_from_dclusterbasis_dclusteroperator .
+ * 
+ * After filling the cluster basis according to the choosen order of interpolation, 
+ * the matrices will be orthogonalized. The cluster operator is filled
+ * with the matrices, which describes the basis change.
+ * 
+ * @param bem Corresponding @ref bem3d object filled with the needed parameters 
+ *        and callback functions.
+ * @param cb Directional column cluster basis. 
+ * @param co @ref dclusteroperator object corresponding to <tt>cb</tt> .
+ */
+
+HEADER_PREFIX void
+assemble_bem3d_dh2matrix_ortho_col_dclusterbasis(pcbem3d bem, pdclusterbasis cb,
+    pdclusteroperator co);
+
+/** 
+ * @brief Function for filling both directional cluster bases with orthogonal
+ * matrices.
+ * 
+ * @attention This function should be called together with 
+ *  @ref setup_dh2matrix_aprx_inter_recomp_bem3d and before the
+ *  @f$\mathcal{DH}^2@f$-matrix is filled!
+ *  
+ * @remark The needed @ref dclusteroperator object could be easily created 
+ *        with @ref build_from_dclusterbasis_dclusteroperator .
+ * 
+ * After filling the cluster basis according to the choosen order of interpolation, 
+ * the matrices will be truncated according to the truncation mode and accuracy given 
+ * in the @ref _bem3d "bem" object.
+ * The transfer matrices describing the basis change are saved in the two 
+ * @ref dclusteroperator obejcts <tt>bro</tt> and <tt>bco</tt> for filling 
+ * the @f$\mathcal{DH}^2@f$-matrix later.
+ * 
+ * @param bem Corresponding @ref bem3d object filled with the needed parameters 
+ *        and callback functions.
+ * @param rb Directional row cluster basis. 
+ * @param bro @ref dclusteroperator object corresponding to <tt>rb</tt>.
+ * @param cb Directional column cluster basis. 
+ * @param bco @ref dclusteroperator object corresponding to <tt>cb</tt>.
+ * @param broot @ref dblock object for the corresponding @f$\mathcal{DH}^2@f$-matrix.
+ */
+HEADER_PREFIX void
+assemble_bem3d_dh2matrix_recomp_both_dclusterbasis(pcbem3d bem,
+    pdclusterbasis rb, pdclusteroperator bro, pdclusterbasis cb,
+    pdclusteroperator bco, pcdblock broot);
+
+/**
+ * @brief Fills a @ref _dh2matrix "dh2matrix" with a predefined approximation
+ * technique.
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For a leaf block either the full matrix @f$
+ * G_{|t \times s} @f$ is computed or a @ref _duniform "duniform"
+ * rank-k-approximation specified
+ * within the @ref _bem3d "bem3d" object is created as
+ * @f$ G_{|t \times s} \approx V_{t,c} \, S_{b,c} \, W_{s,c}^* @f$
+ *
+ * @attention Before using this function to fill an @ref _dh2matrix
+ * "dh2matrix" one has to initialize the @ref _bem3d "bem3d" object with
+ * one of the approximation techniques such as @ref
+ * setup_dh2matrix_aprx_inter_bem3d. Otherwise the
+ * behavior of the function is undefined.
+ * @attention The @ref _dclusterbasis "dclusterbasis" @f$ V_t @f$ and @f$ W_s @f$
+ * have to be computed before
+ * calling this function because some approximation schemes depend on information
+ * residing within the @ref _dclusterbasis "dclusterbasis".
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
+ * @param G @ref _dh2matrix "dh2matrix" to be filled.
+ */
+HEADER_PREFIX void
+assemble_bem3d_dh2matrix(pbem3d bem, pdh2matrix G);
+
+/**
+ * @brief Fills the nearfield part of a @ref _dh2matrix "dh2matrix".
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For an inadmissible leaf block the full matrix @f$
+ * G_{|t \times s} @f$ is computed.
+ *
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _dh2matrix "dh2matrix" <tt>G</tt> .
+ * @param G @ref _dh2matrix "dh2matrix" to be filled.
+ */
+HEADER_PREFIX void
+assemble_bem3d_nearfield_dh2matrix(pbem3d bem, pdh2matrix G);
+
+/**
+ * @brief Fills a @ref _dh2matrix "dh2matrix" with a predefined approximation
+ * technique.
+ *
+ * This will traverse the block tree until it reaches its leafs.
+ * For an admissible leaf block a @ref _duniform "duniform"
+ * rank-k-approximation specified
+ * within the @ref _bem3d "bem3d" object is created as
+ * @f$ G_{|t \times s} \approx V_{t,c} \, S_{b,c} \, W_{s,c}^* @f$
+ *
+ * @attention Before using this function to fill an @ref _dh2matrix
+ * "dh2matrix" one has to initialize the @ref _bem3d "bem3d" object with
+ * one of the approximation techniques such as @ref
+ * setup_dh2matrix_aprx_inter_bem3d. Otherwise the
+ * behavior of the function is undefined.
+ * @attention The @ref _dclusterbasis "dclusterbasis" @f$ V_t @f$ and @f$ W_s @f$
+ * have to be computed before
+ * calling this function because some approximation schemes depend on information
+ * residing within the @ref _dclusterbasis "dclusterbasis".
+ *
+ * @param bem @ref _bem3d "bem3d" object containing all necessary information
+ * for computing the entries of @ref _h2matrix "h2matrix" <tt>G</tt> .
+ * @param G @ref _dh2matrix "dh2matrix" to be filled.
+ */
+HEADER_PREFIX void
+assemble_bem3d_farfield_dh2matrix(pbem3d bem, pdh2matrix G);
 
 /* ------------------------------------------------------------
- lagrange-polynomials
- ------------------------------------------------------------ */
+ * Lagrange polynomials
+ * ------------------------------------------------------------ */
 
 /**
  * @brief This function will integrate Lagrange polynomials on the boundary domain
@@ -2728,18 +3529,60 @@ HEADER_PREFIX void assemblehiercomp_bem3d_h2matrix(pbem3d bem, pblock b,
  * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
  * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
  *  -1 @f$ instead.
- * @param px A Vector of type @ref _avector "avector" that contains interpolation
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in x-direction.
- * @param py A Vector of type @ref _avector "avector" that contains interpolation
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in y-direction.
- * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in z-direction.
  * @param bem BEM-object containing additional information for computation
  * of the matrix entries.
  * @param V Matrix to store the computed results as stated above.
  */
-HEADER_PREFIX void assemble_bem3d_lagrange_const_amatrix(const uint *idx,
-    pcavector px, pcavector py, pcavector pz, pcbem3d bem, pamatrix V);
+HEADER_PREFIX void
+assemble_bem3d_lagrange_c_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcbem3d bem, pamatrix V);
+
+/**
+ * @brief This function will integrate modified Lagrange polynomials on
+ * the boundary domain using piecewise constant basis function and store
+ * the results in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{i\mu} := \int_\Gamma \, \varphi_i(\vec x) \, \mathcal
+ * L_{\mu, c} (\vec x) \, \mathrm d \vec x
+ * = \int_\Gamma \, \varphi_i(\vec x) \, \mathcal
+ * L_{\mu} (\vec x) \, e^{\langle c, \vec x \rangle} \, \mathrm d \vec x
+ * @f]
+ * with Lagrange polynomial @f$ \mathcal L_\mu (\vec x) @f$ defined as:
+ * @f[
+ * \mathcal L_\mu (\vec x) := \left( \prod_{\nu_1 = 1, \nu_1 \neq \mu_1}^m
+ * \frac{\xi_{\nu_1} - x_1}{\xi_{\nu_1} - \xi_{\mu_1}} \right) \cdot
+ * \left( \prod_{\nu_2 = 1, \nu_2 \neq \mu_2}^m
+ * \frac{\xi_{\nu_2} - x_2}{\xi_{\nu_2} - \xi_{\mu_2}} \right) \cdot
+ * \left( \prod_{\nu_3 = 1, \nu_3 \neq \mu_3}^m
+ * \frac{\xi_{\nu_3} - x_3}{\xi_{\nu_3} - \xi_{\mu_3}} \right)
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in x-direction.
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in y-direction.
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in z-direction.
+ * @param dir Direction vector for the direction @f$c@f$.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ */
+HEADER_PREFIX void
+assemble_bem3d_lagrange_wave_c_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix V);
 
 /**
  * @brief This function will integrate Lagrange polynomials on the boundary domain
@@ -2765,18 +3608,60 @@ HEADER_PREFIX void assemble_bem3d_lagrange_const_amatrix(const uint *idx,
  * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
  * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
  *  -1 @f$ instead.
- * @param px A Vector of type @ref _avector "avector" that contains interpolation
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in x-direction.
- * @param py A Vector of type @ref _avector "avector" that contains interpolation
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in y-direction.
- * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in z-direction.
  * @param bem BEM-object containing additional information for computation
  * of the matrix entries.
  * @param V Matrix to store the computed results as stated above.
  */
-HEADER_PREFIX void assemble_bem3d_lagrange_linear_amatrix(const uint *idx,
-    pcavector px, pcavector py, pcavector pz, pcbem3d bem, pamatrix V);
+HEADER_PREFIX void
+assemble_bem3d_lagrange_l_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcbem3d bem, pamatrix V);
+
+/**
+ * @brief This function will integrate modified Lagrange polynomials on the
+ * boundary domain using linear basis function and store the results in a
+ * matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{i\mu} := \int_\Gamma \, \varphi_i(\vec x) \, \mathcal
+ * L_{\mu, c} (\vec x) \, \mathrm d \vec x
+ * = \int_\Gamma \, \varphi_i(\vec x) \, \mathcal
+ * L_{\mu} (\vec x) \, e^{\langle c, \vec x \rangle} \, \mathrm d \vec x
+ * @f]
+ * with Lagrange polynomial @f$ \mathcal L_\mu (\vec x) @f$ defined as:
+ * @f[
+ * \mathcal L_\mu (\vec x) := \left( \prod_{\nu_1 = 1, \nu_1 \neq \mu_1}^m
+ * \frac{\xi_{\nu_1} - x_1}{\xi_{\nu_1} - \xi_{\mu_1}} \right) \cdot
+ * \left( \prod_{\nu_2 = 1, \nu_2 \neq \mu_2}^m
+ * \frac{\xi_{\nu_2} - x_2}{\xi_{\nu_2} - \xi_{\mu_2}} \right) \cdot
+ * \left( \prod_{\nu_3 = 1, \nu_3 \neq \mu_3}^m
+ * \frac{\xi_{\nu_3} - x_3}{\xi_{\nu_3} - \xi_{\mu_3}} \right)
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in x-direction.
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in y-direction.
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in z-direction.
+ * @param dir Direction vector for the direction @f$c@f$.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ */
+HEADER_PREFIX void
+assemble_bem3d_lagrange_wave_l_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix V);
 
 /**
  * @brief This function will integrate the normal derivatives of the Lagrange
@@ -2802,18 +3687,61 @@ HEADER_PREFIX void assemble_bem3d_lagrange_linear_amatrix(const uint *idx,
  * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
  * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
  *  -1 @f$ instead.
- * @param px A Vector of type @ref _avector "avector" that contains interpolation
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in x-direction.
- * @param py A Vector of type @ref _avector "avector" that contains interpolation
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in y-direction.
- * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in z-direction.
  * @param bem BEM-object containing additional information for computation
  * of the matrix entries.
  * @param V Matrix to store the computed results as stated above.
  */
-HEADER_PREFIX void assemble_bem3d_dn_lagrange_const_amatrix(const uint *idx,
-    pcavector px, pcavector py, pcavector pz, pcbem3d bem, pamatrix V);
+HEADER_PREFIX void
+assemble_bem3d_dn_lagrange_c_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcbem3d bem, pamatrix V);
+
+/**
+ * @brief This function will integrate the normal derivatives of the modified
+ * Lagrange polynomials on the boundary domain using piecewise constant basis
+ * function and store the results in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{i\mu} := \int_\Gamma \, \varphi_i(\vec x) \,
+ * \frac{\partial \mathcal L_{\mu, c}}{\partial n} (\vec x) \, \mathrm d \vec x
+ *   = \int_\Gamma \, \varphi_i(\vec x) \,
+ * \frac{\partial}{\partial n}  \left(\mathcal L_\mu (\vec x)
+ * \, e^{\langle c, \vec x \rangle} \right) \, \mathrm d \vec x
+ * @f]
+ * with Lagrange polynomial @f$ \mathcal L_\mu (\vec x) @f$ defined as:
+ * @f[
+ * \mathcal L_\mu (\vec x) := \left( \prod_{\nu_1 = 1, \nu_1 \neq \mu_1}^m
+ * \frac{\xi_{\nu_1} - x_1}{\xi_{\nu_1} - \xi_{\mu_1}} \right) \cdot
+ * \left( \prod_{\nu_2 = 1, \nu_2 \neq \mu_2}^m
+ * \frac{\xi_{\nu_2} - x_2}{\xi_{\nu_2} - \xi_{\mu_2}} \right) \cdot
+ * \left( \prod_{\nu_3 = 1, \nu_3 \neq \mu_3}^m
+ * \frac{\xi_{\nu_3} - x_3}{\xi_{\nu_3} - \xi_{\mu_3}} \right)
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in x-direction.
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in y-direction.
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in z-direction.
+ * @param dir Direction vector for the direction @f$c@f$.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ */
+HEADER_PREFIX void
+assemble_bem3d_dn_lagrange_wave_c_amatrix(const uint * idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix V);
 
 /**
  * @brief This function will integrate the normal derivatives of the Lagrange
@@ -2839,18 +3767,61 @@ HEADER_PREFIX void assemble_bem3d_dn_lagrange_const_amatrix(const uint *idx,
  * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
  * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
  *  -1 @f$ instead.
- * @param px A Vector of type @ref _avector "avector" that contains interpolation
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in x-direction.
- * @param py A Vector of type @ref _avector "avector" that contains interpolation
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in y-direction.
- * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in z-direction.
  * @param bem BEM-object containing additional information for computation
  * of the matrix entries.
  * @param V Matrix to store the computed results as stated above.
  */
-HEADER_PREFIX void assemble_bem3d_dn_lagrange_linear_amatrix(const uint *idx,
-    pcavector px, pcavector py, pcavector pz, pcbem3d bem, pamatrix V);
+HEADER_PREFIX void
+assemble_bem3d_dn_lagrange_l_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcbem3d bem, pamatrix V);
+
+/**
+ * @brief This function will integrate the normal derivatives of the modified
+ * Lagrange polynomials on the boundary domain using linear basis function
+ * and store the results in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{i\mu} := \int_\Gamma \, \varphi_i(\vec x) \,
+ * \frac{\partial \mathcal L_{\mu, c}}{\partial n} (\vec x) \, \mathrm d \vec x
+ * = \int_\Gamma \, \varphi_i(\vec x) \,
+ * \frac{\partial}{\partial n} \left( \mathcal L_\mu (\vec x)
+ * \, e^{\langle c, \vec x \rangle} \right) \, \mathrm d \vec x
+ * @f]
+ * with Lagrange polynomial @f$ \mathcal L_\mu (\vec x) @f$ defined as:
+ * @f[
+ * \mathcal L_\mu (\vec x) := \left( \prod_{\nu_1 = 1, \nu_1 \neq \mu_1}^m
+ * \frac{\xi_{\nu_1} - x_1}{\xi_{\nu_1} - \xi_{\mu_1}} \right) \cdot
+ * \left( \prod_{\nu_2 = 1, \nu_2 \neq \mu_2}^m
+ * \frac{\xi_{\nu_2} - x_2}{\xi_{\nu_2} - \xi_{\mu_2}} \right) \cdot
+ * \left( \prod_{\nu_3 = 1, \nu_3 \neq \mu_3}^m
+ * \frac{\xi_{\nu_3} - x_3}{\xi_{\nu_3} - \xi_{\mu_3}} \right)
+ * @f]
+ *
+ * @param idx This array describes the permutation of the degrees of freedom.
+ * Its length is determined by <tt>V->rows</tt> . In case <tt>idx == NULL</tt>
+ * it is assumed the degrees of freedom are @f$ 0, 1, \ldots , \texttt{V->rows}
+ *  -1 @f$ instead.
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in x-direction.
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in y-direction.
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in z-direction.
+ * @param dir Direction vector for the direction @f$c@f$.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ */
+HEADER_PREFIX void
+assemble_bem3d_dn_lagrange_wave_l_amatrix(const uint *idx, pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix V);
 
 /**
  * @brief This function will evaluate the Lagrange polynomials in a given point
@@ -2874,20 +3845,146 @@ HEADER_PREFIX void assemble_bem3d_dn_lagrange_linear_amatrix(const uint *idx,
  * component of the i-th vector. Analogously <tt>X[i][1]</tt> will be the second
  * component of the i-th vector. The length of this array is determined by
  * <tt>V->cols</tt> .
- * @param px A Vector of type @ref _avector "avector" that contains interpolation
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in x-direction.
- * @param py A Vector of type @ref _avector "avector" that contains interpolation
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in y-direction.
- * @param pz A Vector of type @ref _avector "avector" that contains interpolation
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
  * points in z-direction.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
  * @param V Matrix to store the computed results as stated above.
  */
-HEADER_PREFIX void assemble_bem3d_lagrange_amatrix(const real (*X)[3],
-    pcavector px, pcavector py, pcavector pz, pamatrix V);
+HEADER_PREFIX void
+assemble_bem3d_lagrange_amatrix(const real (*X)[3], pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcbem3d bem, pamatrix V);
+
+/**
+ * @brief This function will evaluate the modified Lagrange polynomials in a
+ * given point set <tt>X</tt> and store the results in a matrix <tt>V</tt>.
+ *
+ * The matrix entries of <tt>V</tt> will be computed as
+ * @f[
+ * \left( V \right)_{i\mu} :=  \mathcal L_{\mu, c} (\vec x_i)
+ *   =  \mathcal L_{\mu} (\vec x_i) \, e^{\langle c, \vec \vec x_i \rangle}
+ * @f]
+ * with Lagrange polynomial @f$ \mathcal L_\mu (\vec x) @f$ defined as:
+ * @f[
+ * \mathcal L_\mu (\vec x) := \left( \prod_{\nu_1 = 1, \nu_1 \neq \mu_1}^m
+ * \frac{\xi_{\nu_1} - x_1}{\xi_{\nu_1} - \xi_{\mu_1}} \right) \cdot
+ * \left( \prod_{\nu_2 = 1, \nu_2 \neq \mu_2}^m
+ * \frac{\xi_{\nu_2} - x_2}{\xi_{\nu_2} - \xi_{\mu_2}} \right) \cdot
+ * \left( \prod_{\nu_3 = 1, \nu_3 \neq \mu_3}^m
+ * \frac{\xi_{\nu_3} - x_3}{\xi_{\nu_3} - \xi_{\mu_3}} \right)
+ * @f]
+ *
+ * @param X An array of 3D-vectors. <tt>X[i][0]</tt> will be the first
+ * component of the i-th vector. Analogously <tt>X[i][1]</tt> will be the second
+ * component of the i-th vector. The length of this array is determined by
+ * <tt>V->cols</tt> .
+ * @param px A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in x-direction.
+ * @param py A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in y-direction.
+ * @param pz A Vector of type @ref _realavector "realavector" that contains interpolation
+ * points in z-direction.
+ * @param dir Direction vector for the direction @f$c@f$.
+ * @param bem BEM-object containing additional information for computation
+ * of the matrix entries.
+ * @param V Matrix to store the computed results as stated above.
+ */
+HEADER_PREFIX void
+assemble_bem3d_lagrange_wave_amatrix(const real (*X)[3], pcrealavector px,
+    pcrealavector py, pcrealavector pz, pcreal dir, pcbem3d bem, pamatrix V);
 
 /* ------------------------------------------------------------
- some useful functions
- ------------------------------------------------------------ */
+ * Some useful functions
+ * ------------------------------------------------------------ */
+
+/**
+ * @brief Compute the @f$L_2(\Gamma)@f$-norm of some given function @p f.
+ *
+ * @param bem BEM-object containing additional information for the computation.
+ * @param f Function for that the norm should be computed.
+ * @param data Additional data needed to evaluate the function @p f.
+ * @return @f$\lVert f \rVert_{L_2(\Gamma)}@f$ is returned.
+ */
+HEADER_PREFIX real
+normL2_bem3d(pbem3d bem, boundary_func3d f, void *data);
+
+/**
+ * @brief Compute the @f$L_2(\Gamma)@f$-norm of some given function @f$f@f$
+ * in terms of a piecewise constant basis
+ * @f$\left( \varphi_i \right)_{i \in \mathcal I}@f$.
+ *
+ * It holds
+ * @f[
+ * f(\vec x) = \sum_{i \in \mathcal I} x_i \varphi_i(\vec x)
+ * @f]
+ *
+ * @param bem BEM-object containing additional information for the computation.
+ * @param x Coefficient vector of @f$f@f$.
+ * @return @f$\lVert f \rVert_{L_2(\Gamma)}@f$ is returned.
+ */
+HEADER_PREFIX real
+normL2_c_bem3d(pbem3d bem, pavector x);
+
+/**
+ * @brief Compute the @f$L_2(\Gamma)@f$ difference norm of some given
+ * function @f$g@f$ in terms of a piecewise constant basis
+ * @f$\left( \varphi_i \right)_{i \in \mathcal I}@f$ and some other function
+ * @f$f@f$
+ *
+ * It holds
+ * @f[
+ * g(\vec x) = \sum_{i \in \mathcal I} x_i \varphi_i(\vec x)
+ * @f]
+ *
+ * @param bem BEM-object containing additional information for the computation.
+ * @param x Coefficient vector of @f$g@f$.
+ * @param f Function for that the norm should be computed.
+ * @param data Additional data needed to evaluate the function @p f.
+ * @return @f$\lVert g - f \rVert_{L_2(\Gamma)}@f$ is returned.
+ */
+HEADER_PREFIX real
+normL2diff_c_bem3d(pbem3d bem, pavector x, boundary_func3d f, void *data);
+
+/**
+ * @brief Compute the @f$L_2(\Gamma)@f$-norm of some given function @f$f@f$
+ * in terms of a piecewise linear basis
+ * @f$\left( \varphi_i \right)_{i \in \mathcal I}@f$.
+ *
+ * It holds
+ * @f[
+ * f(\vec x) = \sum_{i \in \mathcal I} x_i \varphi_i(\vec x)
+ * @f]
+ *
+ * @param bem BEM-object containing additional information for the computation.
+ * @param x Coefficient vector of @f$f@f$.
+ * @return @f$\lVert f \rVert_{L_2(\Gamma)}@f$ is returned.
+ */
+HEADER_PREFIX real
+normL2_l_bem3d(pbem3d bem, pavector x);
+
+/**
+ * @brief Compute the @f$L_2(\Gamma)@f$ difference norm of some given
+ * function @f$g@f$ in terms of a piecewise linear basis
+ * @f$\left( \varphi_i \right)_{i \in \mathcal I}@f$ and some other function
+ * @f$f@f$
+ *
+ * It holds
+ * @f[
+ * g(\vec x) = \sum_{i \in \mathcal I} x_i \varphi_i(\vec x)
+ * @f]
+ *
+ * @param bem BEM-object containing additional information for the computation.
+ * @param x Coefficient vector of @f$g@f$.
+ * @param f Function for that the norm should be computed.
+ * @param data Additional data needed to evaluate the function @p f.
+ * @return @f$\lVert g - f \rVert_{L_2(\Gamma)}@f$ is returned.
+ */
+HEADER_PREFIX real
+normL2diff_l_bem3d(pbem3d bem, pavector x, boundary_func3d f, void *data);
 
 /**
  * @brief Computes the integral of a given function using piecewise
@@ -2903,15 +4000,14 @@ HEADER_PREFIX void assemble_bem3d_lagrange_amatrix(const real (*X)[3],
  *
  * @param bem BEM-object containing additional information for computation
  * of the vector entries.
- * @param rhs This callback defines the function to be integrated. Its
+ * @param f This callback defines the function to be integrated. Its
  * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
- * @param f The integration coefficients are stored within this vector.
+ * @param w The integration coefficients are stored within this vector.
  * Therefore its length has to be at least <tt>bem->gr->triangles</tt>.
  * @param data Additional data for evaluating the functional
  */
 HEADER_PREFIX void
-integrate_bem3d_const_avector(pbem3d bem, boundary_func3d rhs, pavector f,
-    void *data);
+integrate_bem3d_c_avector(pbem3d bem, boundary_func3d f, pavector w, void *data);
 
 /**
  * @brief Computes the integral of a given function using piecewise
@@ -2927,15 +4023,14 @@ integrate_bem3d_const_avector(pbem3d bem, boundary_func3d rhs, pavector f,
  *
  * @param bem BEM-object containing additional information for computation
  * of the vector entries.
- * @param rhs This callback defines the function to be integrated. Its
+ * @param f This callback defines the function to be integrated. Its
  * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
- * @param f The integration coefficients are stored within this vector.
+ * @param w The integration coefficients are stored within this vector.
  * Therefore its length has to be at least <tt>bem->gr->vertices</tt>.
  * @param data Additional data for evaluating the functional
  */
 HEADER_PREFIX void
-integrate_bem3d_linear_avector(pbem3d bem, boundary_func3d rhs, pavector f,
-    void *data);
+integrate_bem3d_l_avector(pbem3d bem, boundary_func3d f, pavector w, void *data);
 
 /**
  * @brief Computes the @f$ L_2 @f$-projection of a given function using piecewise
@@ -2953,14 +4048,14 @@ integrate_bem3d_linear_avector(pbem3d bem, boundary_func3d rhs, pavector f,
  *
  * @param bem BEM-object containing additional information for computation
  * of the vector entries.
- * @param rhs This callback defines the function to be @f$ L_2 @f$ projected. Its
+ * @param f This callback defines the function to be @f$ L_2 @f$ projected. Its
  * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
- * @param f The @f$ L_2 @f$-projection coefficients are stored within this vector.
+ * @param w The @f$ L_2 @f$-projection coefficients are stored within this vector.
  * Therefore its length has to be at least <tt>bem->gr->triangles</tt>.
  * @param data Additional data for evaluating the functional
  */
-HEADER_PREFIX void projectl2_bem3d_const_avector(pbem3d bem,
-    boundary_func3d rhs, pavector f, void *data);
+HEADER_PREFIX void
+projectL2_bem3d_c_avector(pbem3d bem, boundary_func3d f, pavector w, void *data);
 
 /**
  * @brief Computes the @f$ L_2 @f$-projection of a given function using linear
@@ -2987,14 +4082,14 @@ HEADER_PREFIX void projectl2_bem3d_const_avector(pbem3d bem,
  *
  * @param bem BEM-object containing additional information for computation
  * of the vector entries.
- * @param rhs This callback defines the function to be @f$ L_2 @f$ projected. Its
+ * @param f This callback defines the function to be @f$ L_2 @f$ projected. Its
  * arguments are an evaluation 3D-vector <tt>x</tt> and its normal vector <tt>n</tt>.
- * @param f The @f$ L_2 @f$-projection coefficients are stored within this vector.
+ * @param w The @f$ L_2 @f$-projection coefficients are stored within this vector.
  * Therefore its length has to be at least <tt>bem->gr->triangles</tt>.
  * @param data Additional data for evaluating the functional
  */
-HEADER_PREFIX void projectl2_bem3d_linear_avector(pbem3d bem,
-    boundary_func3d rhs, pavector f, void *data);
+HEADER_PREFIX void
+projectL2_bem3d_l_avector(pbem3d bem, boundary_func3d f, pavector w, void *data);
 
 /**
  * @brief initializes the field <tt>bem->v2t</tt> when using linear basis
@@ -3003,7 +4098,8 @@ HEADER_PREFIX void projectl2_bem3d_linear_avector(pbem3d bem,
  * @param bem the @ref _bem3d "bem3d" object for which the vertex to triangle map
  * should be computed.
  */
-HEADER_PREFIX void setup_vertex_to_triangle_map_bem3d(pbem3d bem);
+HEADER_PREFIX void
+setup_vertex_to_triangle_map_bem3d(pbem3d bem);
 
 /**
  * @brief Generating quadrature points, weights and normal vectors on a cube
@@ -3064,8 +4160,8 @@ void build_bem3d_cube_quadpoints(pcbem3d bem, const real a[3], const real b[3],
  *
  * @return A rank-k-approximation of the current block is returned.
  */
-HEADER_PREFIX prkmatrix build_bem3d_rkmatrix(pccluster row, pccluster col,
-    void* data);
+HEADER_PREFIX prkmatrix
+build_bem3d_rkmatrix(pccluster row, pccluster col, void* data);
 
 /**
  * @brief For a block defined by <tt>row</tt> and <tt>col</tt> this function
@@ -3083,8 +4179,24 @@ HEADER_PREFIX prkmatrix build_bem3d_rkmatrix(pccluster row, pccluster col,
  *
  * @return Submatrix @f$ G_{|t \times s} @f$.
  */
-HEADER_PREFIX pamatrix build_bem3d_amatrix(pccluster row, pccluster col,
-    void* data);
+HEADER_PREFIX pamatrix
+build_bem3d_amatrix(pccluster row, pccluster col, void* data);
+
+/** @brief Set up the surface curl operator.
+ *
+ *  This function creates three @ref sparsematrix objects corresponding
+ *  to the first, second, and third coordinates of the surface curl
+ *  operator mapping linear nodal basis functions to piecewise constant
+ *  basis functions.
+ *
+ *  @param bem BEM object.
+ *  @param C0 First component, i.e., @f$c_{0,ij}=(\operatorname{curl}_\Gamma \varphi_j)_1|_{T_i}@f$
+ *  @param C1 Second component, i.e., @f$c_{1,ij}=(\operatorname{curl}_\Gamma \varphi_j)_2|_{T_i}@f$
+ *  @param C2 Third component, i.e., @f$c_{2,ij}=(\operatorname{curl}_\Gamma \varphi_j)_3|_{T_i}@f$
+ */
+HEADER_PREFIX void
+build_bem3d_curl_sparsematrix(pcbem3d bem, psparsematrix *C0, psparsematrix *C1,
+    psparsematrix *C2);
 
 /** @} */
 
