@@ -84,10 +84,10 @@ diageval_realavector_amatrix(field alpha, bool atrans, pcrealavector a,
  *
  *  @param alower Set if @f$A@f$ is lower triangular, otherwise it is
  *                assumed to be upper triangular.
+ *  @param aunit Set if @f$A@f$ has unit diagonal.
  *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
- *  @param aunit Set of @f$A@f$ has unit diagonal.
  *  @param a Triangular matrix @f$A@f$.
- *  @param x Right-hand side @f$b@f$, gets overwritten by solution @f$x@f$ */
+ *  @param x Right-hand side @f$b@f$, gets overwritten by solution @f$x@f$. */
 HEADER_PREFIX void
 triangularsolve_amatrix_avector(bool alower, bool aunit, bool atrans,
     pcamatrix a, pavector x);
@@ -97,8 +97,8 @@ triangularsolve_amatrix_avector(bool alower, bool aunit, bool atrans,
  *
  *  @param alower Set if @f$A@f$ is lower triangular, otherwise
  *         it is assumed to be upper triangular.
- *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
  *  @param aunit Set if @f$A@f$ has unit diagonal.
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
  *  @param a Triangular matrix @f$A@f$.
  *  @param x Right-hand side @f$B@f$, gets overwritten by solution @f$X@f$.
  *  @param xtrans Set if @f$X^*@f$ has to be used instead of @f$X@f$. */
@@ -111,7 +111,7 @@ triangularsolve_amatrix(bool alower, bool aunit, bool atrans, pcamatrix a,
  *  @param alower Set if @f$A@f$ is lower triangular, otherwise
  *         it is assumed to be upper triangular.
  *  @param aunit Set if @f$A@f$ has unit diagonal.
- *  @param atrans
+ *  @param atrans Set if @f$A^*@f$ is to be used instead of @f$A@f$.
  *  @param a Triangular matrix @f$A@f$.
  *  @param x Right-hand side vector @f$x@f$, gets overwritten by @f$b@f$. */
 HEADER_PREFIX void
