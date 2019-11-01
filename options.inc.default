@@ -61,6 +61,9 @@ HARITH_RKMATRIX_QUICK_EXIT=1
 # (i.e., do not recompress the target matrix)
 #HARITH_AMATRIX_QUICK_EXIT=1
 
+# Do nothing if a zero sparsematrix is added to an amatrix
+HARITH_SPARSEMATRIX_QUICK_EXIT=1
+
 # Trace allocation/deallocation of memory. 
 # (consumes extra memory per allocation)
 #TRACE_MEMORY=1
