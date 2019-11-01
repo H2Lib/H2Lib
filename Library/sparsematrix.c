@@ -29,10 +29,6 @@ new_raw_sparsematrix(uint rows, uint cols, uint nz)
   sp->cols = cols;
   sp->nz = nz;
 
-  for (i = 0; i < rows + 1; ++i) {
-    sp->row[i] = 0;
-  }
-
   return sp;
 }
 
