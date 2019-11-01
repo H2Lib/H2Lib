@@ -203,9 +203,9 @@ solve_gmres_avector(void *A, addeval_t addeval_A, pcavector b, pavector x,
   init_gmres(addeval_A, A, b, x, rhat, q, &k, qr, tau);
   error = residualnorm_gmres(rhat, k);
 
-  iter = 0;
+  iter = 0;  
   while (error > eps * norm && iter + 1 != maxiter) {
-    if (k + 1 >= kmax) {
+    if (k + 1 >= kmax && iter != 0) {
       finish_gmres(addeval_A, A, b, x, rhat, q, &k, qr, tau);
     }
 
@@ -214,7 +214,9 @@ solve_gmres_avector(void *A, addeval_t addeval_A, pcavector b, pavector x,
 
     iter++;
   }
-  finish_gmres(addeval_A, A, b, x, rhat, q, &k, qr, tau);
+  if (iter != 0) {
+    finish_gmres(addeval_A, A, b, x, rhat, q, &k, qr, tau);
+  }
 
   del_avector(tau);
   del_amatrix(qr);
@@ -300,7 +302,7 @@ solve_pgmres_avector(void *A, addeval_t addeval_A, prcd_t prcd,
 
   iter = 0;
   while (error > eps * norm && iter + 1 != maxiter) {
-    if (k + 1 >= kmax) {
+    if (k + 1 >= kmax && iter != 0) {
       finish_pgmres(addeval_A, A, prcd, pdata, b, x, rhat, q, &k, qr, tau);
     }
 
@@ -310,7 +312,7 @@ solve_pgmres_avector(void *A, addeval_t addeval_A, prcd_t prcd,
     iter++;
   }
 
-  if (k > 0)
+  if (k > 0 && iter != 0)
     finish_pgmres(addeval_A, A, prcd, pdata, b, x, rhat, q, &k, qr, tau);
 
   del_avector(tau);
