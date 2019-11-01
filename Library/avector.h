@@ -177,6 +177,24 @@ new_sub_avector(pavector src, uint dim, uint off);
 HEADER_PREFIX pavector
 new_zero_avector(uint dim);
 
+/** @brief Create a new @ref avector object using a column vector of a
+ *  given matrix.
+ *
+ *  Allocates storage for the object an sets up its components by
+ *  using part of the storage of an @ref amatrix corresponding to
+ *  one of its columns.
+ *  Changes to the coefficients of the new vector also change the column
+ *  of the source matrix.
+ * 
+ *  @remark Should always be matched by a call to @ref del_avector that
+ *  will <em>not</em> release the coefficient storage.
+ * 
+ *  @param src Source matrix.
+ *  @param col Column of the source matrix that will be used for the vector.
+ *  @returns New @ref avector object. */
+HEADER_PREFIX pavector
+new_column_avector(pamatrix src, uint col);
+
 /** @brief Create a new @ref avector object using a given array for
  *  the coefficients.
  *

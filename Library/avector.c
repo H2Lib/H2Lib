@@ -156,6 +156,18 @@ new_zero_avector(uint dim)
 }
 
 pavector
+new_column_avector(pamatrix src, uint col)
+{
+  pavector  v;
+
+  v = (pavector) allocmem(sizeof(avector));
+
+  init_column_avector(v, src, col);
+
+  return v;
+}
+
+pavector
 new_pointer_avector(pfield src, uint dim)
 {
   pavector  v;
