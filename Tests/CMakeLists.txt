@@ -8,11 +8,16 @@ set(TESTS
    helmholtzbem3d_ocl
    hmatrix
    krylov
+   krylovsolvers
    laplacebem2d
    laplacebem3d
    laplacebem3d_ocl
    tet3d
+   tet3dp1
+   tet3drt0
    tri2d
+   tri2dp1
+   tri2drt0
    )
 
 include_directories(${PROJECT_SOURCE_DIR}/Library)
