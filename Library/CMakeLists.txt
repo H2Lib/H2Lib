@@ -11,7 +11,14 @@ set(H2LIB_SRCS
    clustergeometry.c
    clusteroperator.c
    curve2d.c
+   dblock.c
+   dclusterbasis.c
+   dcluster.c
+   dclusteroperator.c
    ddcluster.c
+   dh2compression.c
+   dh2matrix.c
+   duniform.c
    eigensolvers.c
    factorizations.c
    gaussquad.c
@@ -26,10 +33,12 @@ set(H2LIB_SRCS
    helmholtzoclbem3d.c
    hmatrix.c
    krylov.c
+   krylovsolvers.c
    laplacebem2d.c
    laplacebem3d.c
    laplaceoclbem3d.c
    macrosurface3d.c
+   matrixnorms.c
    oclbem3d.c
    opencl.c
    parameters.c
@@ -43,10 +52,13 @@ set(H2LIB_SRCS
    surface3d.c
    tet3d.c
    tet3dp1.c
+   tet3drt0.c
    tri2d.c
    tri2dp1.c
+   tri2drt0.c
    truncation.c
    uniform.c
+   visualize.c
    )
 set(H2LIB_HDRS
    aca.h
@@ -63,7 +75,14 @@ set(H2LIB_HDRS
    cluster.h
    clusteroperator.h
    curve2d.h
+   dblock.h
+   dclusterbasis.h
+   dcluster.h
+   dclusteroperator.h
    ddcluster.h
+   dh2compression.h
+   dh2matrix.h
+   duniform.h
    eigensolvers.h
    factorizations.h
    gaussquad.h
@@ -78,16 +97,21 @@ set(H2LIB_HDRS
    helmholtzoclbem3d.h
    hmatrix.h
    krylov.h
+   krylovsolvers.h
    laplacebem2d.h
    laplacebem3d.h
    laplaceoclbem3d.h
    macrosurface3d.h
+   matrixnorms.h
    oclbem3d.h
    opencl.h
    parameters.h
    realavector.h
    rkmatrix.h
    settings.h
+   simd_avx.h
+   simd.h
+   simd_sse2.h
    singquad1d.h
    singquad2d.h
    sparsematrix.h
@@ -95,10 +119,13 @@ set(H2LIB_HDRS
    surface3d.h
    tet3d.h
    tet3dp1.h
+   tet3drt0.h
    tri2d.h
    tri2dp1.h
+   tri2drt0.h
    truncation.h
    uniform.h
+   visualize.h
    )
 
 add_library(H2LIB ${H2LIB_SRCS} ${H2LIB_HDRS})
