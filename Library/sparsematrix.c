@@ -29,10 +29,6 @@ new_raw_sparsematrix(uint rows, uint cols, uint nz)
   sp->cols = cols;
   sp->nz = nz;
 
-  for (i = 0; i < rows + 1; ++i) {
-    sp->row[i] = 0;
-  }
-
   return sp;
 }
 
@@ -438,10 +434,10 @@ add_sparsematrix_amatrix(field alpha, bool atrans, pcsparsematrix a,
       assert(b->cols == rows);
 
       for (i = 0; i < rows; i++) {
-	for (k = row[i]; k < row[i + 1]; k++) {
-	  j = col[k];
-	  b->a[j + i * ldb] += alpha * coeff[k];
-	}
+        for (k = row[i]; k < row[i + 1]; k++) {
+        j = col[k];
+        b->a[j + i * ldb] += alpha * coeff[k];
+        }
       }
     }
     else {
@@ -449,10 +445,10 @@ add_sparsematrix_amatrix(field alpha, bool atrans, pcsparsematrix a,
       assert(b->cols == cols);
 
       for (i = 0; i < rows; i++) {
-	for (k = row[i]; k < row[i + 1]; k++) {
-	  j = col[k];
-	  b->a[i + j * ldb] += alpha * coeff[k];
-	}
+        for (k = row[i]; k < row[i + 1]; k++) {
+          j = col[k];
+          b->a[i + j * ldb] += alpha * coeff[k];
+        }
       }
     }
   }

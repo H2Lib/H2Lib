@@ -53,7 +53,7 @@ typedef stopwatch *pstopwatch;
 /** @brief Reasonable cut-off depth for parallelization. */
 extern int max_pardepth;
 
-/** @brief "Machine accuracy" for some algorithms */
+/** @brief "Machine accuracy" for some algorithms. */
 #define H2_MACH_EPS 1e-13
 
 /* ------------------------------------------------------------
@@ -105,7 +105,7 @@ uninit_h2lib();
 
 
 /**
- * @brief Current amount of allocated memory (bytes)
+ * @brief Current amount of allocated memory (bytes).
  * @return Current amount of currently allocated memory is returned.
  */
 HEADER_PREFIX size_t
@@ -218,7 +218,7 @@ get_current_memory();
 #define REAL_TAN(x) tan(x)
 #endif
 
-/** @brief Compute the square root @f$\sqrt{x}@f$ of a non-negative real nunber @f$x@f$. */
+/** @brief Compute the square root @f$\sqrt{x}@f$ of a non-negative real number @f$x@f$. */
 #ifdef USE_FLOAT
 #define REAL_SQRT(x) sqrtf(x)
 #else
@@ -226,7 +226,7 @@ get_current_memory();
 #endif
 
 /** @brief Compute the reciprocal square root @f$1.0/\sqrt{x}@f$ of a
- *  non-negative real nunber @f$x@f$. */
+ *  non-negative real number @f$x@f$. */
 #define REAL_RSQRT(x) _h2_rsqrt(x)
 
 /** @brief Compute the @f$y@f$-th power @f$x^y@f$ of a real number @f$x@f$. */
@@ -243,7 +243,7 @@ get_current_memory();
 #define REAL_LOG(x) log(x)
 #endif
 
-/** @brief Compute the exponetial function @f$\exp(x)@f$ of a real number @f$x@f$. */
+/** @brief Compute the exponential function @f$\exp(x)@f$ of a real number @f$x@f$. */
 #ifdef USE_FLOAT
 #define REAL_EXP(x) expf(x)
 #else
@@ -321,7 +321,7 @@ get_current_memory();
 /** @brief Compute the maximum @f$\max\{x,y,z\}@f$ of three unsigned integers @f$x,y@f$ and @f$z@f$. */
 #define UINT_MAX3(x, y, z) _h2_uintmax3(x, y, z)
 
-/** @brief Compute the minimum @f$\min\{x,y,z\}@f$ of two unsigned integers @f$x,y@f$ and @f$z@f$. */
+/** @brief Compute the minimum @f$\min\{x,y\}@f$ of two unsigned integers @f$x@f$ and @f$y@f$. */
 #define UINT_MIN(x, y) _h2_uintmin(x, y)
 
 /** @brief Compute the minimum @f$\min\{x,y,z\}@f$ of three unsigned integers @f$x,y@f$ and @f$z@f$. */
@@ -347,8 +347,8 @@ INLINE_PREFIX real _h2_realrand();
 #endif
 
 /** @brief Compute the reciprocal square root @f$1.0/\sqrt{x}@f$ of a
- *  non-negative real nunber @f$x@f$.
- *  @param x Input value
+ *  non-negative real number @f$x@f$.
+ *  @param x Input value.
  */
 INLINE_PREFIX real _h2_rsqrt(real x) {
   return r_one / REAL_SQRT(x);
@@ -535,7 +535,7 @@ _h2_allocuint(size_t sz, const char *filename, int line);
 
 /** @brief Allocate heap storage of type @ref real.
  *
- *  @param sz Number of @ref real variables
+ *  @param sz Number of @ref real variables.
  *  @returns Pointer to <tt>sz</tt> variables of type @ref real. */
 #define allocreal(sz) _h2_allocreal(sz,__FILE__,__LINE__)
 /** @brief Allocate heap storage of type @ref real.
