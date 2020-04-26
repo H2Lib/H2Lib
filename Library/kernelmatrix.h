@@ -84,18 +84,41 @@ del_kernelmatrix(pkernelmatrix km);
 HEADER_PREFIX pclustergeometry
 creategeometry_kernelmatrix(pckernelmatrix km);
 
+/** @brief Fill nearfield matrices.
+ *
+ *  @param ridx Row indices.
+ *  @param cidx Column indices.
+ *  @param km Description of the kernel matrix.
+ *  @param N Nearfield matrix to be filled. */
 HEADER_PREFIX void
 fillN_kernelmatrix(const uint *ridx, const uint *cidx, pckernelmatrix km,
 		   pamatrix N);
 
+/** @brief Fill coupling matrices with interpolation coefficients.
+ *
+ *  @param rc Row cluster.
+ *  @param cc Column cluster.
+ *  @param km Description of the kernel matrix.
+ *  @param S Coupling matrix to be filled. */
 HEADER_PREFIX void
 fillS_kernelmatrix(pccluster rc, pccluster cc,
 		   pckernelmatrix km, pamatrix S);
 
+/** @brief Fill leaf matrices for Lagrange interpolation.
+ *
+ *  @param tc Cluster.
+ *  @param km Description of the kernel matrix.
+ *  @param V Leaf matrix to be filled. */
 HEADER_PREFIX void
 fillV_kernelmatrix(pccluster tc,
 		   pckernelmatrix km, pamatrix V);
 
+/** @brief Fill transfer matrices for Lagrange interpolation.
+ *
+ *  @param sc Son cluster.
+ *  @param fc Father cluster.
+ *  @param km Description of the kernel matrix.
+ *  @param E Transfer matrix to be filled. */
 HEADER_PREFIX void
 fillE_kernelmatrix(pccluster sc, pccluster fc,
 		   pckernelmatrix km, pamatrix E);
