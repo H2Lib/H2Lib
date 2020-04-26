@@ -30,7 +30,8 @@ H2LIB_CORE2 = \
 	Library/h2matrix.c \
 	Library/rkmatrix.c \
 	Library/hmatrix.c \
-	Library/krylovsolvers.c
+	Library/krylovsolvers.c \
+	Library/kernelmatrix.c
 
 H2LIB_CORE3 = \
 	Library/truncation.c \
@@ -111,6 +112,7 @@ SOURCES_tests := \
 	Tests/test_eigen.c \
 	Tests/test_hmatrix.c \
 	Tests/test_h2matrix.c \
+	Tests/test_kernelmatrix.c \
 	Tests/test_krylov.c \
 	Tests/test_krylovsolvers.c \
 	Tests/test_laplacebem2d.c \
