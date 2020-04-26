@@ -189,7 +189,7 @@ step_cg(addeval_t addeval, void *matrix, pcavector b, pavector x,
 
   add_avector(-lambda, a, r);	/* r = r - lambda a */
 
-  mu = dotprod_avector(r, a) / gamma;	/* p = r - mu p */
+  mu = dotprod_avector(a, r) / gamma; /* p = r - mu p */
   scale_avector(-mu, p);
   add_avector(1.0, r, p);
 }
@@ -255,8 +255,9 @@ step_pcg(addeval_t addeval, void *matrix, prcd_t prcd, void *pdata, pcavector b,
   if (prcd)
     prcd(pdata, q);
 
-  mu = dotprod_avector(q, a) / gamma;	/* p = r - mu p */
-  scale_avector(-mu, p);
+  mu = dotprod_avector(a, q) / gamma; /* mu = <a, q> / <p, a> */
+  
+  scale_avector(-mu, p);	/* p = r - mu p */
   add_avector(1.0, q, p);
 }
 
