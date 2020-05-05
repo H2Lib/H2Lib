@@ -141,7 +141,6 @@ struct _weightsdata {
   bool      Gtrans;
 };
 
-
 static    real
 norm2_fast_uniform(pcuniform u, pcclusteroperator rw, pcclusteroperator cw)
 {
@@ -3714,6 +3713,7 @@ addrow_comp(pccluster rc, pcamatrix G, pcblock b, pctruncmode tm,
   pcomppassive cp;
   pamatrix  Ahat;
   const uint *ridx, *cidx;
+  longindex ldAhat, ldG;
   uint      rsize, csize;
   real      norm, weight;
   uint      rsons, csons;
@@ -3757,11 +3757,13 @@ addrow_comp(pccluster rc, pcamatrix G, pcblock b, pctruncmode tm,
     *active = ca;
 
     /* Copy entries from original matrix G */
+    ldAhat = Ahat->ld;
+    ldG = G->ld;
     ridx = b->rc->idx;
     cidx = b->cc->idx;
     for (j = 0; j < csize; j++)
       for (i = 0; i < rsize; i++)
-	Ahat->a[i + j * Ahat->ld] = G->a[ridx[i] + cidx[j] * G->ld];
+	Ahat->a[i + j * ldAhat] = G->a[ridx[i] + cidx[j] * ldG];
 
     /* Compute weight factor if necessary */
     weight = 1.0;
@@ -3782,6 +3784,7 @@ addcol_comp(pccluster cc, pcamatrix G, pcblock b, pctruncmode tm,
   pcomppassive cp;
   pamatrix  Bhat;
   const uint *ridx, *cidx;
+  longindex ldBhat, ldG;
   uint      rsize, csize;
   real      norm, weight;
   uint      rsons, csons;
@@ -3825,11 +3828,13 @@ addcol_comp(pccluster cc, pcamatrix G, pcblock b, pctruncmode tm,
     *active = ca;
 
     /* Copy entries from original matrix G */
+    ldBhat = Bhat->ld;
+    ldG = G->ld;
     ridx = b->rc->idx;
     cidx = b->cc->idx;
     for (j = 0; j < rsize; j++)
       for (i = 0; i < csize; i++)
-	Bhat->a[i + j * Bhat->ld] = G->a[ridx[j] + cidx[i] * G->ld];
+	Bhat->a[i + j * ldBhat] = G->a[ridx[j] + cidx[i] * ldG];
 
     /* Compute weight factor if necessary */
     weight = 1.0;
@@ -4083,6 +4088,7 @@ build_projected_amatrix_h2matrix(pcamatrix G, pcblock b,
   pclusterbasis rb1, cb1;
   pccluster rc, cc;
   const uint *ridx, *cidx;
+  longindex ldf, ldG;
   uint      rsize, csize;
   uint      rsons, csons;
   uint      i, j;
@@ -4131,9 +4137,11 @@ build_projected_amatrix_h2matrix(pcamatrix G, pcblock b,
     assert(h2->f->rows == rc->size);
     assert(h2->f->cols == cc->size);
 
+    ldf = f->ld;
+    ldG = G->ld;
     for (j = 0; j < csize; j++)
       for (i = 0; i < rsize; i++)
-	f->a[i + j * f->ld] = G->a[ridx[i] + cidx[j] * G->ld];
+	f->a[i + j * ldf] = G->a[ridx[i] + cidx[j] * ldG];
   }
 
   update_h2matrix(h2);

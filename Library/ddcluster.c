@@ -1,8 +1,6 @@
 
-
 #include "basic.h"
 #include "ddcluster.h"
-
 
 #include <stdio.h>
 
@@ -137,8 +135,6 @@ build_regular_interface_cluster(pclustergeometry cg, uint size, uint * idx,
   update_cluster(c);
   return c;
 }
-
-
 
 pcluster
 build_regular_dd_cluster(pclustergeometry cg, uint size, uint * idx, uint clf,
@@ -653,8 +649,8 @@ build_adaptive_dd_cluster(pclustergeometry cg, uint size, uint * idx,
 }
 
 /**************************************************************
- *Cluterstrategy basing on Clusterstrategy for the triangles
- * ************************************************************/
+ * Clusterstrategy based on Clusterstrategy for the triangles
+ **************************************************************/
 
 pcluster
 build_adaptive_interface_fromcluster_cluster(pcluster c1, pcluster c2,

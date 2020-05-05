@@ -242,7 +242,6 @@ norml2_tet3dp1(pctet3dp1 dc,
 HEADER_PREFIX pclustergeometry
 build_tet3dp1_clustergeometry(pctet3dp1 p1, uint *idx);
 
-
 /** @} */
 
 #endif
