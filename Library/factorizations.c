@@ -2589,7 +2589,7 @@ qrdecomp_rank_amatrix(pamatrix a, pavector tau, pctruncmode tm, real eps,
 
       if (colpiv) {
 	j = colpiv[k];
-	colpiv[k] = jmax;
+	colpiv[k] = colpiv[jmax];
 	colpiv[jmax] = j;
       }
     }
