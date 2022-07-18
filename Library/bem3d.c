@@ -3039,6 +3039,10 @@ assemble_ll_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 		       bool ntrans, pamatrix N, kernel_func3d kernel)
 {
   const pcsurface3d gr = bem->gr;
+  const real(*gr_x)[3] = (const real(*)[3]) gr->x;
+  const uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
+  const real(*gr_n)[3] = (const real(*)[3]) gr->n;
+  const preal gr_g = (const preal) gr->g;
   const uint triangles = gr->triangles;
   plistnode *v2t = bem->v2t;
   field    *aa = N->a;
@@ -3119,11 +3123,6 @@ field **current_thread_quad;
     quad = allocfield(bem->sq->nmax);;
     for (s = 0, tl1_c = tl_c; s < cj; s++, tl1_c = tl1_c->next) {
 #endif
-        const real(*gr_x)[3] = (const real(*)[3]) gr->x;
-        const uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
-        const real(*gr_n)[3] = (const real(*)[3]) gr->n;
-        const preal gr_g = (const preal) gr->g;
-
         uint t, k, l, tt, ss, q, nq, vnq, jj;
         const real *A_t, *B_t, *C_t, *A_s, *B_s, *C_s, *nt, *ns;
         pvert_list vl_r, vl_c;
