@@ -3039,32 +3039,21 @@ assemble_ll_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
 		       bool ntrans, pamatrix N, kernel_func3d kernel)
 {
   const pcsurface3d gr = bem->gr;
-  const     real(*gr_x)[3] = (const real(*)[3]) gr->x;
-  const     uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
-  const     real(*gr_n)[3] = (const real(*)[3]) gr->n;
+  const real(*gr_x)[3] = (const real(*)[3]) gr->x;
+  const uint(*gr_t)[3] = (const uint(*)[3]) gr->t;
+  const real(*gr_n)[3] = (const real(*)[3]) gr->n;
   const preal gr_g = (const preal) gr->g;
   const uint triangles = gr->triangles;
   plistnode *v2t = bem->v2t;
-  field    *quad;
   field    *aa = N->a;
   uint      rows = ntrans ? N->cols : N->rows;
   uint      cols = ntrans ? N->rows : N->cols;
   longindex ld = N->ld;
 
-  ptri_list tl_r, tl1_r, tl_c, tl1_c;
-  pvert_list vl_r, vl_c;
-  const real *A_t, *B_t, *C_t, *A_s, *B_s, *C_s, *nt, *ns;
-  const uint *tri_t, *tri_s;
+    ptri_list tl_r, tl1_r, tl_c, tl1_c;
   plistnode v;
-  real     *xq, *yq, *wq, *ww;
-  uint      tp[3], sp[3], tri_tp[3], tri_sp[3];
-  real      Ax, Bx, Cx, Ay, By, Cy, tx, sx, ty, sy, x[3], y[3], factor,
-    factor2, base;
-  field     res;
-  real     *mass;
-  uint      i, j, t, s, k, l, rj, cj, tt, ss, q, nq, vnq, ii, jj, vv;
-
-  quad = allocfield(bem->sq->nmax);
+  uint      i, j, s, rj, cj, ii, vv;
+  field    *quad;
 
   clear_amatrix(N);
 
@@ -3115,138 +3104,186 @@ assemble_ll_near_bem3d(const uint * ridx, const uint * cidx, pcbem3d bem,
     }
   }
 
+#ifdef USE_OPENMP
+field **current_thread_quad;
+#pragma omp parallel if(!omp_in_parallel()) num_threads(1 << max_pardepth) shared(current_thread_quad)
+  {
+#pragma omp single
+  {
+      current_thread_quad = (field **) malloc(omp_get_num_threads() * sizeof(field *));
+      for (i = 0; i < omp_get_num_threads(); ++i)
+          current_thread_quad[i] = allocfield(bem->sq->nmax);
+
   for (s = 0, tl1_c = tl_c; s < cj; s++, tl1_c = tl1_c->next) {
-    ss = tl1_c->t;
-    assert(ss < triangles);
-    factor = gr_g[ss] * bem->kernel_const;
-    tri_s = gr_t[ss];
-    ns = gr_n[ss];
-    for (t = 0, tl1_r = tl_r; t < rj; t++, tl1_r = tl1_r->next) {
-      tt = tl1_r->t;
-      assert(tt < triangles);
-      factor2 = factor * gr_g[tt];
-      tri_t = gr_t[tt];
-      nt = gr_n[tt];
 
-      select_quadrature_singquad2d(bem->sq, tri_t, tri_s, tp, sp, &xq, &yq,
-				   &wq, &nq, &base);
-      vnq = ROUNDUP(nq, VREAL);
+#pragma omp task default(shared)  private(i, j, ii, quad) firstprivate(tl_r, tl1_r, tl_c, tl1_c)
+{
+    quad = current_thread_quad[omp_get_thread_num()];
+#else
+    quad = allocfield(bem->sq->nmax);;
+    for (s = 0, tl1_c = tl_c; s < cj; s++, tl1_c = tl1_c->next) {
+#endif
+        uint t, k, l, tt, ss, q, nq, vnq, jj;
+        const real *A_t, *B_t, *C_t, *A_s, *B_s, *C_s, *nt, *ns;
+        pvert_list vl_r, vl_c;
+        const uint *tri_t, *tri_s;
+        real *xq, *yq, *wq, *ww;
+        uint tp[3], sp[3], tri_tp[3], tri_sp[3];
+        real Ax, Bx, Cx, Ay, By, Cy, tx, sx, ty, sy, x[3], y[3], factor,
+                factor2, base;
+        field res;
+        real *mass;
 
-      for (i = 0; i < 3; ++i) {
-	tri_tp[i] = tri_t[tp[i]];
-	tri_sp[i] = tri_s[sp[i]];
-      }
+        ss = tl1_c->t;
+        assert(ss < triangles);
+        factor = gr_g[ss] * bem->kernel_const;
+        tri_s = gr_t[ss];
+        ns = gr_n[ss];
 
-      A_t = gr_x[tri_tp[0]];
-      B_t = gr_x[tri_tp[1]];
-      C_t = gr_x[tri_tp[2]];
-      A_s = gr_x[tri_sp[0]];
-      B_s = gr_x[tri_sp[1]];
-      C_s = gr_x[tri_sp[2]];
+        for (t = 0, tl1_r = tl_r; t < rj && tl1_r != NULL; t++, tl1_r = tl1_r->next) {
+            tt = tl1_r->t;
+            assert(tt < triangles);
+            factor2 = factor * gr_g[tt];
+            tri_t = gr_t[tt];
+            nt = gr_n[tt];
 
-      for (q = 0; q < nq; ++q) {
-	tx = xq[q];
-	sx = xq[q + vnq];
-	ty = yq[q];
-	sy = yq[q + vnq];
-	Ax = 1.0 - tx;
-	Bx = tx - sx;
-	Cx = sx;
-	Ay = 1.0 - ty;
-	By = ty - sy;
-	Cy = sy;
+            select_quadrature_singquad2d(bem->sq, tri_t, tri_s, tp, sp, &xq, &yq,
+                                         &wq, &nq, &base);
+            vnq = ROUNDUP(nq, VREAL);
 
-	x[0] = A_t[0] * Ax + B_t[0] * Bx + C_t[0] * Cx;
-	x[1] = A_t[1] * Ax + B_t[1] * Bx + C_t[1] * Cx;
-	x[2] = A_t[2] * Ax + B_t[2] * Bx + C_t[2] * Cx;
-	y[0] = A_s[0] * Ay + B_s[0] * By + C_s[0] * Cy;
-	y[1] = A_s[1] * Ay + B_s[1] * By + C_s[1] * Cy;
-	y[2] = A_s[2] * Ay + B_s[2] * By + C_s[2] * Cy;
+            for (i = 0; i < 3; ++i) {
+                tri_tp[i] = tri_t[tp[i]];
+                tri_sp[i] = tri_s[sp[i]];
+            }
 
-	quad[q] = kernel(x, y, nt, ns, (void *) bem);
-      }
+            A_t = gr_x[tri_tp[0]];
+            B_t = gr_x[tri_tp[1]];
+            C_t = gr_x[tri_tp[2]];
+            A_s = gr_x[tri_sp[0]];
+            B_s = gr_x[tri_sp[1]];
+            C_s = gr_x[tri_sp[2]];
 
-      vl_c = tl1_c->vl;
-      while (vl_c) {
-	j = vl_c->v;
-	assert(j < cols);
-	jj = ((cidx == NULL) ? j : cidx[j]);
-	for (k = 0; k < 3; ++k) {
-	  if (jj == tri_sp[k]) {
-	    vl_r = tl1_r->vl;
-	    while (vl_r) {
-	      i = vl_r->v;
-	      assert(i < rows);
-	      ii = ((ridx == NULL) ? i : ridx[i]);
-	      for (l = 0; l < 3; ++l) {
-		if (ii == tri_tp[l]) {
-		  res = base;
+            for (q = 0; q < nq; ++q) {
+                tx = xq[q];
+                sx = xq[q + vnq];
+                ty = yq[q];
+                sy = yq[q + vnq];
+                Ax = 1.0 - tx;
+                Bx = tx - sx;
+                Cx = sx;
+                Ay = 1.0 - ty;
+                By = ty - sy;
+                Cy = sy;
 
-		  ww = wq + (l + k * 3) * vnq;
-		  for (q = 0; q < nq; ++q) {
-		    res += ww[q] * quad[q];
-		  }
+                x[0] = A_t[0] * Ax + B_t[0] * Bx + C_t[0] * Cx;
+                x[1] = A_t[1] * Ax + B_t[1] * Bx + C_t[1] * Cx;
+                x[2] = A_t[2] * Ax + B_t[2] * Bx + C_t[2] * Cx;
+                y[0] = A_s[0] * Ay + B_s[0] * By + C_s[0] * Cy;
+                y[1] = A_s[1] * Ay + B_s[1] * By + C_s[1] * Cy;
+                y[2] = A_s[2] * Ay + B_s[2] * By + C_s[2] * Cy;
 
-		  if (ntrans) {
-		    aa[j + i * ld] += CONJ(res * factor2);
-		  }
-		  else {
-		    aa[i + j * ld] += res * factor2;
-		  }
-		}
-	      }
-	      vl_r = vl_r->next;
-	    }
-	  }
-	}
-	vl_c = vl_c->next;
-      }
+                quad[q] = kernel(x, y, nt, ns, (void *) bem);
+            }
 
-      if (bem->alpha != 0.0 && tt == ss) {
-	for (i = 0; i < 3; ++i) {
-	  tri_tp[i] = tri_t[i];
-	  tri_sp[i] = tri_s[i];
-	}
+            vl_c = tl1_c->vl;
+            while (vl_c) {
+                j = vl_c->v;
+                assert(j < cols);
+                jj = ((cidx == NULL) ? j : cidx[j]);
+                for (k = 0; k < 3; ++k) {
+                    if (jj == tri_sp[k]) {
+                        vl_r = tl1_r->vl;
+                        while (vl_r) {
+                            i = vl_r->v;
+                            assert(i < rows);
+                            ii = ((ridx == NULL) ? i : ridx[i]);
+                            for (l = 0; l < 3; ++l) {
+                                if (ii == tri_tp[l]) {
+                                    res = base;
 
-	mass = bem->mass;
-	factor2 = bem->alpha * gr_g[tt];
+                                    ww = wq + (l + k * 3) * vnq;
+                                    for (q = 0; q < nq; ++q) {
+                                        res += ww[q] * quad[q];
+                                    }
 
-	vl_c = tl1_c->vl;
-	while (vl_c) {
-	  j = vl_c->v;
-	  assert(j < cols);
-	  jj = ((cidx == NULL) ? j : cidx[j]);
-	  for (k = 0; k < 3; ++k) {
-	    if (jj == tri_sp[k]) {
-	      vl_r = tl1_r->vl;
-	      while (vl_r) {
-		i = vl_r->v;
-		assert(i < rows);
-		ii = ((ridx == NULL) ? i : ridx[i]);
-		for (l = 0; l < 3; ++l) {
-		  if (ii == tri_tp[l]) {
-		    if (ntrans) {
-		      aa[j + i * ld] += CONJ(mass[l + k * 3] * factor2);
-		    }
-		    else {
-		      aa[i + j * ld] += mass[l + k * 3] * factor2;
-		    }
-		  }
-		}
-		vl_r = vl_r->next;
-	      }
-	    }
-	  }
-	  vl_c = vl_c->next;
-	}
+                                    if (ntrans) {
+                                    #ifdef USE_OPENMP
+                                        #pragma omp atomic
+                                    #endif
+                                        aa[j + i * ld] += CONJ(res * factor2);
+                                    } else {
+                                    #ifdef USE_OPENMP
+                                        #pragma omp atomic
+                                    #endif
+                                        aa[i + j * ld] += res * factor2;
+                                    }
+                                }
+                            }
+                            vl_r = vl_r->next;
+                        }
+                    }
+                }
+                vl_c = vl_c->next;
+            }
+            if (bem->alpha != 0.0 && tt == ss) {
+                for (i = 0; i < 3; ++i) {
+                    tri_tp[i] = tri_t[i];
+                    tri_sp[i] = tri_s[i];
+                }
+
+                mass = bem->mass;
+                factor2 = bem->alpha * gr_g[tt];
+
+                vl_c = tl1_c->vl;
+                while (vl_c) {
+                    j = vl_c->v;
+                    assert(j < cols);
+                    jj = ((cidx == NULL) ? j : cidx[j]);
+                    for (k = 0; k < 3; ++k) {
+                        if (jj == tri_sp[k]) {
+                            vl_r = tl1_r->vl;
+                            while (vl_r) {
+                                i = vl_r->v;
+                                assert(i < rows);
+                                ii = ((ridx == NULL) ? i : ridx[i]);
+                                for (l = 0; l < 3; ++l) {
+                                    if (ii == tri_tp[l]) {
+                                        if (ntrans) {
+                                        #ifdef USE_OPENMP
+                                            #pragma omp atomic
+                                        #endif
+                                            aa[j + i * ld] += CONJ(mass[l + k * 3] * factor2);
+                                        } else {
+                                        #ifdef USE_OPENMP
+                                            #pragma omp atomic
+                                        #endif
+                                            aa[i + j * ld] += mass[l + k * 3] * factor2;
+                                        }
+                                    }
+                                }
+                                vl_r = vl_r->next;
+                            }
+                        }
+                    }
+                    vl_c = vl_c->next;
+                }
+            }
+        }
+#ifdef USE_OPENMP
+        }
       }
     }
   }
-
+  for (i = 0; i < omp_get_num_threads(); ++i)
+      freemem(current_thread_quad[i]);
+  free(current_thread_quad);
+  current_thread_quad = NULL;
+#else
+    }
+    freemem(quad);
+#endif
   del_tri_list(tl_r);
   del_tri_list(tl_c);
-
-  freemem(quad);
 }
 
 #ifdef USE_SIMD

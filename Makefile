@@ -200,12 +200,14 @@ Library/helmholtzoclbem3d.c: Library/helmholtzbem3d.cl
 # Build configuration
 # ------------------------------------------------------------
 
+ifndef IGNORE_DEFAULT_READING
 ifeq ($(wildcard options.inc),)
 $(OBJECTS): options.inc.default
 include options.inc.default
 else
 $(OBJECTS): options.inc
 include options.inc
+endif
 endif
 
 # ------------------------------------------------------------
