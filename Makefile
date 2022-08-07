@@ -54,7 +54,8 @@ H2LIB_DIRECTIONAL = \
 	Library/dh2compression.c \
 	Library/dclusteroperator.c
 
-H2LIB_SIMPLE =
+H2LIB_SIMPLE = \
+	Library/ie1d.c
 
 H2LIB_FEM = \
 	Library/tri2d.c \

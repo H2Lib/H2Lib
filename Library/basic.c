@@ -1,7 +1,8 @@
+
 /* ------------------------------------------------------------
- This is the file "basic.c" of the H2Lib package.
- All rights reserved, Steffen Boerm 2009
- ------------------------------------------------------------ */
+ * This is the file "basic.c" of the H2Lib package.
+ * All rights reserved, Steffen Boerm 2009
+ * ------------------------------------------------------------ */
 
 #include "basic.h"
 
