@@ -341,6 +341,13 @@ identity_hmatrix(phmatrix hm);
 HEADER_PREFIX void
 random_hmatrix(phmatrix hm, uint kmax);
 
+/** @brief Scale an @ref h2matrix by a factor.
+ *
+ * @param alpha Scaling factor @f$\alpha@f$.
+ * @param h2 Target matrix @f$G@f$, will be overwritten by @f$\alpha G@f$. */
+HEADER_PREFIX void
+scale_hmatrix(field alpha, phmatrix hm);
+
 /* ------------------------------------------------------------
  * Build H-matrix based on block tree
  * ------------------------------------------------------------ */

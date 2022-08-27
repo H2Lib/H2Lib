@@ -455,6 +455,24 @@ random_hmatrix(phmatrix hm, uint kmax)
   }
 }
 
+void
+scale_hmatrix(field alpha, phmatrix hm)
+{
+  uint      rsons = hm->rsons;
+  uint      csons = hm->csons;
+  uint      i, j;
+
+  if (hm->son) {
+    for (j = 0; j < csons; j++)
+      for (i = 0; i < rsons; i++)
+	scale_hmatrix(alpha, hm->son[i + j * rsons]);
+  }
+  else if (hm->r)
+    scale_rkmatrix(alpha, hm->r);
+  else if (hm->f)
+    scale_amatrix(alpha, hm->f);
+}
+
 /* ------------------------------------------------------------
  * Build H-matrix based on block tree
  * ------------------------------------------------------------ */
