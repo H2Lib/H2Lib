@@ -156,7 +156,7 @@ del_rkmatrix(prkmatrix r);
  *
  *  @param r Target matrix.
  *  @param k New rank. */
-void
+HEADER_PREFIX void
 setrank_rkmatrix(prkmatrix r, uint k);
 
 /** @brief Change the size of an @ref rkmatrix.
@@ -170,7 +170,7 @@ setrank_rkmatrix(prkmatrix r, uint k);
  *  @param rows New number of rows.
  *  @param cols New number of columns.
  *  @param k New rank. */
-void
+HEADER_PREFIX void
 resize_rkmatrix(prkmatrix r, uint rows, uint cols, uint k);
 
 /* ------------------------------------------------------------
