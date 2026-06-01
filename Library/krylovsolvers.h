@@ -331,7 +331,7 @@ solve_gmres_dh2matrix_avector(pcdh2matrix A, pcavector b, pavector x, real eps,
  *         means that the number of iterations is not bounded.
  *  @param kmax Maximal dimension of Krylov subspace.
  *  @returns Number of iterations. */
-uint
+HEADER_PREFIX uint
 solve_pgmres_avector(void* A, addeval_t addeval_A, prcd_t prcd, void *pdata,
     pcavector b, pavector x, real eps, uint maxiter, uint kmax);
 
@@ -349,7 +349,7 @@ solve_pgmres_avector(void* A, addeval_t addeval_A, prcd_t prcd, void *pdata,
  *         means that the number of iterations is not bounded.
  *  @param kmax Maximal dimension of Krylov subspace.
  *  @returns Number of iterations. */
-uint
+HEADER_PREFIX uint
 solve_pgmres_amatrix_avector(pcamatrix A, prcd_t prcd, void *pdata, pcavector b,
     pavector x, real eps, uint maxiter, uint kmax);
 
@@ -367,7 +367,7 @@ solve_pgmres_amatrix_avector(pcamatrix A, prcd_t prcd, void *pdata, pcavector b,
  *         means that the number of iterations is not bounded.
  *  @param kmax Maximal dimension of Krylov subspace.
  *  @returns Number of iterations. */
-uint
+HEADER_PREFIX uint
 solve_pgmres_sparsematrix_avector(pcsparsematrix A, prcd_t prcd, void *pdata,
     pcavector b, pavector x, real eps, uint maxiter, uint kmax);
 
@@ -385,7 +385,7 @@ solve_pgmres_sparsematrix_avector(pcsparsematrix A, prcd_t prcd, void *pdata,
  *         means that the number of iterations is not bounded.
  *  @param kmax Maximal dimension of Krylov subspace.
  *  @returns Number of iterations. */
-uint
+HEADER_PREFIX uint
 solve_pgmres_hmatrix_avector(pchmatrix A, prcd_t prcd, void *pdata, pcavector b,
     pavector x, real eps, uint maxiter, uint kmax);
 
@@ -403,7 +403,7 @@ solve_pgmres_hmatrix_avector(pchmatrix A, prcd_t prcd, void *pdata, pcavector b,
  *         means that the number of iterations is not bounded.
  *  @param kmax Maximal dimension of Krylov subspace.
  *  @returns Number of iterations. */
-uint
+HEADER_PREFIX uint
 solve_pgmres_h2matrix_avector(pch2matrix A, prcd_t prcd, void *pdata,
     pcavector b, pavector x, real eps, uint maxiter, uint kmax);
 
@@ -421,7 +421,7 @@ solve_pgmres_h2matrix_avector(pch2matrix A, prcd_t prcd, void *pdata,
  *         means that the number of iterations is not bounded.
  *  @param kmax Maximal dimension of Krylov subspace.
  *  @returns Number of iterations. */
-uint
+HEADER_PREFIX uint
 solve_pgmres_dh2matrix_avector(pcdh2matrix A, prcd_t prcd, void *pdata,
     pcavector b, pavector x, real eps, uint maxiter, uint kmax);
 
